@@ -67,7 +67,7 @@ export default function DayView() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md bg-gray-50 px-4 py-6 text-gray-900">
+    <main className="px-4 py-6 text-gray-900">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold">Hoy</h1>
         <p className="text-sm text-gray-500">{formatToday(today)}</p>
