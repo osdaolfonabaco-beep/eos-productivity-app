@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import DayView from './components/DayView'
 import HabitsView from './components/HabitsView'
+import WeekView from './components/WeekView'
 
-type View = 'day' | 'habits'
+type View = 'day' | 'week' | 'habits'
 
 function Tab({
   label,
@@ -32,11 +33,14 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-md bg-gray-50">
-      <div className="pb-24">{view === 'day' ? <DayView /> : <HabitsView />}</div>
+      <div className="pb-24">
+        {view === 'day' ? <DayView /> : view === 'week' ? <WeekView /> : <HabitsView />}
+      </div>
 
       <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-2">
+        <div className="grid grid-cols-3">
           <Tab label="Hoy" active={view === 'day'} onClick={() => setView('day')} />
+          <Tab label="Semana" active={view === 'week'} onClick={() => setView('week')} />
           <Tab
             label="Hábitos"
             active={view === 'habits'}

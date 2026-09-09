@@ -43,3 +43,14 @@ export function addDays(isoDate: string, n: number): string {
   base.setDate(base.getDate() + n)
   return toISODate(base)
 }
+
+/**
+ * El lunes de la semana que contiene `isoDate`, como `YYYY-MM-DD`.
+ * La semana va de lunes a domingo.
+ */
+export function startOfWeekISO(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const dayOfWeek = new Date(y, m - 1, d).getDay() // 0 = domingo … 6 = sábado
+  const sinceMonday = (dayOfWeek + 6) % 7
+  return addDays(isoDate, -sinceMonday)
+}

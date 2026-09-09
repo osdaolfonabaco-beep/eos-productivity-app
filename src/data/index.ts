@@ -7,7 +7,7 @@
 
 export type { Habit, HabitEntry, EntryStatus } from './types'
 
-export { isISODate, toISODate, todayISO, addDays } from './dates'
+export { isISODate, toISODate, todayISO, addDays, startOfWeekISO } from './dates'
 
 export {
   listHabits,
