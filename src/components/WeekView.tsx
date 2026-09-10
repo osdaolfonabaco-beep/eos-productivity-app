@@ -140,7 +140,7 @@ export default function WeekView() {
                 <Fragment key={h.id}>
                   <div
                     title={h.name}
-                    className="self-center break-words border-t border-gray-100 px-2 py-2 text-right text-sm text-gray-800"
+                    className="self-center break-words border-t border-gray-100 px-2 py-2 text-right text-sm font-medium text-gray-800"
                   >
                     {h.name}
                   </div>
@@ -170,7 +170,9 @@ export default function WeekView() {
 
               {habits.map((h) => (
                 <div key={h.id} className="mt-3 border-t border-gray-100 pt-3">
-                  <p className="mb-1 break-words text-left text-sm text-gray-800">{h.name}</p>
+                  <p className="mb-1 break-words text-left text-sm font-medium text-gray-800">
+                    {h.name}
+                  </p>
                   <div className="grid grid-cols-7 overflow-hidden rounded-lg border border-gray-100">
                     {days.map((iso) => (
                       <StatusCell
