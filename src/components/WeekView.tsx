@@ -41,7 +41,9 @@ function formatRange(start: string, end: string): string {
 /** Cabecera de un día: inicial + número; resaltada si es hoy. */
 function DayHead({ iso, letter, isToday }: { iso: string; letter: string; isToday: boolean }) {
   return (
-    <div className={`pb-2 text-sm ${isToday ? 'font-bold text-gray-900' : 'text-gray-500'}`}>
+    <div
+      className={`pb-2 pt-1 text-sm ${isToday ? 'font-bold text-gray-900' : 'text-gray-500'}`}
+    >
       <div>{letter}</div>
       <div
         className={
@@ -128,7 +130,7 @@ export default function WeekView() {
       ) : (
         <>
           {wide ? (
-            <div className="grid grid-cols-[minmax(0,1fr)_repeat(7,2rem)] text-center text-base">
+            <div className="grid grid-cols-[minmax(0,13rem)_repeat(7,minmax(2rem,1fr))] overflow-hidden rounded-lg border border-gray-200 text-center text-base">
               <div />
               {days.map((iso, i) => (
                 <DayHead key={iso} iso={iso} letter={DAY_LETTERS[i]} isToday={iso === today} />
@@ -138,7 +140,7 @@ export default function WeekView() {
                 <Fragment key={h.id}>
                   <div
                     title={h.name}
-                    className="self-center break-words border-t border-gray-100 py-2 pr-2 text-left text-sm text-gray-800"
+                    className="self-center break-words border-t border-gray-100 px-2 py-2 text-right text-sm text-gray-800"
                   >
                     {h.name}
                   </div>
