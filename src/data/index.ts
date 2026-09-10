@@ -5,7 +5,7 @@
  * internos y nunca de `localStorage`.
  */
 
-export type { Habit, HabitEntry, EntryStatus } from './types'
+export type { Habit, HabitEntry, EntryStatus, Debt, Payment, DebtStatus } from './types'
 
 export { isISODate, toISODate, todayISO, addDays, startOfWeekISO } from './dates'
 
@@ -22,3 +22,18 @@ export {
   clearEntry,
   entryStatus,
 } from './store'
+
+export type { DebtInput } from './finance'
+
+export {
+  listDebts,
+  getDebt,
+  createDebt,
+  updateDebt,
+  archiveDebt,
+  getPayments,
+  addPayment,
+  deletePayment,
+  sumPayments,
+  debtBalance,
+} from './finance'

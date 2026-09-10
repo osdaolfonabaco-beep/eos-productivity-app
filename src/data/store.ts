@@ -1,43 +1,17 @@
 /**
- * El módulo de datos.
+ * El módulo de datos de hábitos.
  *
- * TODO el acceso al almacenamiento pasa por aquí: ningún componente lee ni
- * escribe `localStorage` directamente. Hoy los datos viven en `localStorage`;
- * el día que eso cambie a una base de datos sincronizada, este es el único
- * archivo que hay que tocar.
- *
- * No guarda estado en memoria: cada lectura vuelve a `localStorage`, así que
- * `localStorage` es siempre la única fuente de verdad y no hay copias que
- * puedan quedar desincronizadas.
+ * Ningún componente lee ni escribe `localStorage` directamente: pasa por aquí,
+ * y el acceso crudo vive en `storage.ts`. No guarda estado en memoria: cada
+ * lectura vuelve a `localStorage`, así que es siempre la única fuente de verdad.
  */
 
 import { isISODate } from './dates'
+import { newId, readList, writeList } from './storage'
 import type { EntryStatus, Habit, HabitEntry } from './types'
 
 const HABITS_KEY = 'productividad.habits'
 const ENTRIES_KEY = 'productividad.entries'
-
-// --- Acceso crudo a localStorage (privado) --------------------------------
-
-function readList<T>(key: string): T[] {
-  try {
-    const raw = localStorage.getItem(key)
-    if (!raw) return []
-    const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as T[]) : []
-  } catch {
-    // localStorage no disponible, o JSON corrupto: se trata como "sin datos".
-    return []
-  }
-}
-
-function writeList<T>(key: string, list: T[]): void {
-  localStorage.setItem(key, JSON.stringify(list))
-}
-
-function newId(): string {
-  return crypto.randomUUID()
-}
 
 // --- Hábitos -------------------------------------------------------------
 

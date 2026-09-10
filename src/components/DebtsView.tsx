@@ -1,0 +1,188 @@
+import { useCallback, useEffect, useState } from 'react'
+import {
+  createDebt,
+  debtBalance,
+  getDebt,
+  getPayments,
+  listDebts,
+  sumPayments,
+  updateDebt,
+  type Debt,
+  type DebtInput,
+} from '../data'
+import { formatCOP, formatRate } from '../money'
+import DebtDetail from './DebtDetail'
+import DebtForm from './DebtForm'
+import DebtStatusChip from './DebtStatusChip'
+
+/** Navegación interna de la pestaña, sin librería de rutas. */
+type Screen =
+  | { name: 'list' }
+  | { name: 'new' }
+  | { name: 'detail'; debtId: string }
+  | { name: 'edit'; debtId: string }
+
+interface Row {
+  debt: Debt
+  balance: number
+  paid: number
+}
+
+function FormScreen({
+  title,
+  initial,
+  onSubmit,
+  onCancel,
+}: {
+  title: string
+  initial?: Debt
+  onSubmit: (values: DebtInput) => void
+  onCancel: () => void
+}) {
+  return (
+    <main className="px-4 py-6 text-gray-900">
+      <button type="button" onClick={onCancel} className="text-sm text-gray-600">
+        ‹ Deudas
+      </button>
+      <h1 className="mb-4 mt-3 text-2xl font-semibold">{title}</h1>
+      <DebtForm initial={initial} onSubmit={onSubmit} onCancel={onCancel} />
+    </main>
+  )
+}
+
+export default function DebtsView() {
+  const [screen, setScreen] = useState<Screen>({ name: 'list' })
+  const [rows, setRows] = useState<Row[]>([])
+
+  const load = useCallback(() => {
+    setRows(
+      listDebts().map((debt) => {
+        const payments = getPayments(debt.id)
+        return { debt, balance: debtBalance(debt, payments), paid: sumPayments(payments) }
+      }),
+    )
+  }, [])
+
+  // Recarga la lista cada vez que se vuelve a ella (tras crear, editar,
+  // archivar o registrar/borrar un pago).
+  useEffect(() => {
+    if (screen.name === 'list') load()
+  }, [screen, load])
+
+  if (screen.name === 'new') {
+    return (
+      <FormScreen
+        title="Nueva deuda"
+        onCancel={() => setScreen({ name: 'list' })}
+        onSubmit={(values) => {
+          createDebt(values)
+          setScreen({ name: 'list' })
+        }}
+      />
+    )
+  }
+
+  if (screen.name === 'edit') {
+    return (
+      <FormScreen
+        title="Editar deuda"
+        initial={getDebt(screen.debtId)}
+        onCancel={() => setScreen({ name: 'detail', debtId: screen.debtId })}
+        onSubmit={(values) => {
+          updateDebt(screen.debtId, values)
+          setScreen({ name: 'detail', debtId: screen.debtId })
+        }}
+      />
+    )
+  }
+
+  if (screen.name === 'detail') {
+    return (
+      <DebtDetail
+        debtId={screen.debtId}
+        onBack={() => setScreen({ name: 'list' })}
+        onEdit={() => setScreen({ name: 'edit', debtId: screen.debtId })}
+      />
+    )
+  }
+
+  const totalBalance = rows.reduce((t, r) => t + Math.max(0, r.balance), 0)
+  const totalPaid = rows.reduce((t, r) => t + r.paid, 0)
+  const totalOpening = rows.reduce((t, r) => t + r.debt.openingBalance, 0)
+  const progress =
+    totalOpening > 0 ? Math.min(100, Math.round((totalPaid / totalOpening) * 100)) : 0
+
+  return (
+    <main className="px-4 py-6 text-gray-900">
+      <h1 className="mb-4 text-2xl font-semibold">Deudas</h1>
+
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">
+          No tienes deudas registradas.
+        </p>
+      ) : (
+        <>
+          <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-sm text-gray-500">Saldo total</p>
+            <p className="text-3xl font-semibold tabular-nums">{formatCOP(totalBalance)}</p>
+            <p className="mt-1 text-sm text-gray-600">
+              Abonado {formatCOP(totalPaid)} de {formatCOP(totalOpening)}
+            </p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="h-full rounded-full bg-gray-900"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          <ul className="flex flex-col gap-3">
+            {rows.map(({ debt, balance, paid }) => {
+              const settled = balance <= 0
+              return (
+                <li key={debt.id}>
+                  <button
+                    type="button"
+                    onClick={() => setScreen({ name: 'detail', debtId: debt.id })}
+                    className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 truncate font-medium">{debt.name}</span>
+                      {settled ? (
+                        <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                          ✓ Saldada
+                        </span>
+                      ) : (
+                        <DebtStatusChip status={debt.status} />
+                      )}
+                    </div>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      {formatCOP(Math.max(0, balance))}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Abonado {formatCOP(paid)}
+                      {debt.monthlyPayment > 0 && ` · cuota ${formatCOP(debt.monthlyPayment)}`}
+                    </p>
+                    {debt.annualRate != null && (
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {formatRate(debt.annualRate)} % E.A.
+                      </p>
+                    )}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setScreen({ name: 'new' })}
+        className="mt-6 w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white"
+      >
+        + Nueva deuda
+      </button>
+    </main>
+  )
+}
