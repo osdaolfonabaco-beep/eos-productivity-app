@@ -9,6 +9,17 @@
  */
 
 /**
+ * Las claves de `localStorage` de todo el proyecto. Un único inventario de qué
+ * se guarda: es también lo que exporta e importa el respaldo (`backup.ts`).
+ */
+export const KEYS = {
+  habits: 'productividad.habits',
+  entries: 'productividad.entries',
+  debts: 'productividad.debts',
+  payments: 'productividad.payments',
+} as const
+
+/**
  * Lee la lista guardada bajo `key`. Si no hay nada, si el JSON está corrupto o
  * si `localStorage` no está disponible, devuelve `[]`.
  */

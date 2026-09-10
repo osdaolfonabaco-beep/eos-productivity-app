@@ -7,11 +7,11 @@
  */
 
 import { isISODate } from './dates'
-import { newId, readList, writeList } from './storage'
+import { KEYS, newId, readList, writeList } from './storage'
 import type { EntryStatus, Habit, HabitEntry } from './types'
 
-const HABITS_KEY = 'productividad.habits'
-const ENTRIES_KEY = 'productividad.entries'
+const HABITS_KEY = KEYS.habits
+const ENTRIES_KEY = KEYS.entries
 
 // --- Hábitos -------------------------------------------------------------
 

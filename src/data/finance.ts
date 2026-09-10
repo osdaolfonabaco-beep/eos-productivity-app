@@ -6,11 +6,11 @@
  */
 
 import { isISODate } from './dates'
-import { newId, readList, writeList } from './storage'
+import { KEYS, newId, readList, writeList } from './storage'
 import type { Debt, DebtStatus, Payment } from './types'
 
-const DEBTS_KEY = 'productividad.debts'
-const PAYMENTS_KEY = 'productividad.payments'
+const DEBTS_KEY = KEYS.debts
+const PAYMENTS_KEY = KEYS.payments
 
 /** Los campos que la interfaz puede fijar al crear o editar una deuda. */
 export interface DebtInput {

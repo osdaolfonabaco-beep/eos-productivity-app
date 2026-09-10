@@ -37,3 +37,7 @@ export {
   sumPayments,
   debtBalance,
 } from './finance'
+
+export type { BackupFile, BackupData } from './backup'
+
+export { exportAll, parseBackup, applyBackup, importAll } from './backup'
