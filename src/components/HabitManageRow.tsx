@@ -69,7 +69,7 @@ export default function HabitManageRow({ name, onRename, onDelete }: HabitManage
   if (mode === 'confirm-delete') {
     return (
       <div className="rounded-xl border border-rose-300 bg-rose-50 p-3">
-        <p className="truncate text-lg text-gray-900">{name}</p>
+        <p className="break-words text-lg text-gray-900">{name}</p>
         <p className="mt-1 text-sm text-gray-600">Se archivará. El historial se conserva.</p>
         <div className="mt-2 flex gap-2">
           <button
@@ -93,7 +93,7 @@ export default function HabitManageRow({ name, onRename, onDelete }: HabitManage
 
   return (
     <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3">
-      <span className="min-w-0 flex-1 truncate text-lg text-gray-900">{name}</span>
+      <span className="min-w-0 flex-1 break-words text-lg text-gray-900">{name}</span>
       <button
         type="button"
         onClick={startEdit}

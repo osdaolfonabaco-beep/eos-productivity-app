@@ -101,7 +101,7 @@ export default function HabitRow({ name, status, onCycle }: HabitRowProps) {
         <Glyph status={status} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-lg text-gray-900">{name}</span>
+        <span className="break-words text-lg text-gray-900">{name}</span>
         <span className={`text-sm ${meta.word}`}>{meta.label}</span>
       </span>
     </button>

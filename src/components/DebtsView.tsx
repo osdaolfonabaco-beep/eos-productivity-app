@@ -147,7 +147,7 @@ export default function DebtsView() {
                     className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left"
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="min-w-0 truncate font-medium">{debt.name}</span>
+                      <span className="min-w-0 break-words font-medium">{debt.name}</span>
                       {settled ? (
                         <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
                           ✓ Saldada

@@ -9,6 +9,7 @@ import {
   type EntryStatus,
   type Habit,
 } from '../data'
+import { useMediaQuery } from '../useMediaQuery'
 
 /** Iniciales de lunes a domingo. X para miércoles, para no chocar con martes. */
 const DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
@@ -37,14 +38,58 @@ function formatRange(start: string, end: string): string {
   return `${startText} – ${endText}`
 }
 
+/** Cabecera de un día: inicial + número; resaltada si es hoy. */
+function DayHead({ iso, letter, isToday }: { iso: string; letter: string; isToday: boolean }) {
+  return (
+    <div className={`pb-2 text-sm ${isToday ? 'font-bold text-gray-900' : 'text-gray-500'}`}>
+      <div>{letter}</div>
+      <div
+        className={
+          isToday
+            ? 'mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-white'
+            : 'mt-0.5'
+        }
+      >
+        {Number(iso.slice(8, 10))}
+      </div>
+    </div>
+  )
+}
+
+/** Una casilla de estado. Los bordes los pone cada disposición con `className`. */
+function StatusCell({
+  status,
+  isToday,
+  className = '',
+}: {
+  status: EntryStatus
+  isToday: boolean
+  className?: string
+}) {
+  const cell = CELL[status]
+  return (
+    <div
+      className={`flex items-center justify-center py-2 ${cell.className} ${
+        isToday ? 'ring-1 ring-inset ring-gray-200' : ''
+      } ${className}`}
+    >
+      <span aria-hidden="true">{cell.glyph}</span>
+      <span className="sr-only">{cell.label}</span>
+    </div>
+  )
+}
+
 /**
- * La vista de semana: una cuadrícula de hábitos × 7 días (lunes a domingo) con
- * lo cumplido en cada día. Solo lectura: marcar se hace en la pestaña "Hoy".
+ * La vista de semana: hábitos × 7 días (lunes a domingo) con lo cumplido.
+ * Solo lectura: marcar se hace en la pestaña "Hoy". Siempre la semana actual.
  *
- * Muestra siempre la semana actual; no hay navegación a otras semanas en la v1.
+ * Dos disposiciones: en pantalla ancha, tabla con la columna del nombre
+ * quedándose todo el espacio libre; en estrecha, el nombre completo en su
+ * línea y debajo sus 7 casillas a lo ancho.
  */
 export default function WeekView() {
   const today = todayISO()
+  const wide = useMediaQuery('(min-width: 480px)')
   const monday = useMemo(() => startOfWeekISO(today), [today])
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(monday, i)),
@@ -55,7 +100,6 @@ export default function WeekView() {
   const [habits, setHabits] = useState<Habit[]>([])
   // Clave `${habitId}|${date}` → estado. Lo que no está en el mapa es "sin responder".
   const [statuses, setStatuses] = useState<Map<string, EntryStatus>>(new Map())
-  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     setHabits(listHabits())
@@ -83,65 +127,62 @@ export default function WeekView() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-[5.5rem_repeat(7,1fr)] text-center text-base">
-            {/* Cabecera: esquina vacía + los 7 días */}
-            <div />
-            {days.map((d, i) => {
-              const isToday = d === today
-              return (
-                <div
-                  key={d}
-                  className={`pb-2 text-sm ${isToday ? 'font-bold text-gray-900' : 'text-gray-500'}`}
-                >
-                  <div>{DAY_LETTERS[i]}</div>
-                  <div
-                    className={
-                      isToday
-                        ? 'mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-white'
-                        : 'mt-0.5'
-                    }
-                  >
-                    {Number(d.slice(8, 10))}
-                  </div>
-                </div>
-              )
-            })}
+          {wide ? (
+            <div className="grid grid-cols-[minmax(0,1fr)_repeat(7,2rem)] text-center text-base">
+              <div />
+              {days.map((iso, i) => (
+                <DayHead key={iso} iso={iso} letter={DAY_LETTERS[i]} isToday={iso === today} />
+              ))}
 
-            {/* Una fila por hábito: nombre + 7 celdas */}
-            {habits.map((h) => {
-              const expanded = expandedId === h.id
-              return (
+              {habits.map((h) => (
                 <Fragment key={h.id}>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(expanded ? null : h.id)}
+                  <div
                     title={h.name}
-                    aria-label={`${h.name}. Tocar para ver el nombre completo.`}
-                    className={`block w-full border-t border-gray-100 py-2 pr-1 text-left text-sm text-gray-800 ${
-                      expanded ? 'whitespace-normal break-words' : 'truncate'
-                    }`}
+                    className="self-center break-words border-t border-gray-100 py-2 pr-2 text-left text-sm text-gray-800"
                   >
                     {h.name}
-                  </button>
-                  {days.map((d) => {
-                    const cell = CELL[statusAt(h.id, d)]
-                    const isToday = d === today
-                    return (
-                      <div
-                        key={d}
-                        className={`flex items-center justify-center border-l border-t border-gray-100 py-2 ${cell.className} ${
-                          isToday ? 'ring-1 ring-inset ring-gray-200' : ''
-                        }`}
-                      >
-                        <span aria-hidden="true">{cell.glyph}</span>
-                        <span className="sr-only">{cell.label}</span>
-                      </div>
-                    )
-                  })}
+                  </div>
+                  {days.map((iso) => (
+                    <StatusCell
+                      key={iso}
+                      status={statusAt(h.id, iso)}
+                      isToday={iso === today}
+                      className="border-l border-t border-gray-100"
+                    />
+                  ))}
                 </Fragment>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-base">
+              <div className="grid grid-cols-7">
+                {days.map((iso, i) => (
+                  <DayHead
+                    key={iso}
+                    iso={iso}
+                    letter={DAY_LETTERS[i]}
+                    isToday={iso === today}
+                  />
+                ))}
+              </div>
+
+              {habits.map((h) => (
+                <div key={h.id} className="mt-3 border-t border-gray-100 pt-3">
+                  <p className="mb-1 break-words text-left text-sm text-gray-800">{h.name}</p>
+                  <div className="grid grid-cols-7 overflow-hidden rounded-lg border border-gray-100">
+                    {days.map((iso) => (
+                      <StatusCell
+                        key={iso}
+                        status={statusAt(h.id, iso)}
+                        isToday={iso === today}
+                        className="border-l border-gray-100 first:border-l-0"
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
             <span>
