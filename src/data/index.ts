@@ -7,7 +7,16 @@
  * síncronos.
  */
 
-export type { Habit, HabitEntry, EntryStatus, Debt, Payment, DebtStatus } from './types'
+export type {
+  Habit,
+  HabitEntry,
+  EntryStatus,
+  Debt,
+  Payment,
+  DebtStatus,
+  Idea,
+  IdeaStatus,
+} from './types'
 
 export { isISODate, toISODate, todayISO, addDays, startOfWeekISO } from './dates'
 
@@ -50,6 +59,14 @@ export {
   applyBackup,
   importAll,
 } from './backup'
+
+export {
+  listIdeas,
+  createIdea,
+  updateIdeaText,
+  setIdeaStatus,
+  archiveIdea,
+} from './ideas'
 
 export { clearLocalData } from './storage'
 

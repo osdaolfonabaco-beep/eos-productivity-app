@@ -2,12 +2,13 @@ import { useState } from 'react'
 import DayView from './components/DayView'
 import DebtsView from './components/DebtsView'
 import HabitsView from './components/HabitsView'
+import IdeasView from './components/IdeasView'
 import LoginScreen from './components/LoginScreen'
 import SettingsView from './components/SettingsView'
 import WeekView from './components/WeekView'
 import { useSession } from './useSession'
 
-type View = 'day' | 'week' | 'habits' | 'debts'
+type View = 'day' | 'week' | 'habits' | 'debts' | 'ideas'
 
 function GearIcon() {
   return (
@@ -86,13 +87,15 @@ export default function App() {
               <WeekView />
             ) : view === 'habits' ? (
               <HabitsView />
-            ) : (
+            ) : view === 'debts' ? (
               <DebtsView />
+            ) : (
+              <IdeasView />
             )}
           </div>
 
           <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
-            <div className="grid grid-cols-4">
+            <div className="grid grid-cols-5">
               <Tab label="Hoy" active={!settingsOpen && view === 'day'} onClick={() => go('day')} />
               <Tab
                 label="Semana"
@@ -108,6 +111,11 @@ export default function App() {
                 label="Deudas"
                 active={!settingsOpen && view === 'debts'}
                 onClick={() => go('debts')}
+              />
+              <Tab
+                label="Ideas"
+                active={!settingsOpen && view === 'ideas'}
+                onClick={() => go('ideas')}
               />
             </div>
           </nav>

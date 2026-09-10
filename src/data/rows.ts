@@ -7,13 +7,22 @@
  * trigger); nunca se envían ni se leen aquí.
  */
 
-import type { Debt, DebtStatus, Habit, HabitEntry, Payment } from './types'
+import type {
+  Debt,
+  DebtStatus,
+  Habit,
+  HabitEntry,
+  Idea,
+  IdeaStatus,
+  Payment,
+} from './types'
 
 export const HABIT_COLS = 'id,name,archived,sort_order,created_at'
 export const ENTRY_COLS = 'id,habit_id,date,done'
 export const DEBT_COLS =
   'id,name,opening_balance,annual_rate,monthly_payment,status,archived,sort_order,created_at'
 export const PAYMENT_COLS = 'id,debt_id,date,amount'
+export const IDEA_COLS = 'id,text,status,created_at,archived'
 
 interface HabitRow {
   id: string
@@ -111,4 +120,32 @@ export function rowToPayment(r: PaymentRow): Payment {
 
 export function paymentToRow(p: Payment) {
   return { id: p.id, debt_id: p.debtId, date: p.date, amount: p.amount }
+}
+
+interface IdeaRow {
+  id: string
+  text: string
+  status: string
+  created_at: string
+  archived: boolean
+}
+
+export function rowToIdea(r: IdeaRow): Idea {
+  return {
+    id: r.id,
+    text: r.text,
+    status: r.status as IdeaStatus,
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function ideaToRow(i: Idea) {
+  return {
+    id: i.id,
+    text: i.text,
+    status: i.status,
+    created_at: i.createdAt,
+    archived: i.archived,
+  }
 }

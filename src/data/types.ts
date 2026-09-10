@@ -82,3 +82,18 @@ export interface Payment {
   /** Pesos colombianos, entero > 0. */
   amount: number
 }
+
+// --- Ideas ----------------------------------------------------------------
+
+/** Estado de una idea. Lo marca la persona; "descartada" no es lo mismo que archivada. */
+export type IdeaStatus = 'pendiente' | 'en-marcha' | 'descartada'
+
+/** Una idea anotada: un solo campo de texto libre y su estado. */
+export interface Idea {
+  id: string
+  text: string
+  status: IdeaStatus
+  /** Fecha ISO completa de creación. Ordena la lista: más recientes primero. */
+  createdAt: string
+  archived: boolean
+}
