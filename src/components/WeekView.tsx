@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useMemo } from 'react'
 import {
   addDays,
   entryStatus,
@@ -9,7 +9,9 @@ import {
   type EntryStatus,
   type Habit,
 } from '../data'
+import { useAsyncData } from '../useAsyncData'
 import { useMediaQuery } from '../useMediaQuery'
+import { LoadError, Loading } from './ViewState'
 
 /** Iniciales de lunes a domingo. X para miércoles, para no chocar con martes. */
 const DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
@@ -99,22 +101,27 @@ export default function WeekView() {
   )
   const sunday = days[6]
 
-  const [habits, setHabits] = useState<Habit[]>([])
-  // Clave `${habitId}|${date}` → estado. Lo que no está en el mapa es "sin responder".
-  const [statuses, setStatuses] = useState<Map<string, EntryStatus>>(new Map())
-
-  useEffect(() => {
-    setHabits(listHabits())
-    const map = new Map<string, EntryStatus>()
-    for (const e of getEntriesInRange(monday, sunday)) {
-      map.set(`${e.habitId}|${e.date}`, entryStatus(e))
-    }
-    setStatuses(map)
+  const fetcher = useCallback(async () => {
+    const [habits, entries] = await Promise.all([
+      listHabits(),
+      getEntriesInRange(monday, sunday),
+    ])
+    // Clave `${habitId}|${date}` → estado. Lo que no está en el mapa es "sin responder".
+    const statuses = new Map<string, EntryStatus>()
+    for (const e of entries) statuses.set(`${e.habitId}|${e.date}`, entryStatus(e))
+    return { habits, statuses }
   }, [monday, sunday])
 
+  const { data, loading, error, reload } = useAsyncData(fetcher, [monday, sunday])
+
   function statusAt(habitId: string, date: string): EntryStatus {
-    return statuses.get(`${habitId}|${date}`) ?? 'unanswered'
+    return data?.statuses.get(`${habitId}|${date}`) ?? 'unanswered'
   }
+
+  if (loading && !data) return <Loading />
+  if (error && !data) return <LoadError onRetry={reload} />
+
+  const habits: Habit[] = data?.habits ?? []
 
   return (
     <main className="px-4 py-6 text-gray-900">

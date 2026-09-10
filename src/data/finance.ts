@@ -1,16 +1,21 @@
 /**
- * El módulo de datos de finanzas: deudas y pagos.
+ * El módulo de datos de finanzas: deudas y pagos, contra Supabase.
  *
- * Mismo criterio que hábitos: el acceso crudo vive en `storage.ts`, no hay
- * estado en memoria y el saldo actual de una deuda no se guarda, se deriva.
+ * Lecturas y escrituras `async`. El saldo actual de una deuda sigue derivándose
+ * con los helpers puros síncronos (`sumPayments`, `debtBalance`).
  */
 
 import { isISODate } from './dates'
-import { KEYS, newId, readList, writeList } from './storage'
+import {
+  DEBT_COLS,
+  PAYMENT_COLS,
+  debtToRow,
+  paymentToRow,
+  rowToDebt,
+  rowToPayment,
+} from './rows'
+import { supabase, unwrap } from './supabase'
 import type { Debt, DebtStatus, Payment } from './types'
-
-const DEBTS_KEY = KEYS.debts
-const PAYMENTS_KEY = KEYS.payments
 
 /** Los campos que la interfaz puede fijar al crear o editar una deuda. */
 export interface DebtInput {
@@ -19,23 +24,6 @@ export interface DebtInput {
   annualRate: number | null
   monthlyPayment: number
   status: DebtStatus
-}
-
-// --- Deudas ------------------------------------------------------------
-
-/** Todas las deudas, archivadas incluidas, ordenadas por `order`. Uso interno. */
-function allDebts(): Debt[] {
-  return readList<Debt>(DEBTS_KEY).sort((a, b) => a.order - b.order)
-}
-
-/** Las deudas activas (no archivadas), ordenadas por `order`. */
-export function listDebts(): Debt[] {
-  return allDebts().filter((d) => !d.archived)
-}
-
-/** Una deuda por id, o `undefined`. Incluye las archivadas. */
-export function getDebt(id: string): Debt | undefined {
-  return allDebts().find((d) => d.id === id)
 }
 
 function assertValidInput(input: Pick<DebtInput, 'name' | 'openingBalance'>): void {
@@ -48,7 +36,7 @@ function assertValidInput(input: Pick<DebtInput, 'name' | 'openingBalance'>): vo
 }
 
 /** Normaliza los montos a enteros de pesos no negativos. */
-function normalize(input: DebtInput): Omit<Debt, 'id' | 'createdAt' | 'archived' | 'order'> {
+function normalize(input: DebtInput) {
   return {
     name: input.name.trim(),
     openingBalance: Math.round(input.openingBalance),
@@ -58,73 +46,108 @@ function normalize(input: DebtInput): Omit<Debt, 'id' | 'createdAt' | 'archived'
   }
 }
 
-/** Crea una deuda activa. El saldo pasado es el punto de partida (`openingBalance`). */
-export function createDebt(input: DebtInput): Debt {
+// --- Deudas ------------------------------------------------------------
+
+/** Las deudas activas (no archivadas), ordenadas por `order`. */
+export async function listDebts(): Promise<Debt[]> {
+  const rows = unwrap(
+    await supabase
+      .from('debts')
+      .select(DEBT_COLS)
+      .eq('archived', false)
+      .order('sort_order', { ascending: true }),
+    'listDebts',
+  )
+  return rows.map(rowToDebt)
+}
+
+/** Una deuda por id, o `undefined`. Incluye las archivadas. */
+export async function getDebt(id: string): Promise<Debt | undefined> {
+  const rows = unwrap(
+    await supabase.from('debts').select(DEBT_COLS).eq('id', id).limit(1),
+    'getDebt',
+  )
+  return rows[0] ? rowToDebt(rows[0]) : undefined
+}
+
+/** Crea una deuda activa. El saldo pasado es el punto de partida. */
+export async function createDebt(input: DebtInput): Promise<Debt> {
   assertValidInput(input)
 
-  const debts = allDebts()
-  const maxOrder = debts.reduce((max, d) => Math.max(max, d.order), -1)
+  const top = unwrap(
+    await supabase
+      .from('debts')
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1),
+    'createDebt (orden)',
+  )
+  const maxOrder = top[0] ? top[0].sort_order : -1
+
   const debt: Debt = {
-    id: newId(),
+    id: crypto.randomUUID(),
     ...normalize(input),
     createdAt: new Date().toISOString(),
     archived: false,
     order: maxOrder + 1,
   }
-  writeList(DEBTS_KEY, [...debts, debt])
-  return debt
+  const rows = unwrap(
+    await supabase.from('debts').insert(debtToRow(debt)).select(DEBT_COLS),
+    'createDebt',
+  )
+  return rowToDebt(rows[0])
 }
 
-/**
- * Edita una deuda. Cambiar `openingBalance` es una corrección del punto de
- * partida; no toca los pagos.
- */
-export function updateDebt(id: string, input: DebtInput): Debt {
+/** Edita una deuda. Cambiar el saldo es una corrección; no toca los pagos. */
+export async function updateDebt(id: string, input: DebtInput): Promise<Debt> {
   assertValidInput(input)
+  const n = normalize(input)
 
-  const debts = allDebts()
-  const debt = debts.find((d) => d.id === id)
-  if (!debt) throw new Error(`No existe la deuda ${id}`)
-
-  const updated: Debt = { ...debt, ...normalize(input) }
-  writeList(
-    DEBTS_KEY,
-    debts.map((d) => (d.id === id ? updated : d)),
+  const rows = unwrap(
+    await supabase
+      .from('debts')
+      .update({
+        name: n.name,
+        opening_balance: n.openingBalance,
+        annual_rate: n.annualRate,
+        monthly_payment: n.monthlyPayment,
+        status: n.status,
+      })
+      .eq('id', id)
+      .select(DEBT_COLS),
+    'updateDebt',
   )
-  return updated
+  if (!rows[0]) throw new Error(`No existe la deuda ${id}`)
+  return rowToDebt(rows[0])
 }
 
-/**
- * Archiva una deuda. Es lo que hace el botón "Archivar deuda": la deuda y sus
- * pagos se conservan, solo deja de aparecer en la lista. Idempotente.
- */
-export function archiveDebt(id: string): void {
-  const debts = allDebts()
-  const debt = debts.find((d) => d.id === id)
-  if (!debt) throw new Error(`No existe la deuda ${id}`)
-  if (debt.archived) return
-
-  writeList(
-    DEBTS_KEY,
-    debts.map((d) => (d.id === id ? { ...d, archived: true } : d)),
-  )
+/** Archiva una deuda (el botón "Archivar deuda"). Idempotente. */
+export async function archiveDebt(id: string): Promise<void> {
+  const res = await supabase.from('debts').update({ archived: true }).eq('id', id)
+  if (res.error) throw new Error(`archiveDebt: ${res.error.message}`)
 }
 
 // --- Pagos -----------------------------------------------------------
 
-function allPayments(): Payment[] {
-  return readList<Payment>(PAYMENTS_KEY)
-}
-
 /** Los pagos de una deuda, del más reciente al más antiguo. */
-export function getPayments(debtId: string): Payment[] {
-  return allPayments()
-    .filter((p) => p.debtId === debtId)
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+export async function getPayments(debtId: string): Promise<Payment[]> {
+  const rows = unwrap(
+    await supabase
+      .from('payments')
+      .select(PAYMENT_COLS)
+      .eq('debt_id', debtId)
+      .order('date', { ascending: false }),
+    'getPayments',
+  )
+  return rows.map(rowToPayment)
 }
 
 /** Registra un pago. `date` en `YYYY-MM-DD`; `amount` en pesos, entero > 0. */
-export function addPayment(debtId: string, date: string, amount: number): Payment {
+export async function addPayment(
+  debtId: string,
+  date: string,
+  amount: number,
+): Promise<Payment> {
   if (!isISODate(date)) {
     throw new Error(`Fecha inválida: ${date} (se espera YYYY-MM-DD)`)
   }
@@ -132,20 +155,23 @@ export function addPayment(debtId: string, date: string, amount: number): Paymen
     throw new Error('El monto del pago debe ser mayor que cero')
   }
 
-  const payments = allPayments()
-  const payment: Payment = { id: newId(), debtId, date, amount: Math.round(amount) }
-  writeList(PAYMENTS_KEY, [...payments, payment])
-  return payment
+  const payment: Payment = {
+    id: crypto.randomUUID(),
+    debtId,
+    date,
+    amount: Math.round(amount),
+  }
+  const rows = unwrap(
+    await supabase.from('payments').insert(paymentToRow(payment)).select(PAYMENT_COLS),
+    'addPayment',
+  )
+  return rowToPayment(rows[0])
 }
 
-/**
- * Borra un pago entero. La única operación que quita algo del historial, y la
- * interfaz siempre la pide con confirmación. Si no hay tal pago, no hace nada.
- */
-export function deletePayment(id: string): void {
-  const payments = allPayments()
-  const next = payments.filter((p) => p.id !== id)
-  if (next.length !== payments.length) writeList(PAYMENTS_KEY, next)
+/** Borra un pago entero. La interfaz siempre lo pide con confirmación. */
+export async function deletePayment(id: string): Promise<void> {
+  const res = await supabase.from('payments').delete().eq('id', id)
+  if (res.error) throw new Error(`deletePayment: ${res.error.message}`)
 }
 
 // --- Derivados (puros) --------------------------------------------

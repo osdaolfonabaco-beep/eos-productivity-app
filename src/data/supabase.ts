@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type PostgrestError } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -33,4 +33,22 @@ export function signInWithEmail(email: string) {
 /** Cierra la sesión actual. */
 export function signOut() {
   return supabase.auth.signOut()
+}
+
+/**
+ * Para lecturas (y escrituras con `.select()`): devuelve las filas o lanza un
+ * `Error` con contexto si Supabase reportó error.
+ */
+export function unwrap<T>(
+  res: { data: T | null; error: PostgrestError | null },
+  context: string,
+): T {
+  if (res.error) throw new Error(`${context}: ${res.error.message}`)
+  if (res.data === null) throw new Error(`${context}: respuesta vacía`)
+  return res.data
+}
+
+/** Para escrituras sin `.select()`: lanza si hubo error, si no no devuelve nada. */
+export function assertOk(res: { error: PostgrestError | null }, context: string): void {
+  if (res.error) throw new Error(`${context}: ${res.error.message}`)
 }

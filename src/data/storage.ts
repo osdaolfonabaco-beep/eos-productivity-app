@@ -1,17 +1,10 @@
 /**
- * Acceso crudo a `localStorage`: el único sitio de todo el proyecto que lee y
- * escribe el almacenamiento. Lo usan `store.ts` (hábitos) y `finance.ts`
- * (deudas). El día que se cambie `localStorage` por una base de datos
- * sincronizada, es el archivo que hay que tocar.
- *
- * Ningún módulo guarda estado en memoria: cada lectura vuelve aquí, así que
- * `localStorage` es siempre la única fuente de verdad.
+ * Lo que queda de `localStorage` tras pasar a Supabase: solo lectura de la
+ * copia local que había antes de la migración, más su borrado explícito.
+ * Ninguna otra parte de la app escribe ya en `localStorage` los datos.
  */
 
-/**
- * Las claves de `localStorage` de todo el proyecto. Un único inventario de qué
- * se guarda: es también lo que exporta e importa el respaldo (`backup.ts`).
- */
+/** Las claves donde vivían los datos antes de la nube. */
 export const KEYS = {
   habits: 'productividad.habits',
   entries: 'productividad.entries',
@@ -34,9 +27,15 @@ export function readList<T>(key: string): T[] {
   }
 }
 
-/** Guarda `list` bajo `key`. Los errores (p. ej. cuota llena) se propagan. */
-export function writeList<T>(key: string, list: T[]): void {
-  localStorage.setItem(key, JSON.stringify(list))
+/** Borra la copia local de los cuatro conjuntos de datos de este dispositivo. */
+export function clearLocalData(): void {
+  for (const key of Object.values(KEYS)) {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      /* si localStorage no está disponible, no hay nada que borrar */
+    }
+  }
 }
 
 export function newId(): string {

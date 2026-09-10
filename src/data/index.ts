@@ -1,8 +1,10 @@
 /**
  * Punto de entrada del módulo de datos.
  *
- * Los componentes importan desde aquí (`../data`), nunca de los archivos
- * internos y nunca de `localStorage`.
+ * Los componentes importan desde aquí (`../data`). Las lecturas y escrituras de
+ * hábitos, registros, deudas y pagos son `async` (van a Supabase); los helpers
+ * de fechas y los derivados (`entryStatus`, `sumPayments`, `debtBalance`) son
+ * síncronos.
  */
 
 export type { Habit, HabitEntry, EntryStatus, Debt, Payment, DebtStatus } from './types'
@@ -40,4 +42,17 @@ export {
 
 export type { BackupFile, BackupData } from './backup'
 
-export { exportAll, parseBackup, applyBackup, importAll } from './backup'
+export {
+  exportAll,
+  exportLocal,
+  readLocalBackup,
+  parseBackup,
+  applyBackup,
+  importAll,
+} from './backup'
+
+export { clearLocalData } from './storage'
+
+export type { UploadReport, TableReport } from './migrate'
+
+export { readLocalCounts, uploadLocalData } from './migrate'

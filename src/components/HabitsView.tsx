@@ -1,37 +1,55 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { archiveHabit, createHabit, listHabits, renameHabit, type Habit } from '../data'
+import { useCallback, useState, type FormEvent } from 'react'
+import { archiveHabit, createHabit, listHabits, renameHabit } from '../data'
+import { useAsyncData } from '../useAsyncData'
 import HabitManageRow from './HabitManageRow'
+import { ActionError, LoadError, Loading } from './ViewState'
 
 /**
  * La pantalla "Hábitos": crear, renombrar y eliminar (archivar).
- *
- * Mismo patrón sin caché que `DayView`: tras cada cambio vuelve a leer del
- * módulo de datos con `load` y re-renderiza.
+ * Tras cada cambio se vuelve a leer de la nube.
  */
 export default function HabitsView() {
-  const [habits, setHabits] = useState<Habit[]>([])
+  const fetcher = useCallback(() => listHabits(), [])
+  const { data, loading, error, reload } = useAsyncData(fetcher)
+
   const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    setHabits(listHabits())
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
+  async function run(action: () => Promise<unknown>, message: string) {
+    setBusy(true)
+    setActionError(null)
+    try {
+      await action()
+      reload()
+    } catch {
+      setActionError(message)
+      reload()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   function add(e: FormEvent) {
     e.preventDefault()
     const clean = name.trim()
-    if (!clean) return
-    createHabit(clean)
+    if (!clean || busy) return
     setName('')
-    load()
+    void run(() => createHabit(clean), 'No se pudo crear el hábito.')
   }
+
+  if (loading && !data) return <Loading />
+  if (error && !data) return <LoadError onRetry={reload} />
+
+  const habits = data ?? []
 
   return (
     <main className="px-4 py-6 text-gray-900">
       <h1 className="mb-4 text-2xl font-semibold">Hábitos</h1>
+
+      {actionError && (
+        <ActionError message={actionError} onDismiss={() => setActionError(null)} />
+      )}
 
       <form onSubmit={add} className="mb-6 flex gap-2">
         <input
@@ -44,7 +62,7 @@ export default function HabitsView() {
         />
         <button
           type="submit"
-          disabled={!name.trim()}
+          disabled={!name.trim() || busy}
           className="shrink-0 rounded-lg bg-gray-900 px-4 py-3 font-medium text-white disabled:opacity-40"
         >
           Añadir
@@ -61,14 +79,12 @@ export default function HabitsView() {
             <li key={h.id}>
               <HabitManageRow
                 name={h.name}
-                onRename={(newName) => {
-                  renameHabit(h.id, newName)
-                  load()
-                }}
-                onDelete={() => {
-                  archiveHabit(h.id)
-                  load()
-                }}
+                onRename={(newName) =>
+                  void run(() => renameHabit(h.id, newName), 'No se pudo renombrar.')
+                }
+                onDelete={() =>
+                  void run(() => archiveHabit(h.id), 'No se pudo eliminar.')
+                }
               />
             </li>
           ))}

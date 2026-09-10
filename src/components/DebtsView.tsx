@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   createDebt,
   debtBalance,
-  getDebt,
   getPayments,
   listDebts,
   sumPayments,
@@ -11,9 +10,11 @@ import {
   type DebtInput,
 } from '../data'
 import { formatCOP, formatRate } from '../money'
+import { useAsyncData } from '../useAsyncData'
 import DebtDetail from './DebtDetail'
 import DebtForm from './DebtForm'
 import DebtStatusChip from './DebtStatusChip'
+import { ActionError, LoadError, Loading } from './ViewState'
 
 /** Navegación interna de la pestaña, sin librería de rutas. */
 type Screen =
@@ -31,11 +32,17 @@ interface Row {
 function FormScreen({
   title,
   initial,
+  busy,
+  error,
+  onDismissError,
   onSubmit,
   onCancel,
 }: {
   title: string
   initial?: Debt
+  busy: boolean
+  error: string | null
+  onDismissError: () => void
   onSubmit: (values: DebtInput) => void
   onCancel: () => void
 }) {
@@ -45,53 +52,78 @@ function FormScreen({
         ‹ Deudas
       </button>
       <h1 className="mb-4 mt-3 text-2xl font-semibold">{title}</h1>
-      <DebtForm initial={initial} onSubmit={onSubmit} onCancel={onCancel} />
+      {error && <ActionError message={error} onDismiss={onDismissError} />}
+      <fieldset disabled={busy} className="disabled:opacity-60">
+        <DebtForm initial={initial} onSubmit={onSubmit} onCancel={onCancel} />
+      </fieldset>
     </main>
   )
 }
 
 export default function DebtsView() {
   const [screen, setScreen] = useState<Screen>({ name: 'list' })
-  const [rows, setRows] = useState<Row[]>([])
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    setRows(
-      listDebts().map((debt) => {
-        const payments = getPayments(debt.id)
-        return { debt, balance: debtBalance(debt, payments), paid: sumPayments(payments) }
-      }),
-    )
+  const fetcher = useCallback(async (): Promise<Row[]> => {
+    const debts = await listDebts()
+    const paymentsByDebt = await Promise.all(debts.map((d) => getPayments(d.id)))
+    return debts.map((debt, i) => ({
+      debt,
+      balance: debtBalance(debt, paymentsByDebt[i]),
+      paid: sumPayments(paymentsByDebt[i]),
+    }))
   }, [])
 
-  // Recarga la lista cada vez que se vuelve a ella (tras crear, editar,
-  // archivar o registrar/borrar un pago).
-  useEffect(() => {
-    if (screen.name === 'list') load()
-  }, [screen, load])
+  const { data, loading, error, reload } = useAsyncData(fetcher)
+  const rows = data ?? []
+
+  async function save(action: () => Promise<unknown>, then: () => void) {
+    setBusy(true)
+    setActionError(null)
+    try {
+      await action()
+      then()
+      reload()
+    } catch {
+      setActionError('No se pudo guardar. Revisa la conexión.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   if (screen.name === 'new') {
     return (
       <FormScreen
         title="Nueva deuda"
+        busy={busy}
+        error={actionError}
+        onDismissError={() => setActionError(null)}
         onCancel={() => setScreen({ name: 'list' })}
-        onSubmit={(values) => {
-          createDebt(values)
-          setScreen({ name: 'list' })
-        }}
+        onSubmit={(values) =>
+          void save(
+            () => createDebt(values),
+            () => setScreen({ name: 'list' }),
+          )
+        }
       />
     )
   }
 
   if (screen.name === 'edit') {
+    const initial = rows.find((r) => r.debt.id === screen.debtId)?.debt
+    const backToDetail = () => setScreen({ name: 'detail', debtId: screen.debtId })
     return (
       <FormScreen
         title="Editar deuda"
-        initial={getDebt(screen.debtId)}
-        onCancel={() => setScreen({ name: 'detail', debtId: screen.debtId })}
-        onSubmit={(values) => {
-          updateDebt(screen.debtId, values)
-          setScreen({ name: 'detail', debtId: screen.debtId })
-        }}
+        initial={initial}
+        busy={busy}
+        error={actionError}
+        onDismissError={() => setActionError(null)}
+        onCancel={backToDetail}
+        onSubmit={(values) =>
+          void save(() => updateDebt(screen.debtId, values), backToDetail)
+        }
       />
     )
   }
@@ -106,6 +138,9 @@ export default function DebtsView() {
     )
   }
 
+  if (loading && !data) return <Loading />
+  if (error && !data) return <LoadError onRetry={reload} />
+
   const totalBalance = rows.reduce((t, r) => t + Math.max(0, r.balance), 0)
   const totalPaid = rows.reduce((t, r) => t + r.paid, 0)
   const totalOpening = rows.reduce((t, r) => t + r.debt.openingBalance, 0)
@@ -115,6 +150,10 @@ export default function DebtsView() {
   return (
     <main className="px-4 py-6 text-gray-900">
       <h1 className="mb-4 text-2xl font-semibold">Deudas</h1>
+
+      {actionError && (
+        <ActionError message={actionError} onDismiss={() => setActionError(null)} />
+      )}
 
       {rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import {
   addPayment,
   archiveDebt,
@@ -13,7 +13,9 @@ import {
   type Payment,
 } from '../data'
 import { formatCOP, formatRate, parsePesos } from '../money'
+import { useAsyncData } from '../useAsyncData'
 import DebtStatusChip from './DebtStatusChip'
+import { ActionError, LoadError, Loading } from './ViewState'
 
 interface DebtDetailProps {
   debtId: string
@@ -31,22 +33,46 @@ function formatDate(iso: string): string {
   })
 }
 
+interface DetailData {
+  debt: Debt | undefined
+  payments: Payment[]
+}
+
 export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) {
-  const [debt, setDebt] = useState<Debt | undefined>(undefined)
-  const [payments, setPayments] = useState<Payment[]>([])
+  const fetcher = useCallback(async (): Promise<DetailData> => {
+    const [debt, payments] = await Promise.all([getDebt(debtId), getPayments(debtId)])
+    return { debt, payments }
+  }, [debtId])
+
+  const { data, loading, error, reload } = useAsyncData(fetcher, [debtId])
+
   const [date, setDate] = useState(todayISO())
   const [amount, setAmount] = useState('')
   const [confirmingArchive, setConfirmingArchive] = useState(false)
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    setDebt(getDebt(debtId))
-    setPayments(getPayments(debtId))
-  }, [debtId])
+  async function run(action: () => Promise<unknown>, message: string, then?: () => void) {
+    setBusy(true)
+    setActionError(null)
+    try {
+      await action()
+      then?.()
+      reload()
+    } catch {
+      setActionError(message)
+      reload()
+    } finally {
+      setBusy(false)
+    }
+  }
 
-  useEffect(() => {
-    load()
-  }, [load])
+  if (loading && !data) return <Loading />
+  if (error && !data) return <LoadError onRetry={reload} />
+
+  const debt = data?.debt
+  const payments = data?.payments ?? []
 
   if (!debt) {
     return (
@@ -69,15 +95,16 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
       : 0
 
   const amountValue = parsePesos(amount)
-  const canRegister = amountValue !== null && amountValue > 0 && isISODate(date)
+  const canRegister = amountValue !== null && amountValue > 0 && isISODate(date) && !busy
 
   function submitPayment(e: FormEvent) {
     e.preventDefault()
     if (!canRegister || amountValue === null) return
-    addPayment(debtId, date, amountValue)
-    setAmount('')
-    setDate(todayISO())
-    load()
+    const at = date
+    void run(() => addPayment(debtId, at, amountValue), 'No se pudo registrar el pago.', () => {
+      setAmount('')
+      setDate(todayISO())
+    })
   }
 
   return (
@@ -96,6 +123,12 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
       </div>
 
       <h1 className="mt-3 text-2xl font-semibold">{debt.name}</h1>
+
+      {actionError && (
+        <div className="mt-4">
+          <ActionError message={actionError} onDismiss={() => setActionError(null)} />
+        </div>
+      )}
 
       <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
         <div className="flex items-baseline justify-between gap-2">
@@ -149,7 +182,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
             disabled={!canRegister}
             className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
-            Registrar
+            {busy ? 'Guardando…' : 'Registrar'}
           </button>
         </form>
       </section>
@@ -172,12 +205,15 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          deletePayment(p.id)
-                          setConfirmingPaymentId(null)
-                          load()
-                        }}
-                        className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(
+                            () => deletePayment(p.id),
+                            'No se pudo borrar el pago.',
+                            () => setConfirmingPaymentId(null),
+                          )
+                        }
+                        className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
                       >
                         Borrar
                       </button>
@@ -221,11 +257,11 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  archiveDebt(debtId)
-                  onBack()
-                }}
-                className="rounded-lg bg-rose-600 px-4 py-3 text-sm font-medium text-white"
+                disabled={busy}
+                onClick={() =>
+                  void run(() => archiveDebt(debtId), 'No se pudo archivar.', onBack)
+                }
+                className="rounded-lg bg-rose-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
               >
                 Archivar deuda
               </button>

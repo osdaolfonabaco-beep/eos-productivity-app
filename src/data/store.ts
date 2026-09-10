@@ -1,172 +1,180 @@
 /**
- * El módulo de datos de hábitos.
+ * El módulo de datos de hábitos, ahora contra Supabase.
  *
- * Ningún componente lee ni escribe `localStorage` directamente: pasa por aquí,
- * y el acceso crudo vive en `storage.ts`. No guarda estado en memoria: cada
- * lectura vuelve a `localStorage`, así que es siempre la única fuente de verdad.
+ * Las lecturas y escrituras son `async`. Las filas vienen filtradas por RLS
+ * (solo las del usuario) y `user_id` lo pone el servidor. Los helpers puros
+ * (`entryStatus`) siguen siendo síncronos: operan sobre datos ya traídos.
  */
 
 import { isISODate } from './dates'
-import { KEYS, newId, readList, writeList } from './storage'
+import { ENTRY_COLS, HABIT_COLS, habitToRow, rowToEntry, rowToHabit } from './rows'
+import { supabase, unwrap } from './supabase'
 import type { EntryStatus, Habit, HabitEntry } from './types'
-
-const HABITS_KEY = KEYS.habits
-const ENTRIES_KEY = KEYS.entries
 
 // --- Hábitos -------------------------------------------------------------
 
-/** Todos los hábitos, archivados incluidos, ordenados por `order`. Uso interno. */
-function allHabits(): Habit[] {
-  return readList<Habit>(HABITS_KEY).sort((a, b) => a.order - b.order)
-}
-
 /** Los hábitos activos (no archivados), ordenados por `order`. */
-export function listHabits(): Habit[] {
-  return allHabits().filter((h) => !h.archived)
+export async function listHabits(): Promise<Habit[]> {
+  const rows = unwrap(
+    await supabase
+      .from('habits')
+      .select(HABIT_COLS)
+      .eq('archived', false)
+      .order('sort_order', { ascending: true }),
+    'listHabits',
+  )
+  return rows.map(rowToHabit)
 }
 
 /** Un hábito por id, o `undefined` si no existe. Incluye los archivados. */
-export function getHabit(id: string): Habit | undefined {
-  return allHabits().find((h) => h.id === id)
+export async function getHabit(id: string): Promise<Habit | undefined> {
+  const rows = unwrap(
+    await supabase.from('habits').select(HABIT_COLS).eq('id', id).limit(1),
+    'getHabit',
+  )
+  return rows[0] ? rowToHabit(rows[0]) : undefined
 }
 
 /**
  * Crea un hábito activo. `name` se recorta; si queda vacío, lanza error.
- * El hábito nuevo va al final de la lista: `order = (máximo actual) + 1`.
+ * El hábito nuevo va al final: `order = (máximo actual) + 1`.
  */
-export function createHabit(name: string): Habit {
+export async function createHabit(name: string): Promise<Habit> {
   const clean = name.trim()
   if (!clean) throw new Error('El nombre del hábito no puede estar vacío')
 
-  const habits = allHabits()
-  const maxOrder = habits.reduce((max, h) => Math.max(max, h.order), -1)
+  const top = unwrap(
+    await supabase
+      .from('habits')
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1),
+    'createHabit (orden)',
+  )
+  const maxOrder = top[0] ? top[0].sort_order : -1
+
   const habit: Habit = {
-    id: newId(),
+    id: crypto.randomUUID(),
     name: clean,
     createdAt: new Date().toISOString(),
     archived: false,
     order: maxOrder + 1,
   }
-  writeList(HABITS_KEY, [...habits, habit])
-  return habit
+  const rows = unwrap(
+    await supabase.from('habits').insert(habitToRow(habit)).select(HABIT_COLS),
+    'createHabit',
+  )
+  return rowToHabit(rows[0])
 }
 
 /**
- * Renombra un hábito. Es lo único editable de un hábito en la v1.
- * No toca ningún `HabitEntry`: los registros pasados siguen siendo válidos
- * aunque el hábito cambie de nombre.
+ * Renombra un hábito. Es lo único editable de un hábito.
+ * No toca ningún `HabitEntry`.
  */
-export function renameHabit(id: string, name: string): Habit {
+export async function renameHabit(id: string, name: string): Promise<Habit> {
   const clean = name.trim()
   if (!clean) throw new Error('El nombre del hábito no puede estar vacío')
 
-  const habits = allHabits()
-  const habit = habits.find((h) => h.id === id)
-  if (!habit) throw new Error(`No existe el hábito ${id}`)
-
-  const updated: Habit = { ...habit, name: clean }
-  writeList(
-    HABITS_KEY,
-    habits.map((h) => (h.id === id ? updated : h)),
+  const rows = unwrap(
+    await supabase.from('habits').update({ name: clean }).eq('id', id).select(HABIT_COLS),
+    'renameHabit',
   )
-  return updated
+  if (!rows[0]) throw new Error(`No existe el hábito ${id}`)
+  return rowToHabit(rows[0])
 }
 
 /**
- * Archiva un hábito. Esto es lo que hace por dentro el botón "Eliminar" de la
- * interfaz: el hábito y sus registros se conservan, solo deja de aparecer en
- * las listas activas. Idempotente: archivar uno ya archivado no hace nada.
+ * Archiva un hábito (el botón "Eliminar"): deja de aparecer en las listas
+ * activas pero se conserva con sus registros. Idempotente.
  */
-export function archiveHabit(id: string): void {
-  const habits = allHabits()
-  const habit = habits.find((h) => h.id === id)
-  if (!habit) throw new Error(`No existe el hábito ${id}`)
-  if (habit.archived) return
-
-  writeList(
-    HABITS_KEY,
-    habits.map((h) => (h.id === id ? { ...h, archived: true } : h)),
-  )
+export async function archiveHabit(id: string): Promise<void> {
+  const res = await supabase.from('habits').update({ archived: true }).eq('id', id)
+  if (res.error) throw new Error(`archiveHabit: ${res.error.message}`)
 }
 
 // --- Registros diarios -------------------------------------------------
 
-/** Todos los registros, sin ordenar. Uso interno. */
-function allEntries(): HabitEntry[] {
-  return readList<HabitEntry>(ENTRIES_KEY)
+/** El registro de un hábito en una fecha, o `undefined` si está sin responder. */
+export async function getEntry(
+  habitId: string,
+  date: string,
+): Promise<HabitEntry | undefined> {
+  const rows = unwrap(
+    await supabase
+      .from('habit_entries')
+      .select(ENTRY_COLS)
+      .eq('habit_id', habitId)
+      .eq('date', date)
+      .limit(1),
+    'getEntry',
+  )
+  return rows[0] ? rowToEntry(rows[0]) : undefined
+}
+
+/** Todos los registros de una fecha. Para la vista del día. */
+export async function getEntriesForDate(date: string): Promise<HabitEntry[]> {
+  const rows = unwrap(
+    await supabase.from('habit_entries').select(ENTRY_COLS).eq('date', date),
+    'getEntriesForDate',
+  )
+  return rows.map(rowToEntry)
 }
 
 /**
- * El registro de un hábito en una fecha, o `undefined` si ese día está sin
- * responder.
+ * Todos los registros entre `startDate` y `endDate` (`YYYY-MM-DD`), extremos
+ * incluidos. Para la cuadrícula de la semana.
  */
-export function getEntry(habitId: string, date: string): HabitEntry | undefined {
-  return allEntries().find((e) => e.habitId === habitId && e.date === date)
-}
-
-/** Todos los registros de una fecha, de todos los hábitos. Para la vista del día. */
-export function getEntriesForDate(date: string): HabitEntry[] {
-  return allEntries().filter((e) => e.date === date)
-}
-
-/**
- * Todos los registros entre `startDate` y `endDate` (formato `YYYY-MM-DD`),
- * ambos extremos incluidos. Para la cuadrícula de la semana.
- *
- * Compara las fechas como texto: en formato `YYYY-MM-DD` el orden alfabético
- * coincide con el cronológico.
- */
-export function getEntriesInRange(startDate: string, endDate: string): HabitEntry[] {
-  return allEntries().filter((e) => e.date >= startDate && e.date <= endDate)
+export async function getEntriesInRange(
+  startDate: string,
+  endDate: string,
+): Promise<HabitEntry[]> {
+  const rows = unwrap(
+    await supabase
+      .from('habit_entries')
+      .select(ENTRY_COLS)
+      .gte('date', startDate)
+      .lte('date', endDate),
+    'getEntriesInRange',
+  )
+  return rows.map(rowToEntry)
 }
 
 /**
- * Fija si un hábito se cumplió (`done`) o no en una fecha.
- * Si ya había registro para ese (hábito, día), actualiza su `done`; si no, lo crea.
- *
- * Esto no rompe la inmutabilidad del historial: lo inmutable es que editar el
- * hábito no toca sus registros. Marcar y desmarcar un día es la función central
- * de la app.
+ * Fija si un hábito se cumplió (`done`) o no en una fecha. Crea el registro o
+ * actualiza el de ese `(hábito, día)` — la tabla tiene índice único sobre ese par.
  */
-export function setEntryDone(habitId: string, date: string, done: boolean): HabitEntry {
+export async function setEntryDone(
+  habitId: string,
+  date: string,
+  done: boolean,
+): Promise<HabitEntry> {
   if (!isISODate(date)) {
     throw new Error(`Fecha inválida: ${date} (se espera YYYY-MM-DD)`)
   }
-
-  const entries = allEntries()
-  const existing = entries.find((e) => e.habitId === habitId && e.date === date)
-
-  if (existing) {
-    const updated: HabitEntry = { ...existing, done }
-    writeList(
-      ENTRIES_KEY,
-      entries.map((e) => (e === existing ? updated : e)),
-    )
-    return updated
-  }
-
-  const entry: HabitEntry = { id: newId(), habitId, date, done }
-  writeList(ENTRIES_KEY, [...entries, entry])
-  return entry
+  const rows = unwrap(
+    await supabase
+      .from('habit_entries')
+      .upsert({ habit_id: habitId, date, done }, { onConflict: 'habit_id,date' })
+      .select(ENTRY_COLS),
+    'setEntryDone',
+  )
+  return rowToEntry(rows[0])
 }
 
 /**
  * Borra el registro de un hábito en una fecha: ese día vuelve a "sin responder".
- * Es la única forma de volver al tercer estado. Si no había registro, no hace nada.
+ * Si no había registro, no pasa nada.
  */
-export function clearEntry(habitId: string, date: string): void {
-  const entries = allEntries()
-  const next = entries.filter((e) => !(e.habitId === habitId && e.date === date))
-  if (next.length !== entries.length) {
-    writeList(ENTRIES_KEY, next)
-  }
+export async function clearEntry(habitId: string, date: string): Promise<void> {
+  const res = await supabase
+    .from('habit_entries')
+    .delete()
+    .eq('habit_id', habitId)
+    .eq('date', date)
+  if (res.error) throw new Error(`clearEntry: ${res.error.message}`)
 }
 
-/**
- * Traduce un registro (o su ausencia) a los tres estados que distingue la
- * interfaz. Pásale el resultado de `getEntry`, o el valor de un `Map` construido
- * a partir de `getEntriesForDate` / `getEntriesInRange`.
- */
+/** Traduce un registro (o su ausencia) a los tres estados de la interfaz. */
 export function entryStatus(entry: HabitEntry | undefined): EntryStatus {
   if (!entry) return 'unanswered'
   return entry.done ? 'done' : 'not-done'
