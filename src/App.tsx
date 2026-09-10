@@ -2,8 +2,10 @@ import { useState } from 'react'
 import DayView from './components/DayView'
 import DebtsView from './components/DebtsView'
 import HabitsView from './components/HabitsView'
+import LoginScreen from './components/LoginScreen'
 import SettingsView from './components/SettingsView'
 import WeekView from './components/WeekView'
+import { useSession } from './useSession'
 
 type View = 'day' | 'week' | 'habits' | 'debts'
 
@@ -39,6 +41,7 @@ function Tab({
 }
 
 export default function App() {
+  const { session, loading } = useSession()
   const [view, setView] = useState<View>('day')
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -49,54 +52,67 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-md bg-gray-50">
-      <header className="flex h-11 items-center justify-end px-2">
-        <button
-          type="button"
-          onClick={() => setSettingsOpen((open) => !open)}
-          aria-label="Ajustes"
-          aria-pressed={settingsOpen}
-          className={`rounded-lg p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800 ${
-            settingsOpen ? 'text-gray-800' : 'text-gray-400'
-          }`}
-        >
-          <GearIcon />
-        </button>
-      </header>
-
-      <div className="pb-24">
-        {settingsOpen ? (
-          <SettingsView onClose={() => setSettingsOpen(false)} />
-        ) : view === 'day' ? (
-          <DayView />
-        ) : view === 'week' ? (
-          <WeekView />
-        ) : view === 'habits' ? (
-          <HabitsView />
-        ) : (
-          <DebtsView />
-        )}
-      </div>
-
-      <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-4">
-          <Tab label="Hoy" active={!settingsOpen && view === 'day'} onClick={() => go('day')} />
-          <Tab
-            label="Semana"
-            active={!settingsOpen && view === 'week'}
-            onClick={() => go('week')}
-          />
-          <Tab
-            label="Hábitos"
-            active={!settingsOpen && view === 'habits'}
-            onClick={() => go('habits')}
-          />
-          <Tab
-            label="Deudas"
-            active={!settingsOpen && view === 'debts'}
-            onClick={() => go('debts')}
-          />
+      {loading ? (
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-sm text-gray-400">Productividad</p>
         </div>
-      </nav>
+      ) : !session ? (
+        <LoginScreen />
+      ) : (
+        <>
+          <header className="flex h-11 items-center justify-end px-2">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((open) => !open)}
+              aria-label="Ajustes"
+              aria-pressed={settingsOpen}
+              className={`rounded-lg p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800 ${
+                settingsOpen ? 'text-gray-800' : 'text-gray-400'
+              }`}
+            >
+              <GearIcon />
+            </button>
+          </header>
+
+          <div className="pb-24">
+            {settingsOpen ? (
+              <SettingsView
+                onClose={() => setSettingsOpen(false)}
+                email={session.user.email}
+              />
+            ) : view === 'day' ? (
+              <DayView />
+            ) : view === 'week' ? (
+              <WeekView />
+            ) : view === 'habits' ? (
+              <HabitsView />
+            ) : (
+              <DebtsView />
+            )}
+          </div>
+
+          <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
+            <div className="grid grid-cols-4">
+              <Tab label="Hoy" active={!settingsOpen && view === 'day'} onClick={() => go('day')} />
+              <Tab
+                label="Semana"
+                active={!settingsOpen && view === 'week'}
+                onClick={() => go('week')}
+              />
+              <Tab
+                label="Hábitos"
+                active={!settingsOpen && view === 'habits'}
+                onClick={() => go('habits')}
+              />
+              <Tab
+                label="Deudas"
+                active={!settingsOpen && view === 'debts'}
+                onClick={() => go('debts')}
+              />
+            </div>
+          </nav>
+        </>
+      )}
     </div>
   )
 }

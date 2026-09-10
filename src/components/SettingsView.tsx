@@ -1,8 +1,10 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { applyBackup, exportAll, parseBackup, todayISO, type BackupData } from '../data'
+import { signOut } from '../data/supabase'
 
 interface SettingsViewProps {
   onClose: () => void
+  email: string | undefined
 }
 
 /**
@@ -42,7 +44,7 @@ interface Pending {
   data: BackupData
 }
 
-export default function SettingsView({ onClose }: SettingsViewProps) {
+export default function SettingsView({ onClose, email }: SettingsViewProps) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState<Pending | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -218,6 +220,20 @@ export default function SettingsView({ onClose }: SettingsViewProps) {
             </ol>
           </div>
         )}
+      </section>
+
+      <section className="mt-8 border-t border-gray-200 pt-6">
+        <h2 className="text-sm font-semibold text-gray-700">Cuenta</h2>
+        {email && <p className="mt-1 break-words text-sm text-gray-500">{email}</p>}
+        <button
+          type="button"
+          onClick={() => {
+            void signOut()
+          }}
+          className="mt-3 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+        >
+          Cerrar sesión
+        </button>
       </section>
     </main>
   )
