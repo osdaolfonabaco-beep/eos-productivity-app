@@ -2,3 +2,8 @@ node_modules
 dist
 *.local
 .DS_Store
+
+# Variables de entorno con credenciales; se versiona solo .env.example
+.env
+.env.local
+.env.*.local
