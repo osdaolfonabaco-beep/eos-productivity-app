@@ -44,9 +44,7 @@ export default function HabitsView() {
   const habits = data ?? []
 
   return (
-    <main className="px-4 py-6 text-gray-900">
-      <h1 className="mb-4 text-2xl font-semibold">Hábitos</h1>
-
+    <main className="px-4 pb-6 pt-4 text-gray-900">
       {actionError && (
         <ActionError message={actionError} onDismiss={() => setActionError(null)} />
       )}

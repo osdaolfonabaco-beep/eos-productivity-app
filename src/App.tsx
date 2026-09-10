@@ -1,14 +1,28 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import DayView from './components/DayView'
 import DebtsView from './components/DebtsView'
 import HabitsView from './components/HabitsView'
 import IdeasView from './components/IdeasView'
 import LoginScreen from './components/LoginScreen'
+import SectionNav from './components/SectionNav'
 import SettingsView from './components/SettingsView'
 import WeekView from './components/WeekView'
 import { useSession } from './useSession'
 
-type View = 'day' | 'week' | 'habits' | 'debts' | 'ideas'
+type Tab = 'hoy' | 'vida' | 'dinero' | 'ideas'
+type VidaSub = 'habitos' | 'semana'
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'hoy', label: 'Hoy' },
+  { value: 'vida', label: 'Vida' },
+  { value: 'dinero', label: 'Dinero' },
+  { value: 'ideas', label: 'Ideas' },
+]
+
+const VIDA_ITEMS: { value: VidaSub; label: string }[] = [
+  { value: 'habitos', label: 'Hábitos' },
+  { value: 'semana', label: 'Semana' },
+]
 
 function GearIcon() {
   return (
@@ -18,7 +32,7 @@ function GearIcon() {
   )
 }
 
-function Tab({
+function BottomTab({
   label,
   active,
   onClick,
@@ -32,7 +46,7 @@ function Tab({
       type="button"
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`py-3 text-xs focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-gray-800 ${
+      className={`py-3 text-sm focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-gray-800 ${
         active ? 'font-semibold text-gray-900' : 'font-normal text-gray-500'
       }`}
     >
@@ -43,12 +57,33 @@ function Tab({
 
 export default function App() {
   const { session, loading } = useSession()
-  const [view, setView] = useState<View>('day')
+  const [tab, setTab] = useState<Tab>('hoy')
+  const [vidaSub, setVidaSub] = useState<VidaSub>('habitos')
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  function go(next: View) {
-    setView(next)
+  function go(next: Tab) {
+    setTab(next)
     setSettingsOpen(false)
+  }
+
+  let content: ReactNode
+  if (settingsOpen) {
+    content = (
+      <SettingsView onClose={() => setSettingsOpen(false)} email={session?.user.email} />
+    )
+  } else if (tab === 'hoy') {
+    content = <DayView />
+  } else if (tab === 'vida') {
+    content = (
+      <>
+        <SectionNav items={VIDA_ITEMS} active={vidaSub} onChange={setVidaSub} />
+        {vidaSub === 'habitos' ? <HabitsView /> : <WeekView />}
+      </>
+    )
+  } else if (tab === 'dinero') {
+    content = <DebtsView />
+  } else {
+    content = <IdeasView />
   }
 
   return (
@@ -75,48 +110,18 @@ export default function App() {
             </button>
           </header>
 
-          <div className="pb-24">
-            {settingsOpen ? (
-              <SettingsView
-                onClose={() => setSettingsOpen(false)}
-                email={session.user.email}
-              />
-            ) : view === 'day' ? (
-              <DayView />
-            ) : view === 'week' ? (
-              <WeekView />
-            ) : view === 'habits' ? (
-              <HabitsView />
-            ) : view === 'debts' ? (
-              <DebtsView />
-            ) : (
-              <IdeasView />
-            )}
-          </div>
+          <div className="pb-24">{content}</div>
 
           <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
-            <div className="grid grid-cols-5">
-              <Tab label="Hoy" active={!settingsOpen && view === 'day'} onClick={() => go('day')} />
-              <Tab
-                label="Semana"
-                active={!settingsOpen && view === 'week'}
-                onClick={() => go('week')}
-              />
-              <Tab
-                label="Hábitos"
-                active={!settingsOpen && view === 'habits'}
-                onClick={() => go('habits')}
-              />
-              <Tab
-                label="Deudas"
-                active={!settingsOpen && view === 'debts'}
-                onClick={() => go('debts')}
-              />
-              <Tab
-                label="Ideas"
-                active={!settingsOpen && view === 'ideas'}
-                onClick={() => go('ideas')}
-              />
+            <div className="grid grid-cols-4">
+              {TABS.map((t) => (
+                <BottomTab
+                  key={t.value}
+                  label={t.label}
+                  active={!settingsOpen && tab === t.value}
+                  onClick={() => go(t.value)}
+                />
+              ))}
             </div>
           </nav>
         </>

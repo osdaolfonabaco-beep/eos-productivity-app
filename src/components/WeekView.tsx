@@ -124,15 +124,12 @@ export default function WeekView() {
   const habits: Habit[] = data?.habits ?? []
 
   return (
-    <main className="px-4 py-6 text-gray-900">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold">Semana</h1>
-        <p className="text-sm text-gray-500">{formatRange(monday, sunday)}</p>
-      </header>
+    <main className="px-4 pb-6 pt-4 text-gray-900">
+      <p className="mb-4 text-sm text-gray-500">{formatRange(monday, sunday)}</p>
 
       {habits.length === 0 ? (
         <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">
-          No tienes hábitos. Créalos en la pestaña Hábitos.
+          No tienes hábitos. Créalos en Hábitos.
         </p>
       ) : (
         <>
