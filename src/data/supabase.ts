@@ -52,3 +52,31 @@ export function unwrap<T>(
 export function assertOk(res: { error: PostgrestError | null }, context: string): void {
   if (res.error) throw new Error(`${context}: ${res.error.message}`)
 }
+
+/**
+ * Lee el cuerpo JSON de un error de `functions.invoke` (nuestras Edge
+ * Functions siempre responden JSON, incluso en los errores). `undefined` si
+ * no hay cuerpo o no es JSON.
+ */
+export async function readFunctionErrorBody(
+  error: { context?: unknown } | null | undefined,
+): Promise<Record<string, unknown> | undefined> {
+  const context = error?.context
+  if (!(context instanceof Response)) return undefined
+  try {
+    return (await context.clone().json()) as Record<string, unknown>
+  } catch {
+    return undefined
+  }
+}
+
+/** Une "error" + "detail" del cuerpo de una función, si los hay. */
+export function joinErrorDetail(
+  body: Record<string, unknown> | null | undefined,
+): string | undefined {
+  if (!body) return undefined
+  const parts: string[] = []
+  if (typeof body.error === 'string') parts.push(body.error)
+  if (typeof body.detail === 'string' && body.detail) parts.push(body.detail)
+  return parts.length ? parts.join(' — ') : undefined
+}

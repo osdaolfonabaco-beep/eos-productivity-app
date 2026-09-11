@@ -15,7 +15,7 @@
 import { addDays, toISODate, todayISO } from './dates'
 import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
-import { supabase } from './supabase'
+import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
 import { bucketTasks, listTasks } from './tasks'
 
 const DAYS_BACK = 14
@@ -121,29 +121,14 @@ async function buildTasksSummary(today: string): Promise<TasksSummary> {
  * Mensaje a partir del cuerpo de error de la función. Si es saturación de
  * Gemini (`code: 'overloaded'`), un mensaje entendible y nada más — el
  * detalle técnico no ayuda ahí y solo confunde. Para cualquier otro error,
- * "error" + "detail" completos, como antes.
+ * "error" + "detail" completos (compartido con otras funciones vía
+ * `joinErrorDetail`, en `./supabase`).
  */
-function messageFromBody(body: Record<string, unknown>): string | undefined {
-  if (body.code === 'overloaded' && typeof body.error === 'string') {
+function messageFromBody(body: Record<string, unknown> | null | undefined): string | undefined {
+  if (body?.code === 'overloaded' && typeof body.error === 'string') {
     return body.error
   }
-  const parts: string[] = []
-  if (typeof body.error === 'string') parts.push(body.error)
-  if (typeof body.detail === 'string' && body.detail) parts.push(body.detail)
-  return parts.length ? parts.join(' — ') : undefined
-}
-
-/** Saca el mensaje de error que puso la función, si lo hay, sin tener que ir a los logs. */
-async function extractFunctionError(error: { context?: unknown }): Promise<string | undefined> {
-  const context = error.context
-  if (!(context instanceof Response)) return undefined
-  try {
-    const body = (await context.clone().json()) as Record<string, unknown>
-    return messageFromBody(body)
-  } catch {
-    /* el cuerpo no era JSON; se usa el mensaje genérico */
-    return undefined
-  }
+  return joinErrorDetail(body)
 }
 
 /** Pide el análisis. No guarda nada: el texto vive solo en el estado de quien lo pidió. */
@@ -165,11 +150,11 @@ export async function requestAnalysis(): Promise<string> {
   }>('analyze', { body: payload })
 
   if (error) {
-    const message = await extractFunctionError(error)
+    const message = messageFromBody(await readFunctionErrorBody(error))
     throw new Error(message ?? error.message)
   }
   if (!data?.analysis) {
-    throw new Error(messageFromBody(data ?? {}) ?? 'No se pudo obtener el análisis.')
+    throw new Error(messageFromBody(data) ?? 'No se pudo obtener el análisis.')
   }
   return data.analysis
 }

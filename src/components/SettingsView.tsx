@@ -2,12 +2,17 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   applyBackup,
   clearLocalData,
+  enablePushNotifications,
   exportAll,
   exportLocal,
+  getPushPermission,
   getReminderTime,
   getTone,
+  hasActiveSubscription,
+  isPushSupported,
   parseBackup,
   readLocalCounts,
+  sendTestPush,
   setReminderTime,
   setTone,
   todayISO,
@@ -165,6 +170,52 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
       setReminderError(err instanceof Error ? err.message : 'No se pudo guardar la hora.')
     } finally {
       setReminderBusy(false)
+    }
+  }
+
+  // --- Notificaciones push (piezas 1 y 2: permiso + suscripción; sin la
+  // tarea programada todavía) ---
+  const [pushSupported] = useState(isPushSupported)
+  const [pushPermission, setPushPermission] = useState(getPushPermission)
+  const [pushActive, setPushActive] = useState<boolean | null>(null) // null = comprobando
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushError, setPushError] = useState<string | null>(null)
+  const [testResult, setTestResult] = useState<string | null>(null)
+
+  useEffect(() => {
+    hasActiveSubscription()
+      .then(setPushActive)
+      .catch(() => setPushActive(false))
+  }, [])
+
+  async function activatePush() {
+    setPushBusy(true)
+    setPushError(null)
+    try {
+      await enablePushNotifications()
+      setPushActive(true)
+      setPushPermission(getPushPermission())
+    } catch (err) {
+      setPushError(err instanceof Error ? err.message : 'No se pudo activar.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  async function testPush() {
+    setPushBusy(true)
+    setPushError(null)
+    setTestResult(null)
+    try {
+      const { enviados, fallidos } = await sendTestPush()
+      setTestResult(
+        `Enviado a ${enviados} dispositivo${enviados === 1 ? '' : 's'}` +
+          (fallidos ? `, ${fallidos} fallaron.` : '.'),
+      )
+    } catch (err) {
+      setPushError(err instanceof Error ? err.message : 'No se pudo enviar la prueba.')
+    } finally {
+      setPushBusy(false)
     }
   }
 
@@ -543,6 +594,59 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
             Desactivado. Elige una hora para activarlo.
           </p>
         )}
+      </section>
+
+      {/* -------- Notificaciones push -------- */}
+      <section className="mt-8 border-t border-gray-200 pt-6">
+        <h2 className="text-sm font-semibold text-gray-700">Notificaciones push</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Por ahora solo el permiso y un aviso de prueba; el recordatorio automático a la
+          hora de arriba llega en un paso posterior.
+        </p>
+
+        {pushError && (
+          <div className="mt-3">
+            <ActionError message={pushError} onDismiss={() => setPushError(null)} />
+          </div>
+        )}
+
+        {!pushSupported ? (
+          <p className="mt-4 text-sm text-gray-500">
+            Este navegador no admite notificaciones push.
+          </p>
+        ) : pushPermission === 'denied' ? (
+          <p className="mt-4 text-sm text-gray-500">
+            Bloqueaste las notificaciones para esta app. Actívalas desde los ajustes del
+            navegador para este sitio.
+          </p>
+        ) : (
+          <div className="mt-4 flex flex-col gap-3">
+            {!pushActive ? (
+              <button
+                type="button"
+                onClick={() => void activatePush()}
+                disabled={pushBusy}
+                className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+              >
+                {pushBusy ? 'Activando…' : 'Activar notificaciones'}
+              </button>
+            ) : (
+              <>
+                <p className="text-sm text-gray-700">Activadas en este dispositivo.</p>
+                <button
+                  type="button"
+                  onClick={() => void testPush()}
+                  disabled={pushBusy}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 disabled:opacity-40"
+                >
+                  {pushBusy ? 'Enviando…' : 'Enviar aviso de prueba'}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {testResult && <p className="mt-3 text-sm text-gray-600">{testResult}</p>}
       </section>
 
       {/* -------- Cuenta -------- */}
