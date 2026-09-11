@@ -111,27 +111,23 @@ function json(body: unknown, status: number): Response {
  * llamador decida.
  */
 async function callGemini(prompt: string, apiKey: string): Promise<Response> {
+  // Paso 1 de la corrección: sin thinkingConfig todavía (el 400 "invalid
+  // argument" venía de ahí; hay que confirmar primero la forma correcta en
+  // la documentación, no por memoria). Solo se sube maxOutputTokens, como
+  // margen, para que el razonamiento interno no se coma todo el presupuesto
+  // antes de que quede espacio para la respuesta.
+  const requestBody = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.4, maxOutputTokens: 8192 },
+  }
+  console.log('analyze: petición a Gemini', { model: GEMINI_MODEL, body: requestBody })
+
   let last: Response | undefined
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        // El error confirmó la causa con números: thoughtsTokenCount 1962 de
-        // 2048 de maxOutputTokens, dejando solo 82 para la respuesta. Esta
-        // tarea (resumir datos, sin problema a resolver) no necesita ese
-        // razonamiento: thinkingBudget: 0 lo apaga. Si gemini-3.6-flash no
-        // acepta 0, el error de Gemini dirá el mínimo aceptado (ver
-        // console.log de la respuesta cruda / el detalle que llega a la app)
-        // y hay que ajustar este número. maxOutputTokens sube a 8192 como
-        // margen, ya sin el razonamiento comiéndose el presupuesto.
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 8192,
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      }),
+      body: JSON.stringify(requestBody),
     })
     if (res.status !== 503) return res
 
