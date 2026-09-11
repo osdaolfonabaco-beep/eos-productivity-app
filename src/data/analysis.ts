@@ -1,9 +1,12 @@
 /**
  * Pide un análisis breve de hábitos y tareas a la Edge Function `analyze`,
  * que lo manda a Gemini. El payload se arma aquí, con lo mínimo necesario:
- * nombres de hábito y su patrón de los últimos 14 días, y el texto de las
- * tareas de hoy y las atrasadas. El journal nunca entra en este archivo, así
- * que estructuralmente no hay forma de que se cuele en el análisis.
+ * nombres de hábito y su patrón de los últimos 14 días, y las tareas de hoy
+ * (separadas en hechas/sin hacer) y las atrasadas de días anteriores, cada
+ * grupo en su propio campo con nombre explícito — para que no haya que
+ * inferir de un booleano o de una clave "hoy" repetida qué es cada cosa.
+ * El journal nunca entra en este archivo, así que estructuralmente no hay
+ * forma de que se cuele en el análisis.
  */
 
 import { addDays, todayISO } from './dates'
@@ -18,19 +21,29 @@ interface HabitSummary {
   ultimos14dias: string
 }
 
-interface TaskSummary {
+interface TaskItem {
   texto: string
-  hecha?: boolean
-  diasDeAtraso?: number
 }
 
+interface OverdueTaskItem {
+  texto: string
+  diasDeAtraso: number
+}
+
+/**
+ * Nombres deliberadamente explícitos y sin solapar: antes había un "hoy" a
+ * nivel raíz (la fecha) y otro "hoy" dentro de "tareas" (una lista), y el
+ * modelo llegó a confundir tareas de hoy sin hacer con atrasadas. Debe
+ * coincidir con `AnalysisPayload` de `supabase/functions/analyze/index.ts`.
+ */
 interface AnalysisPayload {
-  hoy: string
+  fechaDeHoy: string
   habitos: HabitSummary[]
-  tareas: {
-    hoy: TaskSummary[]
-    atrasadas: TaskSummary[]
-  }
+  tareasDeHoySinHacer: TaskItem[]
+  tareasDeHoyHechas: TaskItem[]
+  tareasAtrasadasDeDiasAnteriores: OverdueTaskItem[]
+  /** Se manda calculado para que el modelo no tenga que contar la lista él mismo. */
+  totalTareasAtrasadas: number
 }
 
 /** Diferencia en días de calendario entre dos fechas `YYYY-MM-DD` (`to` - `from`). */
@@ -73,15 +86,19 @@ async function buildHabitsSummary(today: string): Promise<HabitSummary[]> {
   })
 }
 
-async function buildTasksSummary(today: string): Promise<AnalysisPayload['tareas']> {
+type TasksSummary = Omit<AnalysisPayload, 'fechaDeHoy' | 'habitos'>
+
+async function buildTasksSummary(today: string): Promise<TasksSummary> {
   const tasks = await listTasks()
   const { hoy, atrasadas } = bucketTasks(tasks, today)
   return {
-    hoy: hoy.map((t) => ({ texto: t.text, hecha: t.done })),
-    atrasadas: atrasadas.map((t) => ({
+    tareasDeHoySinHacer: hoy.filter((t) => !t.done).map((t) => ({ texto: t.text })),
+    tareasDeHoyHechas: hoy.filter((t) => t.done).map((t) => ({ texto: t.text })),
+    tareasAtrasadasDeDiasAnteriores: atrasadas.map((t) => ({
       texto: t.text,
       diasDeAtraso: daysBetween(t.date ?? today, today),
     })),
+    totalTareasAtrasadas: atrasadas.length,
   }
 }
 
@@ -122,7 +139,7 @@ export async function requestAnalysis(): Promise<string> {
     buildTasksSummary(today),
   ])
 
-  const payload: AnalysisPayload = { hoy: today, habitos, tareas }
+  const payload: AnalysisPayload = { fechaDeHoy: today, habitos, ...tareas }
 
   const { data, error } = await supabase.functions.invoke<{
     analysis?: string

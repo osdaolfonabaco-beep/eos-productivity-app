@@ -41,38 +41,58 @@ interface HabitSummary {
   ultimos14dias: string
 }
 
-interface TaskSummary {
+interface TaskItem {
   texto: string
-  hecha?: boolean
-  diasDeAtraso?: number
 }
 
+interface OverdueTaskItem {
+  texto: string
+  diasDeAtraso: number
+}
+
+/**
+ * Nombres deliberadamente explícitos y sin solapar ("fechaDeHoy" en vez de
+ * "hoy", que además era el nombre de una lista de tareas): dos ejecuciones
+ * con los mismos datos llegaron a confundir tareas de hoy con atrasadas.
+ * `totalTareasAtrasadas` se manda calculado para que el modelo no tenga que
+ * contar la lista él mismo.
+ */
 interface AnalysisPayload {
-  hoy: string
+  fechaDeHoy: string
   habitos: HabitSummary[]
-  tareas: {
-    hoy: TaskSummary[]
-    atrasadas: TaskSummary[]
-  }
+  tareasDeHoySinHacer: TaskItem[]
+  tareasDeHoyHechas: TaskItem[]
+  tareasAtrasadasDeDiasAnteriores: OverdueTaskItem[]
+  totalTareasAtrasadas: number
 }
 
 function isAnalysisPayload(value: unknown): value is AnalysisPayload {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
-  if (typeof v.hoy !== 'string' || !Array.isArray(v.habitos)) return false
-  const tareas = v.tareas as Record<string, unknown> | undefined
   return (
-    typeof tareas === 'object' &&
-    tareas !== null &&
-    Array.isArray(tareas.hoy) &&
-    Array.isArray(tareas.atrasadas)
+    typeof v.fechaDeHoy === 'string' &&
+    Array.isArray(v.habitos) &&
+    Array.isArray(v.tareasDeHoySinHacer) &&
+    Array.isArray(v.tareasDeHoyHechas) &&
+    Array.isArray(v.tareasAtrasadasDeDiasAnteriores) &&
+    typeof v.totalTareasAtrasadas === 'number'
   )
 }
 
 function buildPrompt(payload: AnalysisPayload): string {
-  const instrucciones = `Eres un asistente que ayuda a revisar hábitos y tareas personales. Con los datos de abajo, escribe un análisis breve (máximo 120 palabras), EN ESPAÑOL —todo el texto, sin mezclar palabras ni frases en inglés, sin importar en qué idioma "pienses" internamente—, con tono cercano y práctico. Señala patrones (hábitos que se sostienen o se están cayendo, tareas que se acumulan) y como mucho una sugerencia concreta. No des consejos médicos ni psicológicos. No inventes datos que no estén aquí. No repitas los datos tal cual ni cites los nombres de los campos del JSON.
+  const instrucciones = `Eres un mentor directo y honesto que revisa hábitos y tareas personales, no un animador.
 
-En "ultimos14dias", cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder.`
+Escribe un análisis breve (máximo 120 palabras) EN ESPAÑOL —todo el texto, sin mezclar palabras ni frases en inglés, sin importar en qué idioma "pienses" internamente—.
+
+Empieza por lo que NO está funcionando (un hábito que se cae, tareas que se acumulan, lo que muestren los datos). Dedica al menos la mitad del texto a esa observación concreta y a una sugerencia práctica y específica para corregirla. Puedes reconocer algo que vaya bien, pero como máximo en una frase, y no al principio.
+
+Nada de signos de exclamación. Nada de frases de ánimo genéricas ("vas muy bien", "sigue así", "buen trabajo", "lo estás haciendo genial") ni relleno motivacional. Tono directo, de alguien que te dice las cosas de frente, no de quien te anima.
+
+Sobre los datos de tareas: "tareasAtrasadasDeDiasAnteriores" son de días ANTERIORES a hoy y siguen sin hacerse — son las que se acumulan. "tareasDeHoySinHacer" son de HOY: no son atrasadas aunque no estén hechas todavía, no las cuentes como acumuladas. El número de tareas atrasadas es exactamente "totalTareasAtrasadas"; usa ese número tal cual, no cuentes tú los elementos de la lista. Si "tareasAtrasadasDeDiasAnteriores" está vacía, no hay ninguna atrasada: no digas que sí las hay.
+
+En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder.
+
+No inventes datos que no estén aquí. No repitas los datos tal cual ni cites los nombres de los campos del JSON. No des consejos médicos ni psicológicos.`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(payload)}`
 }
