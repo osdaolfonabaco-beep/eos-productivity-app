@@ -16,6 +16,7 @@ export type {
   DebtStatus,
   Idea,
   IdeaStatus,
+  Task,
 } from './types'
 
 export { isISODate, toISODate, todayISO, addDays, startOfWeekISO } from './dates'
@@ -67,6 +68,17 @@ export {
   setIdeaStatus,
   archiveIdea,
 } from './ideas'
+
+export type { TaskBuckets } from './tasks'
+
+export {
+  listTasks,
+  createTask,
+  setTaskDone,
+  updateTask,
+  archiveTask,
+  bucketTasks,
+} from './tasks'
 
 export { clearLocalData } from './storage'
 

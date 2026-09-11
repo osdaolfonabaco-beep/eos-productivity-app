@@ -83,6 +83,23 @@ export interface Payment {
   amount: number
 }
 
+// --- Tareas -------------------------------------------------------------
+
+/**
+ * Una tarea diaria. No se repite (eso son los hábitos): es de una sola vez,
+ * con una fecha opcional.
+ */
+export interface Task {
+  id: string
+  text: string
+  /** Fecha `YYYY-MM-DD` local, o `null` si no tiene fecha. */
+  date: string | null
+  done: boolean
+  /** Fecha ISO completa de creación; ordena dentro de cada grupo. */
+  createdAt: string
+  archived: boolean
+}
+
 // --- Ideas ----------------------------------------------------------------
 
 /** Estado de una idea. Lo marca la persona; "descartada" no es lo mismo que archivada. */

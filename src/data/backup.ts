@@ -11,6 +11,7 @@ import {
   HABIT_COLS,
   IDEA_COLS,
   PAYMENT_COLS,
+  TASK_COLS,
   debtToRow,
   entryToRow,
   habitToRow,
@@ -21,21 +22,24 @@ import {
   rowToHabit,
   rowToIdea,
   rowToPayment,
+  rowToTask,
+  taskToRow,
 } from './rows'
 import { KEYS, readList } from './storage'
 import { assertOk, supabase, unwrap } from './supabase'
-import type { Debt, Habit, HabitEntry, Idea, Payment } from './types'
+import type { Debt, Habit, HabitEntry, Idea, Payment, Task } from './types'
 
 const APP = 'productividad'
 const VERSION = 1
 
-/** Las cinco colecciones. */
+/** Las seis colecciones. */
 export interface BackupData {
   habits: Habit[]
   entries: HabitEntry[]
   debts: Debt[]
   payments: Payment[]
   ideas: Idea[]
+  tasks: Task[]
 }
 
 /** El archivo de respaldo tal como se descarga. */
@@ -52,12 +56,13 @@ function wrap(data: BackupData): BackupFile {
 
 /** Reúne el estado de la nube en un objeto de respaldo. */
 export async function exportAll(): Promise<BackupFile> {
-  const [habits, entries, debts, payments, ideas] = await Promise.all([
+  const [habits, entries, debts, payments, ideas, tasks] = await Promise.all([
     supabase.from('habits').select(HABIT_COLS),
     supabase.from('habit_entries').select(ENTRY_COLS),
     supabase.from('debts').select(DEBT_COLS),
     supabase.from('payments').select(PAYMENT_COLS),
     supabase.from('ideas').select(IDEA_COLS),
+    supabase.from('tasks').select(TASK_COLS),
   ])
   return wrap({
     habits: unwrap(habits, 'exportAll hábitos').map(rowToHabit),
@@ -65,6 +70,7 @@ export async function exportAll(): Promise<BackupFile> {
     debts: unwrap(debts, 'exportAll deudas').map(rowToDebt),
     payments: unwrap(payments, 'exportAll pagos').map(rowToPayment),
     ideas: unwrap(ideas, 'exportAll ideas').map(rowToIdea),
+    tasks: unwrap(tasks, 'exportAll tareas').map(rowToTask),
   })
 }
 
@@ -75,8 +81,9 @@ export function readLocalBackup(): BackupData {
     entries: readList<HabitEntry>(KEYS.entries),
     debts: readList<Debt>(KEYS.debts),
     payments: readList<Payment>(KEYS.payments),
-    // Ideas nunca vivió en localStorage: nació en la nube.
+    // Ideas y Tareas nunca vivieron en localStorage: nacieron en la nube.
     ideas: [],
+    tasks: [],
   }
 }
 
@@ -112,9 +119,11 @@ export function parseBackup(value: unknown): BackupData {
       throw new Error(`El respaldo no contiene la lista "${key}".`)
     }
   }
-  // `ideas` es opcional: los respaldos anteriores a este módulo no la traen.
-  if (data.ideas !== undefined && !Array.isArray(data.ideas)) {
-    throw new Error('La lista "ideas" del respaldo no es válida.')
+  // `ideas` y `tasks` son opcionales: los respaldos anteriores no las traen.
+  for (const key of ['ideas', 'tasks'] as const) {
+    if (data[key] !== undefined && !Array.isArray(data[key])) {
+      throw new Error(`La lista "${key}" del respaldo no es válida.`)
+    }
   }
 
   return {
@@ -123,6 +132,7 @@ export function parseBackup(value: unknown): BackupData {
     debts: data.debts as Debt[],
     payments: data.payments as Payment[],
     ideas: (data.ideas as Idea[] | undefined) ?? [],
+    tasks: (data.tasks as Task[] | undefined) ?? [],
   }
 }
 
@@ -140,6 +150,7 @@ export async function applyBackup(data: BackupData): Promise<void> {
   assertOk(await clear('debts'), 'reemplazar: borrar deudas')
   assertOk(await clear('habits'), 'reemplazar: borrar hábitos')
   assertOk(await clear('ideas'), 'reemplazar: borrar ideas')
+  assertOk(await clear('tasks'), 'reemplazar: borrar tareas')
 
   if (data.habits.length) {
     assertOk(
@@ -169,6 +180,12 @@ export async function applyBackup(data: BackupData): Promise<void> {
     assertOk(
       await supabase.from('ideas').insert(data.ideas.map(ideaToRow)),
       'reemplazar: ideas',
+    )
+  }
+  if (data.tasks.length) {
+    assertOk(
+      await supabase.from('tasks').insert(data.tasks.map(taskToRow)),
+      'reemplazar: tareas',
     )
   }
 }

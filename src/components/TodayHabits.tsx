@@ -32,29 +32,19 @@ async function applyCycle(
   else await clearEntry(habitId, date)
 }
 
-/** `2026-09-08` → `Lunes, 8 de septiembre`. Solo para mostrar. */
-function formatToday(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const text = new Date(y, m - 1, d).toLocaleDateString('es', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
-  return text.charAt(0).toUpperCase() + text.slice(1)
-}
-
 interface DayData {
   habits: Habit[]
   statuses: Record<string, EntryStatus>
 }
 
 /**
- * La vista del día: la lista de hábitos de hoy y su estado.
+ * Los hábitos de hoy y su estado, como sección de la pantalla Hoy (`HomeView`
+ * pone el título y la fecha).
  *
  * Al tocar, el cambio se ve al instante (parche optimista); la escritura va
  * detrás y, si falla, un `reload` revierte y aparece una franja de error.
  */
-export default function DayView() {
+export default function TodayHabits() {
   const today = todayISO()
 
   const fetcher = useCallback(async (): Promise<DayData> => {
@@ -92,12 +82,7 @@ export default function DayView() {
   const statuses = data?.statuses ?? {}
 
   return (
-    <main className="px-4 py-6 text-gray-900">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold">Hoy</h1>
-        <p className="text-sm text-gray-500">{formatToday(today)}</p>
-      </header>
-
+    <section className="px-4 pt-3 text-gray-900">
       {actionError && (
         <ActionError message={actionError} onDismiss={() => setActionError(null)} />
       )}
@@ -119,6 +104,6 @@ export default function DayView() {
           ))}
         </ul>
       )}
-    </main>
+    </section>
   )
 }

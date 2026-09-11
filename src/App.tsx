@@ -1,16 +1,17 @@
 import { useState, type ReactNode } from 'react'
-import DayView from './components/DayView'
 import DebtsView from './components/DebtsView'
 import HabitsView from './components/HabitsView'
+import HomeView from './components/HomeView'
 import IdeasView from './components/IdeasView'
 import LoginScreen from './components/LoginScreen'
 import SectionNav from './components/SectionNav'
 import SettingsView from './components/SettingsView'
+import TasksView from './components/TasksView'
 import WeekView from './components/WeekView'
 import { useSession } from './useSession'
 
 type Tab = 'hoy' | 'vida' | 'dinero' | 'ideas'
-type VidaSub = 'habitos' | 'semana'
+type VidaSub = 'habitos' | 'semana' | 'tareas'
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'hoy', label: 'Hoy' },
@@ -22,6 +23,7 @@ const TABS: { value: Tab; label: string }[] = [
 const VIDA_ITEMS: { value: VidaSub; label: string }[] = [
   { value: 'habitos', label: 'Hábitos' },
   { value: 'semana', label: 'Semana' },
+  { value: 'tareas', label: 'Tareas' },
 ]
 
 function GearIcon() {
@@ -72,12 +74,18 @@ export default function App() {
       <SettingsView onClose={() => setSettingsOpen(false)} email={session?.user.email} />
     )
   } else if (tab === 'hoy') {
-    content = <DayView />
+    content = <HomeView />
   } else if (tab === 'vida') {
     content = (
       <>
         <SectionNav items={VIDA_ITEMS} active={vidaSub} onChange={setVidaSub} />
-        {vidaSub === 'habitos' ? <HabitsView /> : <WeekView />}
+        {vidaSub === 'habitos' ? (
+          <HabitsView />
+        ) : vidaSub === 'semana' ? (
+          <WeekView />
+        ) : (
+          <TasksView />
+        )}
       </>
     )
   } else if (tab === 'dinero') {
