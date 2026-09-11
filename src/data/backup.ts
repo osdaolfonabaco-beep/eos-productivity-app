@@ -17,20 +17,20 @@ import {
   entryToRow,
   habitToRow,
   ideaToRow,
-  journalEntryToRow,
+  journalNoteToRow,
   paymentToRow,
   rowToDebt,
   rowToEntry,
   rowToHabit,
   rowToIdea,
-  rowToJournalEntry,
+  rowToJournalNote,
   rowToPayment,
   rowToTask,
   taskToRow,
 } from './rows'
 import { KEYS, readList } from './storage'
 import { assertOk, supabase, unwrap } from './supabase'
-import type { Debt, Habit, HabitEntry, Idea, JournalEntry, Payment, Task } from './types'
+import type { Debt, Habit, HabitEntry, Idea, JournalNote, Payment, Task } from './types'
 
 const APP = 'productividad'
 const VERSION = 1
@@ -43,7 +43,7 @@ export interface BackupData {
   payments: Payment[]
   ideas: Idea[]
   tasks: Task[]
-  journal: JournalEntry[]
+  journal: JournalNote[]
 }
 
 /** El archivo de respaldo tal como se descarga. */
@@ -76,7 +76,7 @@ export async function exportAll(): Promise<BackupFile> {
     payments: unwrap(payments, 'exportAll pagos').map(rowToPayment),
     ideas: unwrap(ideas, 'exportAll ideas').map(rowToIdea),
     tasks: unwrap(tasks, 'exportAll tareas').map(rowToTask),
-    journal: unwrap(journal, 'exportAll diario').map(rowToJournalEntry),
+    journal: unwrap(journal, 'exportAll diario').map(rowToJournalNote),
   })
 }
 
@@ -140,7 +140,7 @@ export function parseBackup(value: unknown): BackupData {
     payments: data.payments as Payment[],
     ideas: (data.ideas as Idea[] | undefined) ?? [],
     tasks: (data.tasks as Task[] | undefined) ?? [],
-    journal: (data.journal as JournalEntry[] | undefined) ?? [],
+    journal: (data.journal as JournalNote[] | undefined) ?? [],
   }
 }
 
@@ -199,7 +199,7 @@ export async function applyBackup(data: BackupData): Promise<void> {
   }
   if (data.journal.length) {
     assertOk(
-      await supabase.from('journal_entries').insert(data.journal.map(journalEntryToRow)),
+      await supabase.from('journal_entries').insert(data.journal.map(journalNoteToRow)),
       'reemplazar: diario',
     )
   }

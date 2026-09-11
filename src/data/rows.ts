@@ -14,7 +14,7 @@ import type {
   HabitEntry,
   Idea,
   IdeaStatus,
-  JournalEntry,
+  JournalNote,
   Payment,
   Task,
 } from './types'
@@ -193,7 +193,7 @@ interface JournalRow {
   archived: boolean
 }
 
-export function rowToJournalEntry(r: JournalRow): JournalEntry {
+export function rowToJournalNote(r: JournalRow): JournalNote {
   return {
     id: r.id,
     date: r.date,
@@ -203,12 +203,12 @@ export function rowToJournalEntry(r: JournalRow): JournalEntry {
   }
 }
 
-export function journalEntryToRow(e: JournalEntry) {
+export function journalNoteToRow(n: JournalNote) {
   return {
-    id: e.id,
-    date: e.date,
-    text: e.text,
-    created_at: e.createdAt,
-    archived: e.archived,
+    id: n.id,
+    date: n.date,
+    text: n.text,
+    created_at: n.createdAt,
+    archived: n.archived,
   }
 }

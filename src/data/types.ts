@@ -106,13 +106,16 @@ export interface Task {
 // --- Journal --------------------------------------------------------------
 
 /**
- * Una entrada del diario: una por día. Solo se puede escribir/reescribir la
- * de hoy (regla de la interfaz, no de la base de datos); las anteriores son
- * de solo lectura y se pueden archivar, pero no editar.
+ * Una nota del diario. Varias notas pueden compartir el mismo día; dentro de
+ * un día se numeran por orden de creación ("Nota 1", "Nota 2"...) — no hay un
+ * campo de número guardado, es la posición al ordenar por `createdAt`.
+ *
+ * Solo las notas de hoy son editables (regla de la interfaz, no de la base de
+ * datos); las de días anteriores son de solo lectura, pero se pueden archivar.
  */
-export interface JournalEntry {
+export interface JournalNote {
   id: string
-  /** El día al que pertenece la entrada, `YYYY-MM-DD`. */
+  /** El día al que pertenece la nota, `YYYY-MM-DD`. */
   date: string
   text: string
   createdAt: string

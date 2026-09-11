@@ -1,69 +1,116 @@
 /**
  * El módulo de datos del diario, contra Supabase.
  *
- * Una entrada por día (`unique (user_id, date)`); escribir la de hoy es un
- * upsert. Solo la interfaz decide que las entradas pasadas no se editan — la
- * base de datos no lo impide. `promptForDate` es pura: no toca la red ni se
- * guarda en ningún sitio, solo decora la pantalla.
+ * Varias notas pueden compartir un día; se numeran por orden de creación
+ * ("Nota 1", "Nota 2"...) — no se guarda ningún número, es la posición al
+ * ordenar por `created_at`. Solo la interfaz decide que las notas de hoy son
+ * editables y las de antes no; la base de datos no lo impone. `promptForDate`
+ * es pura: no toca la red ni se guarda en ningún sitio, solo decora la pantalla.
  */
 
-import { JOURNAL_COLS, rowToJournalEntry } from './rows'
+import { JOURNAL_COLS, journalNoteToRow, rowToJournalNote } from './rows'
 import { supabase, unwrap } from './supabase'
-import type { JournalEntry } from './types'
+import type { JournalNote } from './types'
 
-/** La entrada de una fecha, o `undefined` si no hay. Ignora las archivadas. */
-export async function getJournalEntry(date: string): Promise<JournalEntry | undefined> {
+/** Las notas de un día, de la más vieja a la más nueva (Nota 1, Nota 2...). */
+export async function listTodayNotes(date: string): Promise<JournalNote[]> {
   const rows = unwrap(
     await supabase
       .from('journal_entries')
       .select(JOURNAL_COLS)
       .eq('date', date)
       .eq('archived', false)
-      .limit(1),
-    'getJournalEntry',
+      .order('created_at', { ascending: true }),
+    'listTodayNotes',
   )
-  return rows[0] ? rowToJournalEntry(rows[0]) : undefined
+  return rows.map(rowToJournalNote)
 }
 
-/** Las entradas anteriores a `date` (sin incluirla), de la más reciente a la más antigua. */
-export async function listJournalEntriesBefore(date: string): Promise<JournalEntry[]> {
+/**
+ * Todas las notas de días anteriores a `date`, sin agrupar por día.
+ * Agrúpalas con `groupNotesByDate` antes de mostrarlas.
+ */
+export async function listNotesBefore(date: string): Promise<JournalNote[]> {
   const rows = unwrap(
     await supabase
       .from('journal_entries')
       .select(JOURNAL_COLS)
       .lt('date', date)
       .eq('archived', false)
-      .order('date', { ascending: false }),
-    'listJournalEntriesBefore',
+      .order('date', { ascending: true })
+      .order('created_at', { ascending: true }),
+    'listNotesBefore',
   )
-  return rows.map(rowToJournalEntry)
+  return rows.map(rowToJournalNote)
+}
+
+/** Añade una nota nueva a un día. */
+export async function createNote(date: string, text: string): Promise<JournalNote> {
+  const clean = text.trim()
+  if (!clean) throw new Error('La nota no puede estar vacía')
+
+  const note: JournalNote = {
+    id: crypto.randomUUID(),
+    date,
+    text: clean,
+    createdAt: new Date().toISOString(),
+    archived: false,
+  }
+  const rows = unwrap(
+    await supabase.from('journal_entries').insert(journalNoteToRow(note)).select(JOURNAL_COLS),
+    'createNote',
+  )
+  return rowToJournalNote(rows[0])
 }
 
 /**
- * Escribe la entrada de `date`: la crea si no existe, o reescribe su texto si
- * ya existe. Así es "editable durante ese día" — guardar de nuevo reemplaza.
+ * Cambia el texto de una nota. Pensada para las de hoy: las de días
+ * anteriores son de solo lectura en la interfaz.
  */
-export async function saveJournalEntry(date: string, text: string): Promise<JournalEntry> {
+export async function updateNoteText(id: string, text: string): Promise<JournalNote> {
   const clean = text.trim()
-  if (!clean) throw new Error('La entrada no puede estar vacía')
+  if (!clean) throw new Error('La nota no puede estar vacía')
 
   const rows = unwrap(
     await supabase
       .from('journal_entries')
-      .upsert({ date, text: clean }, { onConflict: 'user_id,date' })
+      .update({ text: clean })
+      .eq('id', id)
       .select(JOURNAL_COLS),
-    'saveJournalEntry',
+    'updateNoteText',
   )
-  return rowToJournalEntry(rows[0])
+  if (!rows[0]) throw new Error(`No existe la nota ${id}`)
+  return rowToJournalNote(rows[0])
+}
+
+/** Archiva una nota: sale de la lista, el texto se conserva. Idempotente. */
+export async function archiveNote(id: string): Promise<void> {
+  const res = await supabase.from('journal_entries').update({ archived: true }).eq('id', id)
+  if (res.error) throw new Error(`archiveNote: ${res.error.message}`)
+}
+
+// --- Agrupación (pura) ------------------------------------------------
+
+export interface DayNotes {
+  date: string
+  notes: JournalNote[]
 }
 
 /**
- * Archiva una entrada pasada: sale de la lista, el texto se conserva.
- * Idempotente.
+ * Agrupa notas de días anteriores por fecha: del día más reciente al más
+ * antiguo, y dentro de cada día de la nota más vieja a la más nueva. Pensada
+ * para el resultado de `listNotesBefore`.
  */
-export async function archiveJournalEntry(id: string): Promise<void> {
-  const res = await supabase.from('journal_entries').update({ archived: true }).eq('id', id)
-  if (res.error) throw new Error(`archiveJournalEntry: ${res.error.message}`)
+export function groupNotesByDate(notes: JournalNote[]): DayNotes[] {
+  const byDate = new Map<string, JournalNote[]>()
+  for (const n of notes) {
+    const group = byDate.get(n.date)
+    if (group) group.push(n)
+    else byDate.set(n.date, [n])
+  }
+  return [...byDate.entries()]
+    .map(([date, dayNotes]) => ({ date, notes: dayNotes }))
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
 }
 
 // --- Pregunta sugerida (pura, no se guarda) --------------------------
