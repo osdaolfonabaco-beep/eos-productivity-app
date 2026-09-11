@@ -86,18 +86,28 @@ async function buildTasksSummary(today: string): Promise<AnalysisPayload['tareas
 }
 
 /**
- * Intenta sacar el mensaje de error que puso la función, si lo hay, con el
- * detalle (el cuerpo que devolvió Gemini) para no tener que ir a los logs.
+ * Mensaje a partir del cuerpo de error de la función. Si es saturación de
+ * Gemini (`code: 'overloaded'`), un mensaje entendible y nada más — el
+ * detalle técnico no ayuda ahí y solo confunde. Para cualquier otro error,
+ * "error" + "detail" completos, como antes.
  */
+function messageFromBody(body: Record<string, unknown>): string | undefined {
+  if (body.code === 'overloaded' && typeof body.error === 'string') {
+    return body.error
+  }
+  const parts: string[] = []
+  if (typeof body.error === 'string') parts.push(body.error)
+  if (typeof body.detail === 'string' && body.detail) parts.push(body.detail)
+  return parts.length ? parts.join(' — ') : undefined
+}
+
+/** Saca el mensaje de error que puso la función, si lo hay, sin tener que ir a los logs. */
 async function extractFunctionError(error: { context?: unknown }): Promise<string | undefined> {
   const context = error.context
   if (!(context instanceof Response)) return undefined
   try {
     const body = (await context.clone().json()) as Record<string, unknown>
-    const parts: string[] = []
-    if (typeof body.error === 'string') parts.push(body.error)
-    if (typeof body.detail === 'string' && body.detail) parts.push(body.detail)
-    return parts.length ? parts.join(' — ') : undefined
+    return messageFromBody(body)
   } catch {
     /* el cuerpo no era JSON; se usa el mensaje genérico */
     return undefined
@@ -118,15 +128,15 @@ export async function requestAnalysis(): Promise<string> {
     analysis?: string
     error?: string
     detail?: string
+    code?: string
   }>('analyze', { body: payload })
 
   if (error) {
-    const detail = await extractFunctionError(error)
-    throw new Error(detail ?? error.message)
+    const message = await extractFunctionError(error)
+    throw new Error(message ?? error.message)
   }
   if (!data?.analysis) {
-    const parts = [data?.error, data?.detail].filter((s): s is string => Boolean(s))
-    throw new Error(parts.length ? parts.join(' — ') : 'No se pudo obtener el análisis.')
+    throw new Error(messageFromBody(data ?? {}) ?? 'No se pudo obtener el análisis.')
   }
   return data.analysis
 }

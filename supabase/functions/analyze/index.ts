@@ -9,11 +9,25 @@
 //
 // Supabase exige un JWT válido antes de ejecutar esto (verify_jwt por
 // defecto): una petición sin sesión nunca llega a este código.
+//
+// Si Gemini está saturado (503), reintenta unas veces con espera creciente
+// antes de rendirse; si aun así falla, la app muestra un mensaje entendible
+// en vez del error técnico. Para cualquier otro tipo de error, el detalle
+// completo de Gemini sigue mostrándose, como antes.
 
 // Google retira modelos con el tiempo; si este vuelve a dar 404, el error de
 // Gemini (que la app ya muestra completo) suele decir el nombre nuevo.
 const GEMINI_MODEL = 'gemini-3.6-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+
+// Reintentos ante 503 ("modelo saturado"), con espera creciente entre cada
+// uno. MAX_RETRIES = 2 -> hasta 3 intentos en total.
+const MAX_RETRIES = 2
+const RETRY_BASE_DELAY_MS = 500
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -70,6 +84,38 @@ function json(body: unknown, status: number): Response {
   })
 }
 
+/**
+ * Llama a Gemini. Si responde 503 (saturado), reintenta con espera creciente
+ * (500ms, 1000ms...) hasta MAX_RETRIES veces más. Cualquier otro estado, o el
+ * último 503 si se agotan los reintentos, se devuelve tal cual para que el
+ * llamador decida.
+ */
+async function callGemini(prompt: string, apiKey: string): Promise<Response> {
+  let last: Response | undefined
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+      }),
+    })
+    if (res.status !== 503) return res
+
+    last = res
+    if (attempt < MAX_RETRIES) {
+      const delay = RETRY_BASE_DELAY_MS * 2 ** attempt
+      console.error('analyze: Gemini saturado (503), reintentando', {
+        intento: attempt + 1,
+        esperaMs: delay,
+      })
+      await sleep(delay)
+    }
+  }
+  return last!
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
@@ -102,14 +148,7 @@ Deno.serve(async (req: Request) => {
   // segura de mostrar en los logs y de devolver a la app.
   let geminiRes: Response
   try {
-    geminiRes = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: buildPrompt(payload) }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
-      }),
-    })
+    geminiRes = await callGemini(buildPrompt(payload), apiKey)
   } catch (err) {
     console.error('analyze: fallo de red al llamar a Gemini', {
       model: GEMINI_MODEL,
@@ -130,6 +169,23 @@ Deno.serve(async (req: Request) => {
       status: geminiRes.status,
       body: detail,
     })
+
+    // 503 tras agotar los reintentos: es saturación de Gemini, no un fallo
+    // nuestro. La app muestra un mensaje entendible en vez del detalle
+    // técnico; para cualquier otro estado, el detalle sigue completo.
+    if (geminiRes.status === 503) {
+      return json(
+        {
+          error: 'El servicio está saturado, inténtalo en unos minutos.',
+          code: 'overloaded',
+          detail,
+          model: GEMINI_MODEL,
+          url: GEMINI_URL,
+        },
+        503,
+      )
+    }
+
     return json(
       {
         error: `Gemini respondió con error (${geminiRes.status}).`,
