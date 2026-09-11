@@ -1,7 +1,9 @@
 /**
  * Pide un análisis breve de hábitos y tareas a la Edge Function `analyze`,
  * que lo manda a Gemini. El payload se arma aquí, con lo mínimo necesario:
- * nombres de hábito y su patrón de los últimos 14 días, y las tareas de hoy
+ * nombres de hábito, su patrón de los últimos 14 días y desde cuándo existen
+ * (para no evaluar como incumplimiento días previos a su creación), y las
+ * tareas de hoy
  * (separadas en hechas/sin hacer) y las atrasadas de días anteriores, cada
  * grupo en su propio campo con nombre explícito — para que no haya que
  * inferir de un booleano o de una clave "hoy" repetida qué es cada cosa.
@@ -9,7 +11,7 @@
  * forma de que se cuele en el análisis.
  */
 
-import { addDays, todayISO } from './dates'
+import { addDays, toISODate, todayISO } from './dates'
 import { getEntriesInRange, listHabits } from './store'
 import { supabase } from './supabase'
 import { bucketTasks, listTasks } from './tasks'
@@ -18,7 +20,12 @@ const DAYS_BACK = 14
 
 interface HabitSummary {
   nombre: string
+  /** Cada carácter es un día: H/N/. como antes, o "_" si el hábito no existía ese día. */
   ultimos14dias: string
+  /** Fecha local (YYYY-MM-DD) en que se creó el hábito. */
+  creadoEl: string
+  /** Días de historial real dentro de la ventana, ya calculados (máx. 14). */
+  diasConHistorial: number
 }
 
 interface TaskItem {
@@ -75,14 +82,18 @@ async function buildHabitsSummary(today: string): Promise<HabitSummary[]> {
   const days = Array.from({ length: DAYS_BACK }, (_, i) => addDays(start, i))
 
   return habits.map((h) => {
+    // Local, no la fecha UTC cruda de createdAt: mismo criterio que todayISO().
+    const createdDate = toISODate(new Date(h.createdAt))
     const perDay = byHabit.get(h.id)
     const code = days
       .map((d) => {
+        if (d < createdDate) return '_' // el hábito todavía no existía ese día
         const done = perDay?.get(d)
         return done === undefined ? '.' : done ? 'H' : 'N'
       })
       .join('')
-    return { nombre: h.name, ultimos14dias: code }
+    const diasConHistorial = Math.min(DAYS_BACK, Math.max(0, daysBetween(createdDate, today) + 1))
+    return { nombre: h.name, ultimos14dias: code, creadoEl: createdDate, diasConHistorial }
   })
 }
 

@@ -37,8 +37,12 @@ const CORS_HEADERS = {
 
 interface HabitSummary {
   nombre: string
-  /** Un carácter por día, de hace 13 días a hoy: H / N / . */
+  /** Un carácter por día, de hace 13 días a hoy: H / N / . / _ (no existía). */
   ultimos14dias: string
+  /** Fecha local (YYYY-MM-DD) en que se creó el hábito. */
+  creadoEl: string
+  /** Días de historial real dentro de la ventana, ya calculados (máx. 14). */
+  diasConHistorial: number
 }
 
 interface TaskItem {
@@ -90,7 +94,7 @@ Nada de signos de exclamación. Nada de frases de ánimo genéricas ("vas muy bi
 
 Sobre los datos de tareas: "tareasAtrasadasDeDiasAnteriores" son de días ANTERIORES a hoy y siguen sin hacerse — son las que se acumulan. "tareasDeHoySinHacer" son de HOY: no son atrasadas aunque no estén hechas todavía, no las cuentes como acumuladas. El número de tareas atrasadas es exactamente "totalTareasAtrasadas"; usa ese número tal cual, no cuentes tú los elementos de la lista. Si "tareasAtrasadasDeDiasAnteriores" está vacía, no hay ninguna atrasada: no digas que sí las hay.
 
-En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder.
+En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder, _ = el hábito todavía no existía ese día (se creó el "creadoEl"). Un día marcado "_" NO es un incumplimiento: no lo evalúes, no lo cuentes en contra del hábito, ignóralo como si no estuviera. Si "diasConHistorial" de un hábito es bajo (menos de 5 días, por ejemplo), dilo explícitamente ("llevas pocos días con este hábito, es pronto para ver un patrón") en vez de concluir que el hábito se sostiene o se cae.
 
 No inventes datos que no estén aquí. No repitas los datos tal cual ni cites los nombres de los campos del JSON. No des consejos médicos ni psicológicos.`
 
