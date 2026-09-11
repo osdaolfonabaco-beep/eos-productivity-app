@@ -103,6 +103,22 @@ export interface Task {
   archived: boolean
 }
 
+// --- Journal --------------------------------------------------------------
+
+/**
+ * Una entrada del diario: una por día. Solo se puede escribir/reescribir la
+ * de hoy (regla de la interfaz, no de la base de datos); las anteriores son
+ * de solo lectura y se pueden archivar, pero no editar.
+ */
+export interface JournalEntry {
+  id: string
+  /** El día al que pertenece la entrada, `YYYY-MM-DD`. */
+  date: string
+  text: string
+  createdAt: string
+  archived: boolean
+}
+
 // --- Ideas ----------------------------------------------------------------
 
 /** Estado de una idea. Lo marca la persona; "descartada" no es lo mismo que archivada. */

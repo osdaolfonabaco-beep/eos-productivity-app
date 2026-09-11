@@ -17,6 +17,7 @@ export type {
   Idea,
   IdeaStatus,
   Task,
+  JournalEntry,
 } from './types'
 
 export { isISODate, toISODate, todayISO, addDays, startOfWeekISO } from './dates'
@@ -79,6 +80,14 @@ export {
   archiveTask,
   bucketTasks,
 } from './tasks'
+
+export {
+  getJournalEntry,
+  listJournalEntriesBefore,
+  saveJournalEntry,
+  archiveJournalEntry,
+  promptForDate,
+} from './journal'
 
 export { clearLocalData } from './storage'
 

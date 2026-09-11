@@ -10,29 +10,32 @@ import {
   ENTRY_COLS,
   HABIT_COLS,
   IDEA_COLS,
+  JOURNAL_COLS,
   PAYMENT_COLS,
   TASK_COLS,
   debtToRow,
   entryToRow,
   habitToRow,
   ideaToRow,
+  journalEntryToRow,
   paymentToRow,
   rowToDebt,
   rowToEntry,
   rowToHabit,
   rowToIdea,
+  rowToJournalEntry,
   rowToPayment,
   rowToTask,
   taskToRow,
 } from './rows'
 import { KEYS, readList } from './storage'
 import { assertOk, supabase, unwrap } from './supabase'
-import type { Debt, Habit, HabitEntry, Idea, Payment, Task } from './types'
+import type { Debt, Habit, HabitEntry, Idea, JournalEntry, Payment, Task } from './types'
 
 const APP = 'productividad'
 const VERSION = 1
 
-/** Las seis colecciones. */
+/** Las siete colecciones. */
 export interface BackupData {
   habits: Habit[]
   entries: HabitEntry[]
@@ -40,6 +43,7 @@ export interface BackupData {
   payments: Payment[]
   ideas: Idea[]
   tasks: Task[]
+  journal: JournalEntry[]
 }
 
 /** El archivo de respaldo tal como se descarga. */
@@ -56,13 +60,14 @@ function wrap(data: BackupData): BackupFile {
 
 /** Reúne el estado de la nube en un objeto de respaldo. */
 export async function exportAll(): Promise<BackupFile> {
-  const [habits, entries, debts, payments, ideas, tasks] = await Promise.all([
+  const [habits, entries, debts, payments, ideas, tasks, journal] = await Promise.all([
     supabase.from('habits').select(HABIT_COLS),
     supabase.from('habit_entries').select(ENTRY_COLS),
     supabase.from('debts').select(DEBT_COLS),
     supabase.from('payments').select(PAYMENT_COLS),
     supabase.from('ideas').select(IDEA_COLS),
     supabase.from('tasks').select(TASK_COLS),
+    supabase.from('journal_entries').select(JOURNAL_COLS),
   ])
   return wrap({
     habits: unwrap(habits, 'exportAll hábitos').map(rowToHabit),
@@ -71,6 +76,7 @@ export async function exportAll(): Promise<BackupFile> {
     payments: unwrap(payments, 'exportAll pagos').map(rowToPayment),
     ideas: unwrap(ideas, 'exportAll ideas').map(rowToIdea),
     tasks: unwrap(tasks, 'exportAll tareas').map(rowToTask),
+    journal: unwrap(journal, 'exportAll diario').map(rowToJournalEntry),
   })
 }
 
@@ -81,9 +87,10 @@ export function readLocalBackup(): BackupData {
     entries: readList<HabitEntry>(KEYS.entries),
     debts: readList<Debt>(KEYS.debts),
     payments: readList<Payment>(KEYS.payments),
-    // Ideas y Tareas nunca vivieron en localStorage: nacieron en la nube.
+    // Ideas, Tareas y Journal nunca vivieron en localStorage: nacieron en la nube.
     ideas: [],
     tasks: [],
+    journal: [],
   }
 }
 
@@ -119,8 +126,8 @@ export function parseBackup(value: unknown): BackupData {
       throw new Error(`El respaldo no contiene la lista "${key}".`)
     }
   }
-  // `ideas` y `tasks` son opcionales: los respaldos anteriores no las traen.
-  for (const key of ['ideas', 'tasks'] as const) {
+  // `ideas`, `tasks` y `journal` son opcionales: los respaldos anteriores no las traen.
+  for (const key of ['ideas', 'tasks', 'journal'] as const) {
     if (data[key] !== undefined && !Array.isArray(data[key])) {
       throw new Error(`La lista "${key}" del respaldo no es válida.`)
     }
@@ -133,6 +140,7 @@ export function parseBackup(value: unknown): BackupData {
     payments: data.payments as Payment[],
     ideas: (data.ideas as Idea[] | undefined) ?? [],
     tasks: (data.tasks as Task[] | undefined) ?? [],
+    journal: (data.journal as JournalEntry[] | undefined) ?? [],
   }
 }
 
@@ -151,6 +159,7 @@ export async function applyBackup(data: BackupData): Promise<void> {
   assertOk(await clear('habits'), 'reemplazar: borrar hábitos')
   assertOk(await clear('ideas'), 'reemplazar: borrar ideas')
   assertOk(await clear('tasks'), 'reemplazar: borrar tareas')
+  assertOk(await clear('journal_entries'), 'reemplazar: borrar diario')
 
   if (data.habits.length) {
     assertOk(
@@ -186,6 +195,12 @@ export async function applyBackup(data: BackupData): Promise<void> {
     assertOk(
       await supabase.from('tasks').insert(data.tasks.map(taskToRow)),
       'reemplazar: tareas',
+    )
+  }
+  if (data.journal.length) {
+    assertOk(
+      await supabase.from('journal_entries').insert(data.journal.map(journalEntryToRow)),
+      'reemplazar: diario',
     )
   }
 }

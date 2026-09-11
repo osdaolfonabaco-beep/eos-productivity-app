@@ -14,6 +14,7 @@ import type {
   HabitEntry,
   Idea,
   IdeaStatus,
+  JournalEntry,
   Payment,
   Task,
 } from './types'
@@ -25,6 +26,7 @@ export const DEBT_COLS =
 export const PAYMENT_COLS = 'id,debt_id,date,amount'
 export const IDEA_COLS = 'id,text,status,created_at,archived'
 export const TASK_COLS = 'id,text,date,done,archived,created_at'
+export const JOURNAL_COLS = 'id,date,text,created_at,archived'
 
 interface HabitRow {
   id: string
@@ -180,5 +182,33 @@ export function taskToRow(t: Task) {
     done: t.done,
     archived: t.archived,
     created_at: t.createdAt,
+  }
+}
+
+interface JournalRow {
+  id: string
+  date: string
+  text: string
+  created_at: string
+  archived: boolean
+}
+
+export function rowToJournalEntry(r: JournalRow): JournalEntry {
+  return {
+    id: r.id,
+    date: r.date,
+    text: r.text,
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function journalEntryToRow(e: JournalEntry) {
+  return {
+    id: e.id,
+    date: e.date,
+    text: e.text,
+    created_at: e.createdAt,
+    archived: e.archived,
   }
 }
