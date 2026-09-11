@@ -95,6 +95,10 @@ export {
 
 export { requestAnalysis } from './analysis'
 
+export type { Tone } from './preferences'
+
+export { getTone, setTone } from './preferences'
+
 export { clearLocalData } from './storage'
 
 export type { UploadReport, TableReport } from './migrate'

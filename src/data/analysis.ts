@@ -3,15 +3,17 @@
  * que lo manda a Gemini. El payload se arma aquí, con lo mínimo necesario:
  * nombres de hábito, su patrón de los últimos 14 días y desde cuándo existen
  * (para no evaluar como incumplimiento días previos a su creación), y las
- * tareas de hoy
- * (separadas en hechas/sin hacer) y las atrasadas de días anteriores, cada
- * grupo en su propio campo con nombre explícito — para que no haya que
- * inferir de un booleano o de una clave "hoy" repetida qué es cada cosa.
+ * tareas de hoy (separadas en hechas/sin hacer) y las atrasadas de días
+ * anteriores, cada grupo en su propio campo con nombre explícito — para que
+ * no haya que inferir de un booleano o de una clave "hoy" repetida qué es
+ * cada cosa. También el tono elegido en Ajustes (`getTone`), para que la
+ * función sepa qué instrucción de tono usar.
  * El journal nunca entra en este archivo, así que estructuralmente no hay
  * forma de que se cuele en el análisis.
  */
 
 import { addDays, toISODate, todayISO } from './dates'
+import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
 import { supabase } from './supabase'
 import { bucketTasks, listTasks } from './tasks'
@@ -51,6 +53,8 @@ interface AnalysisPayload {
   tareasAtrasadasDeDiasAnteriores: OverdueTaskItem[]
   /** Se manda calculado para que el modelo no tenga que contar la lista él mismo. */
   totalTareasAtrasadas: number
+  /** El tono elegido en Ajustes; decide qué instrucción usa la función. */
+  tono: Tone
 }
 
 /** Diferencia en días de calendario entre dos fechas `YYYY-MM-DD` (`to` - `from`). */
@@ -97,7 +101,7 @@ async function buildHabitsSummary(today: string): Promise<HabitSummary[]> {
   })
 }
 
-type TasksSummary = Omit<AnalysisPayload, 'fechaDeHoy' | 'habitos'>
+type TasksSummary = Omit<AnalysisPayload, 'fechaDeHoy' | 'habitos' | 'tono'>
 
 async function buildTasksSummary(today: string): Promise<TasksSummary> {
   const tasks = await listTasks()
@@ -145,12 +149,13 @@ async function extractFunctionError(error: { context?: unknown }): Promise<strin
 /** Pide el análisis. No guarda nada: el texto vive solo en el estado de quien lo pidió. */
 export async function requestAnalysis(): Promise<string> {
   const today = todayISO()
-  const [habitos, tareas] = await Promise.all([
+  const [habitos, tareas, tono] = await Promise.all([
     buildHabitsSummary(today),
     buildTasksSummary(today),
+    getTone(),
   ])
 
-  const payload: AnalysisPayload = { fechaDeHoy: today, habitos, ...tareas }
+  const payload: AnalysisPayload = { fechaDeHoy: today, habitos, ...tareas, tono }
 
   const { data, error } = await supabase.functions.invoke<{
     analysis?: string

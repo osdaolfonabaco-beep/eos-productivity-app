@@ -1,19 +1,36 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   applyBackup,
   clearLocalData,
   exportAll,
   exportLocal,
+  getTone,
   parseBackup,
   readLocalCounts,
+  setTone,
   todayISO,
   uploadLocalData,
   type BackupData,
   type TableReport,
+  type Tone,
   type UploadReport,
 } from '../data'
 import { signOut } from '../data/supabase'
 import { ActionError } from './ViewState'
+
+const TONE_OPTIONS: { value: Tone; label: string; description: string }[] = [
+  {
+    value: 'directo',
+    label: 'Directo',
+    description: 'Factual y sin adornos: empieza por lo que no funciona.',
+  },
+  {
+    value: 'equilibrado',
+    label: 'Equilibrado',
+    description: 'Lo que funciona y lo que no, por igual. Por defecto.',
+  },
+  { value: 'breve', label: 'Breve', description: 'Dos o tres frases, solo lo esencial.' },
+]
 
 interface SettingsViewProps {
   onClose: () => void
@@ -93,6 +110,31 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
 
   const hasLocal =
     localCounts.habits + localCounts.entries + localCounts.debts + localCounts.payments > 0
+
+  // --- Tono del análisis ---
+  const [tone, setToneState] = useState<Tone | null>(null) // null = cargando
+  const [toneBusy, setToneBusy] = useState(false)
+  const [toneError, setToneError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getTone()
+      .then(setToneState)
+      .catch(() => setToneState('equilibrado'))
+  }, [])
+
+  async function chooseTone(next: Tone) {
+    if (next === tone || toneBusy) return
+    setToneBusy(true)
+    setToneError(null)
+    try {
+      await setTone(next)
+      setToneState(next)
+    } catch (err) {
+      setToneError(err instanceof Error ? err.message : 'No se pudo guardar el tono.')
+    } finally {
+      setToneBusy(false)
+    }
+  }
 
   function resetImport() {
     setPending(null)
@@ -392,6 +434,43 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
           </div>
         </section>
       )}
+
+      {/* -------- Tono del análisis -------- */}
+      <section className="mt-8 border-t border-gray-200 pt-6">
+        <h2 className="text-sm font-semibold text-gray-700">Tono del análisis</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Cómo quieres que te hable el análisis de hábitos y tareas.
+        </p>
+
+        {toneError && (
+          <div className="mt-3">
+            <ActionError message={toneError} onDismiss={() => setToneError(null)} />
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-col gap-2">
+          {TONE_OPTIONS.map((opt) => {
+            const active = tone === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => void chooseTone(opt.value)}
+                disabled={tone === null || toneBusy}
+                aria-pressed={active}
+                className={`rounded-lg border px-4 py-3 text-left disabled:opacity-60 ${
+                  active ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 text-gray-700'
+                }`}
+              >
+                <span className="block text-sm font-medium">{opt.label}</span>
+                <span className={`block text-xs ${active ? 'text-gray-300' : 'text-gray-500'}`}>
+                  {opt.description}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </section>
 
       {/* -------- Cuenta -------- */}
       <section className="mt-8 border-t border-gray-200 pt-6">

@@ -54,12 +54,15 @@ interface OverdueTaskItem {
   diasDeAtraso: number
 }
 
+type Tone = 'directo' | 'equilibrado' | 'breve'
+
 /**
  * Nombres deliberadamente explícitos y sin solapar ("fechaDeHoy" en vez de
  * "hoy", que además era el nombre de una lista de tareas): dos ejecuciones
  * con los mismos datos llegaron a confundir tareas de hoy con atrasadas.
  * `totalTareasAtrasadas` se manda calculado para que el modelo no tenga que
- * contar la lista él mismo.
+ * contar la lista él mismo. `tono` es la preferencia elegida en Ajustes
+ * (guardada en `user_metadata`, no en una tabla).
  */
 interface AnalysisPayload {
   fechaDeHoy: string
@@ -68,9 +71,10 @@ interface AnalysisPayload {
   tareasDeHoyHechas: TaskItem[]
   tareasAtrasadasDeDiasAnteriores: OverdueTaskItem[]
   totalTareasAtrasadas: number
+  tono: Tone
 }
 
-function isAnalysisPayload(value: unknown): value is AnalysisPayload {
+function isAnalysisPayload(value: unknown): value is Omit<AnalysisPayload, 'tono'> {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
   return (
@@ -83,14 +87,37 @@ function isAnalysisPayload(value: unknown): value is AnalysisPayload {
   )
 }
 
+/** "tono" es defensivo: si falta o llega algo raro (cliente viejo, etc.), cae a "equilibrado". */
+function toneOf(value: unknown): Tone {
+  const v = (value as { tono?: unknown } | null)?.tono
+  return v === 'directo' || v === 'equilibrado' || v === 'breve' ? v : 'equilibrado'
+}
+
+const TONE_INSTRUCTIONS: Record<Tone, string> = {
+  directo: `Eres un mentor directo y honesto que revisa hábitos y tareas personales, no un animador.
+
+Escribe un análisis breve (máximo 120 palabras). Empieza por lo que NO está funcionando (un hábito que se cae, tareas que se acumulan, lo que muestren los datos). Dedica al menos la mitad del texto a esa observación concreta y a una sugerencia práctica y específica para corregirla. Puedes reconocer algo que vaya bien, pero como máximo en una frase, y no al principio.
+
+Nada de signos de exclamación. Nada de frases de ánimo genéricas ("vas muy bien", "sigue así", "buen trabajo", "lo estás haciendo genial") ni relleno motivacional. Tono directo, de alguien que te dice las cosas de frente, no de quien te anima.`,
+
+  equilibrado: `Eres un mentor honesto que revisa hábitos y tareas personales — ni animador ni crítico.
+
+Escribe un análisis breve (máximo 120 palabras). Señala por igual lo que funciona y lo que no: ni la mayoría son elogios ni la mayoría son críticas. Describe patrones y comportamientos concretos ("tres tareas llevan más de una semana sin hacerse"), nunca juzgues ni etiquetes el carácter de la persona (nada de "eres desorganizado", "te falta disciplina"). Incluye al menos una sugerencia práctica y específica.
+
+Nada de signos de exclamación ni relleno motivacional genérico.`,
+
+  breve: `Eres un mentor honesto que revisa hábitos y tareas personales.
+
+Escribe SOLO 2 o 3 frases — nada más. La observación más importante que muestren los datos (sea buena o mala, la que más importe) y, si cabe en esas frases, una sugerencia concreta. Sin exclamaciones, sin relleno, sin frases de ánimo genéricas.`,
+}
+
 function buildPrompt(payload: AnalysisPayload): string {
-  const instrucciones = `Eres un mentor directo y honesto que revisa hábitos y tareas personales, no un animador.
+  // "tono" ya se tradujo a instrucción; no hace falta que también viaje en
+  // los "Datos", donde solo confundiría (no es algo que haya que analizar).
+  const { tono, ...data } = payload
+  const instrucciones = `${TONE_INSTRUCTIONS[tono]}
 
-Escribe un análisis breve (máximo 120 palabras) EN ESPAÑOL —todo el texto, sin mezclar palabras ni frases en inglés, sin importar en qué idioma "pienses" internamente—.
-
-Empieza por lo que NO está funcionando (un hábito que se cae, tareas que se acumulan, lo que muestren los datos). Dedica al menos la mitad del texto a esa observación concreta y a una sugerencia práctica y específica para corregirla. Puedes reconocer algo que vaya bien, pero como máximo en una frase, y no al principio.
-
-Nada de signos de exclamación. Nada de frases de ánimo genéricas ("vas muy bien", "sigue así", "buen trabajo", "lo estás haciendo genial") ni relleno motivacional. Tono directo, de alguien que te dice las cosas de frente, no de quien te anima.
+Todo el texto EN ESPAÑOL, sin mezclar palabras ni frases en inglés, sin importar en qué idioma "pienses" internamente.
 
 Sobre los datos de tareas: "tareasAtrasadasDeDiasAnteriores" son de días ANTERIORES a hoy y siguen sin hacerse — son las que se acumulan. "tareasDeHoySinHacer" son de HOY: no son atrasadas aunque no estén hechas todavía, no las cuentes como acumuladas. El número de tareas atrasadas es exactamente "totalTareasAtrasadas"; usa ese número tal cual, no cuentes tú los elementos de la lista. Si "tareasAtrasadasDeDiasAnteriores" está vacía, no hay ninguna atrasada: no digas que sí las hay.
 
@@ -98,7 +125,7 @@ En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días 
 
 No inventes datos que no estén aquí. No repitas los datos tal cual ni cites los nombres de los campos del JSON. No des consejos médicos ni psicológicos.`
 
-  return `${instrucciones}\n\nDatos:\n${JSON.stringify(payload)}`
+  return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }
 
 function json(body: unknown, status: number): Response {
@@ -175,12 +202,13 @@ Deno.serve(async (req: Request) => {
   if (!isAnalysisPayload(payload)) {
     return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)
   }
+  const fullPayload: AnalysisPayload = { ...payload, tono: toneOf(payload) }
 
   // La URL no lleva la clave (va en la cabecera x-goog-api-key), así que es
   // segura de mostrar en los logs y de devolver a la app.
   let geminiRes: Response
   try {
-    geminiRes = await callGemini(buildPrompt(payload), apiKey)
+    geminiRes = await callGemini(buildPrompt(fullPayload), apiKey)
   } catch (err) {
     console.error('analyze: fallo de red al llamar a Gemini', {
       model: GEMINI_MODEL,
