@@ -118,11 +118,19 @@ async function callGemini(prompt: string, apiKey: string): Promise<Response> {
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        // gemini-3.6-flash "piensa" antes de responder, y ese razonamiento
-        // gasta del mismo presupuesto de salida; con 400 se quedaba sin
-        // espacio para la respuesta final. 2048 deja margen para pensar y
-        // para las <=120 palabras que pedimos.
-        generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+        // El error confirmó la causa con números: thoughtsTokenCount 1962 de
+        // 2048 de maxOutputTokens, dejando solo 82 para la respuesta. Esta
+        // tarea (resumir datos, sin problema a resolver) no necesita ese
+        // razonamiento: thinkingBudget: 0 lo apaga. Si gemini-3.6-flash no
+        // acepta 0, el error de Gemini dirá el mínimo aceptado (ver
+        // console.log de la respuesta cruda / el detalle que llega a la app)
+        // y hay que ajustar este número. maxOutputTokens sube a 8192 como
+        // margen, ya sin el razonamiento comiéndose el presupuesto.
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 8192,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     })
     if (res.status !== 503) return res
