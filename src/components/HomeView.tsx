@@ -10,6 +10,7 @@ import {
   type Task,
 } from '../data'
 import { useAsyncData } from '../useAsyncData'
+import AnalysisSection from './AnalysisSection'
 import TaskRow from './TaskRow'
 import TodayHabits from './TodayHabits'
 import { ActionError, LoadError, Loading } from './ViewState'
@@ -149,8 +150,9 @@ function TasksToday() {
 }
 
 /**
- * La pantalla de inicio: el título del día, los hábitos de hoy y, debajo, las
- * tareas de hoy y las atrasadas. Cada bloque carga por su cuenta.
+ * La pantalla de inicio: el título del día, los hábitos de hoy, las tareas
+ * de hoy y las atrasadas, y el análisis a pedido. Cada bloque carga por su
+ * cuenta.
  */
 export default function HomeView() {
   return (
@@ -161,6 +163,7 @@ export default function HomeView() {
       </header>
       <TodayHabits />
       <TasksToday />
+      <AnalysisSection />
     </main>
   )
 }

@@ -93,6 +93,8 @@ export {
   promptForDate,
 } from './journal'
 
+export { requestAnalysis } from './analysis'
+
 export { clearLocalData } from './storage'
 
 export type { UploadReport, TableReport } from './migrate'
