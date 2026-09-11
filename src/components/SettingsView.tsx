@@ -4,13 +4,16 @@ import {
   clearLocalData,
   exportAll,
   exportLocal,
+  getReminderTime,
   getTone,
   parseBackup,
   readLocalCounts,
+  setReminderTime,
   setTone,
   todayISO,
   uploadLocalData,
   type BackupData,
+  type ReminderTime,
   type TableReport,
   type Tone,
   type UploadReport,
@@ -133,6 +136,35 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
       setToneError(err instanceof Error ? err.message : 'No se pudo guardar el tono.')
     } finally {
       setToneBusy(false)
+    }
+  }
+
+  // --- Recordatorio diario (solo la preferencia, sin notificar todavía) ---
+  // undefined = cargando; null = desactivado; el valor = activado con esa hora.
+  const [reminder, setReminderState] = useState<ReminderTime | null | undefined>(undefined)
+  const [reminderBusy, setReminderBusy] = useState(false)
+  const [reminderError, setReminderError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getReminderTime()
+      .then(setReminderState)
+      .catch(() => setReminderState(null))
+  }, [])
+
+  async function updateReminder(hora: string | null) {
+    setReminderBusy(true)
+    setReminderError(null)
+    try {
+      await setReminderTime(hora)
+      setReminderState(
+        hora === null
+          ? null
+          : { hora, zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      )
+    } catch (err) {
+      setReminderError(err instanceof Error ? err.message : 'No se pudo guardar la hora.')
+    } finally {
+      setReminderBusy(false)
     }
   }
 
@@ -470,6 +502,47 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
             )
           })}
         </div>
+      </section>
+
+      {/* -------- Recordatorio diario -------- */}
+      <section className="mt-8 border-t border-gray-200 pt-6">
+        <h2 className="text-sm font-semibold text-gray-700">Recordatorio diario</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Hora a la que te gustaría un recordatorio para revisar tus hábitos. Por ahora
+          solo se guarda la hora; la notificación llega en un paso posterior.
+        </p>
+
+        {reminderError && (
+          <div className="mt-3">
+            <ActionError message={reminderError} onDismiss={() => setReminderError(null)} />
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <input
+            type="time"
+            value={reminder?.hora ?? '20:00'}
+            onChange={(e) => void updateReminder(e.target.value)}
+            disabled={reminder === undefined || reminderBusy}
+            aria-label="Hora del recordatorio"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-base disabled:opacity-60"
+          />
+          {reminder && (
+            <button
+              type="button"
+              onClick={() => void updateReminder(null)}
+              disabled={reminderBusy}
+              className="text-sm font-medium text-gray-500 disabled:opacity-60"
+            >
+              Desactivar
+            </button>
+          )}
+        </div>
+        {reminder === null && (
+          <p className="mt-1 text-xs text-gray-500">
+            Desactivado. Elige una hora para activarlo.
+          </p>
+        )}
       </section>
 
       {/* -------- Cuenta -------- */}

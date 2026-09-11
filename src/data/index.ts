@@ -95,9 +95,9 @@ export {
 
 export { requestAnalysis } from './analysis'
 
-export type { Tone } from './preferences'
+export type { Tone, ReminderTime } from './preferences'
 
-export { getTone, setTone } from './preferences'
+export { getTone, setTone, getReminderTime, setReminderTime } from './preferences'
 
 export { clearLocalData } from './storage'
 
