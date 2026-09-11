@@ -85,19 +85,23 @@ async function buildTasksSummary(today: string): Promise<AnalysisPayload['tareas
   }
 }
 
-/** Intenta sacar el mensaje de error que puso la función, si lo hay. */
+/**
+ * Intenta sacar el mensaje de error que puso la función, si lo hay, con el
+ * detalle (el cuerpo que devolvió Gemini) para no tener que ir a los logs.
+ */
 async function extractFunctionError(error: { context?: unknown }): Promise<string | undefined> {
   const context = error.context
   if (!(context instanceof Response)) return undefined
   try {
-    const body: unknown = await context.clone().json()
-    if (body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string') {
-      return (body as { error: string }).error
-    }
+    const body = (await context.clone().json()) as Record<string, unknown>
+    const parts: string[] = []
+    if (typeof body.error === 'string') parts.push(body.error)
+    if (typeof body.detail === 'string' && body.detail) parts.push(body.detail)
+    return parts.length ? parts.join(' — ') : undefined
   } catch {
-    /* el cuerpo no era JSON con "error"; se usa el mensaje genérico */
+    /* el cuerpo no era JSON; se usa el mensaje genérico */
+    return undefined
   }
-  return undefined
 }
 
 /** Pide el análisis. No guarda nada: el texto vive solo en el estado de quien lo pidió. */
@@ -110,17 +114,19 @@ export async function requestAnalysis(): Promise<string> {
 
   const payload: AnalysisPayload = { hoy: today, habitos, tareas }
 
-  const { data, error } = await supabase.functions.invoke<{ analysis?: string; error?: string }>(
-    'analyze',
-    { body: payload },
-  )
+  const { data, error } = await supabase.functions.invoke<{
+    analysis?: string
+    error?: string
+    detail?: string
+  }>('analyze', { body: payload })
 
   if (error) {
     const detail = await extractFunctionError(error)
     throw new Error(detail ?? error.message)
   }
   if (!data?.analysis) {
-    throw new Error(data?.error ?? 'No se pudo obtener el análisis.')
+    const parts = [data?.error, data?.detail].filter((s): s is string => Boolean(s))
+    throw new Error(parts.length ? parts.join(' — ') : 'No se pudo obtener el análisis.')
   }
   return data.analysis
 }

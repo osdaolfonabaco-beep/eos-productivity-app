@@ -78,6 +78,7 @@ Deno.serve(async (req: Request) => {
 
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) {
+    console.error('analyze: falta el secreto GEMINI_API_KEY en el proyecto')
     return json(
       { error: 'Falta configurar GEMINI_API_KEY en los secretos del proyecto.' },
       500,
@@ -95,6 +96,8 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)
   }
 
+  // La URL no lleva la clave (va en la cabecera x-goog-api-key), así que es
+  // segura de mostrar en los logs y de devolver a la app.
   let geminiRes: Response
   try {
     geminiRes = await fetch(GEMINI_URL, {
@@ -105,20 +108,46 @@ Deno.serve(async (req: Request) => {
         generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
       }),
     })
-  } catch {
-    return json({ error: 'No se pudo contactar a Gemini.' }, 502)
+  } catch (err) {
+    console.error('analyze: fallo de red al llamar a Gemini', {
+      model: GEMINI_MODEL,
+      url: GEMINI_URL,
+      error: String(err),
+    })
+    return json(
+      { error: 'No se pudo contactar a Gemini.', detail: String(err), model: GEMINI_MODEL, url: GEMINI_URL },
+      502,
+    )
   }
 
   if (!geminiRes.ok) {
-    const detail = await geminiRes.text().catch(() => '')
-    return json({ error: `Gemini respondió con error (${geminiRes.status}).`, detail }, 502)
+    const detail = await geminiRes.text().catch(() => '(sin cuerpo)')
+    console.error('analyze: Gemini respondió con error', {
+      model: GEMINI_MODEL,
+      url: GEMINI_URL,
+      status: geminiRes.status,
+      body: detail,
+    })
+    return json(
+      {
+        error: `Gemini respondió con error (${geminiRes.status}).`,
+        detail,
+        model: GEMINI_MODEL,
+        url: GEMINI_URL,
+      },
+      502,
+    )
   }
 
   const data = await geminiRes.json()
   const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
 
   if (!text) {
-    return json({ error: 'Gemini no devolvió texto.' }, 502)
+    console.error('analyze: Gemini no devolvió texto', { model: GEMINI_MODEL, body: data })
+    return json(
+      { error: 'Gemini no devolvió texto.', detail: JSON.stringify(data), model: GEMINI_MODEL },
+      502,
+    )
   }
 
   return json({ analysis: text.trim() }, 200)
