@@ -10,7 +10,9 @@
 // Supabase exige un JWT válido antes de ejecutar esto (verify_jwt por
 // defecto): una petición sin sesión nunca llega a este código.
 
-const GEMINI_MODEL = 'gemini-2.5-flash'
+// Google retira modelos con el tiempo; si este vuelve a dar 404, el error de
+// Gemini (que la app ya muestra completo) suele decir el nombre nuevo.
+const GEMINI_MODEL = 'gemini-3.6-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
 const CORS_HEADERS = {
