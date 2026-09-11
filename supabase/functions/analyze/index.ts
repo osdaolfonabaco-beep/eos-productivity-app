@@ -70,7 +70,7 @@ function isAnalysisPayload(value: unknown): value is AnalysisPayload {
 }
 
 function buildPrompt(payload: AnalysisPayload): string {
-  const instrucciones = `Eres un asistente que ayuda a revisar hábitos y tareas personales. Con los datos de abajo, escribe un análisis breve (máximo 120 palabras), en español, con tono cercano y práctico. Señala patrones (hábitos que se sostienen o se están cayendo, tareas que se acumulan) y como mucho una sugerencia concreta. No des consejos médicos ni psicológicos. No inventes datos que no estén aquí. No repitas los datos tal cual.
+  const instrucciones = `Eres un asistente que ayuda a revisar hábitos y tareas personales. Con los datos de abajo, escribe un análisis breve (máximo 120 palabras), EN ESPAÑOL —todo el texto, sin mezclar palabras ni frases en inglés, sin importar en qué idioma "pienses" internamente—, con tono cercano y práctico. Señala patrones (hábitos que se sostienen o se están cayendo, tareas que se acumulan) y como mucho una sugerencia concreta. No des consejos médicos ni psicológicos. No inventes datos que no estén aquí. No repitas los datos tal cual ni cites los nombres de los campos del JSON.
 
 En "ultimos14dias", cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder.`
 
@@ -98,7 +98,11 @@ async function callGemini(prompt: string, apiKey: string): Promise<Response> {
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+        // gemini-3.6-flash "piensa" antes de responder, y ese razonamiento
+        // gasta del mismo presupuesto de salida; con 400 se quedaba sin
+        // espacio para la respuesta final. 2048 deja margen para pensar y
+        // para las <=120 palabras que pedimos.
+        generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
       }),
     })
     if (res.status !== 503) return res
@@ -198,15 +202,53 @@ Deno.serve(async (req: Request) => {
   }
 
   const data = await geminiRes.json()
-  const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text
+  // Se registra siempre, incluso si sale bien: es la única forma de ver por
+  // qué un texto "funciona" pero sale raro (partes de razonamiento coladas,
+  // cortado a mitad, etc.) sin tener que reproducir el problema a ciegas.
+  console.log('analyze: respuesta cruda de Gemini', JSON.stringify(data))
+
+  const candidate = data?.candidates?.[0]
+  const finishReason: string | undefined = candidate?.finishReason
+
+  // Si Gemini se quedó sin presupuesto de salida, lo que haya en `parts` es
+  // una respuesta a medias (a veces mezclada con razonamiento en inglés).
+  // Mejor avisar que devolver texto cortado.
+  if (finishReason === 'MAX_TOKENS') {
+    console.error('analyze: Gemini se quedó sin tokens de salida (MAX_TOKENS)', {
+      model: GEMINI_MODEL,
+      body: data,
+    })
+    return json(
+      {
+        error: 'La respuesta de Gemini se cortó por falta de espacio de salida (MAX_TOKENS).',
+        detail: JSON.stringify(data),
+        model: GEMINI_MODEL,
+      },
+      502,
+    )
+  }
+
+  // Los modelos "thinking" pueden devolver varias partes: algunas son
+  // razonamiento interno (part.thought === true), no la respuesta. Se
+  // descartan esas y se unen las demás, en vez de tomar solo parts[0].
+  const parts: { text?: string; thought?: boolean }[] = candidate?.content?.parts ?? []
+  const text = parts
+    .filter((p) => !p.thought && typeof p.text === 'string')
+    .map((p) => p.text)
+    .join('')
+    .trim()
 
   if (!text) {
-    console.error('analyze: Gemini no devolvió texto', { model: GEMINI_MODEL, body: data })
+    console.error('analyze: Gemini no devolvió texto usable', {
+      model: GEMINI_MODEL,
+      finishReason,
+      body: data,
+    })
     return json(
       { error: 'Gemini no devolvió texto.', detail: JSON.stringify(data), model: GEMINI_MODEL },
       502,
     )
   }
 
-  return json({ analysis: text.trim() }, 200)
+  return json({ analysis: text }, 200)
 })
