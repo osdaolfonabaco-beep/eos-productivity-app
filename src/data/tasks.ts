@@ -1,11 +1,12 @@
 /**
  * El módulo de datos de tareas diarias, contra Supabase.
  *
- * Las tareas no se repiten (eso son los hábitos). `bucketTasks` reparte una
- * lista en los cuatro grupos por fecha; es puro y síncrono.
+ * Las tareas no se repiten (eso son los hábitos) y no llevan fecha elegible:
+ * son siempre del día en que se crean. La columna `date` de la tabla se
+ * conserva, pero la interfaz ni la muestra ni la deja cambiar.
  */
 
-import { isISODate } from './dates'
+import { todayISO } from './dates'
 import { TASK_COLS, rowToTask, taskToRow } from './rows'
 import { supabase, unwrap } from './supabase'
 import type { Task } from './types'
@@ -24,18 +25,15 @@ export async function listTasks(): Promise<Task[]> {
   return rows.map(rowToTask)
 }
 
-/** Crea una tarea. `date` en `YYYY-MM-DD`, o `null` para sin fecha. */
-export async function createTask(text: string, date: string | null): Promise<Task> {
+/** Crea una tarea para el día de hoy. */
+export async function createTask(text: string): Promise<Task> {
   const clean = text.trim()
   if (!clean) throw new Error('La tarea no puede estar vacía')
-  if (date !== null && !isISODate(date)) {
-    throw new Error(`Fecha inválida: ${date} (se espera YYYY-MM-DD)`)
-  }
 
   const task: Task = {
     id: crypto.randomUUID(),
     text: clean,
-    date,
+    date: todayISO(),
     done: false,
     createdAt: new Date().toISOString(),
     archived: false,
@@ -53,30 +51,14 @@ export async function setTaskDone(id: string, done: boolean): Promise<void> {
   if (res.error) throw new Error(`setTaskDone: ${res.error.message}`)
 }
 
-/**
- * Cambia el texto y/o la fecha de una tarea. `date: null` la deja sin fecha.
- * Sin reprogramar la fecha, "Atrasadas" no tendría salida.
- */
-export async function updateTask(
-  id: string,
-  patch: { text?: string; date?: string | null },
-): Promise<Task> {
-  const update: Record<string, unknown> = {}
-  if (patch.text !== undefined) {
-    const clean = patch.text.trim()
-    if (!clean) throw new Error('La tarea no puede estar vacía')
-    update.text = clean
-  }
-  if (patch.date !== undefined) {
-    if (patch.date !== null && !isISODate(patch.date)) {
-      throw new Error(`Fecha inválida: ${patch.date} (se espera YYYY-MM-DD)`)
-    }
-    update.date = patch.date
-  }
+/** Cambia el texto de una tarea. */
+export async function updateTaskText(id: string, text: string): Promise<Task> {
+  const clean = text.trim()
+  if (!clean) throw new Error('La tarea no puede estar vacía')
 
   const rows = unwrap(
-    await supabase.from('tasks').update(update).eq('id', id).select(TASK_COLS),
-    'updateTask',
+    await supabase.from('tasks').update({ text: clean }).eq('id', id).select(TASK_COLS),
+    'updateTaskText',
   )
   if (!rows[0]) throw new Error(`No existe la tarea ${id}`)
   return rowToTask(rows[0])
@@ -91,35 +73,39 @@ export async function archiveTask(id: string): Promise<void> {
 // --- Agrupación (pura) ------------------------------------------------
 
 export interface TaskBuckets {
+  /** Las de hoy. Defensivamente, también las sin fecha o con fecha futura. */
   hoy: Task[]
+  /** Las de días anteriores SIN hacer, que se arrastran hasta hacerlas o archivarlas. */
   atrasadas: Task[]
-  proximas: Task[]
-  sinFecha: Task[]
 }
 
 /**
- * Reparte las tareas en los cuatro grupos por fecha. Dentro de cada grupo, las
- * no hechas primero (por fecha y creación) y las hechas al fondo.
+ * Reparte las tareas en dos grupos. Una tarea de días anteriores ya hecha no
+ * cae en ningún grupo: se queda en la base de datos como historial. Dentro de
+ * cada grupo, las hechas van al fondo.
  */
 export function bucketTasks(tasks: Task[], today: string): TaskBuckets {
-  const buckets: TaskBuckets = { hoy: [], atrasadas: [], proximas: [], sinFecha: [] }
+  const hoy: Task[] = []
+  const atrasadas: Task[] = []
 
   for (const t of tasks) {
-    if (t.date === null) buckets.sinFecha.push(t)
-    else if (t.date === today) buckets.hoy.push(t)
-    else if (t.date < today) buckets.atrasadas.push(t)
-    else buckets.proximas.push(t)
+    if (t.date !== null && t.date < today) {
+      if (!t.done) atrasadas.push(t)
+    } else {
+      hoy.push(t)
+    }
   }
 
-  const order = (a: Task, b: Task): number => {
+  hoy.sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1
-    if (a.date && b.date && a.date !== b.date) return a.date < b.date ? -1 : 1
     return a.createdAt < b.createdAt ? -1 : 1
-  }
-  buckets.hoy.sort(order)
-  buckets.atrasadas.sort(order)
-  buckets.proximas.sort(order)
-  buckets.sinFecha.sort(order)
+  })
+  atrasadas.sort((a, b) => {
+    const da = a.date ?? ''
+    const db = b.date ?? ''
+    if (da !== db) return da < db ? -1 : 1
+    return a.createdAt < b.createdAt ? -1 : 1
+  })
 
-  return buckets
+  return { hoy, atrasadas }
 }

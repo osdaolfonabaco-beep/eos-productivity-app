@@ -92,7 +92,10 @@ export interface Payment {
 export interface Task {
   id: string
   text: string
-  /** Fecha `YYYY-MM-DD` local, o `null` si no tiene fecha. */
+  /**
+   * Fecha `YYYY-MM-DD` de la tarea. Siempre el día en que se creó; la interfaz
+   * no la muestra ni la deja cambiar. La columna se conserva para el futuro.
+   */
   date: string | null
   done: boolean
   /** Fecha ISO completa de creación; ordena dentro de cada grupo. */

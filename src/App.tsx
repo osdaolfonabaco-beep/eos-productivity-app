@@ -6,12 +6,11 @@ import IdeasView from './components/IdeasView'
 import LoginScreen from './components/LoginScreen'
 import SectionNav from './components/SectionNav'
 import SettingsView from './components/SettingsView'
-import TasksView from './components/TasksView'
 import WeekView from './components/WeekView'
 import { useSession } from './useSession'
 
 type Tab = 'hoy' | 'vida' | 'dinero' | 'ideas'
-type VidaSub = 'habitos' | 'semana' | 'tareas'
+type VidaSub = 'habitos' | 'semana'
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'hoy', label: 'Hoy' },
@@ -23,7 +22,6 @@ const TABS: { value: Tab; label: string }[] = [
 const VIDA_ITEMS: { value: VidaSub; label: string }[] = [
   { value: 'habitos', label: 'Hábitos' },
   { value: 'semana', label: 'Semana' },
-  { value: 'tareas', label: 'Tareas' },
 ]
 
 function GearIcon() {
@@ -79,13 +77,7 @@ export default function App() {
     content = (
       <>
         <SectionNav items={VIDA_ITEMS} active={vidaSub} onChange={setVidaSub} />
-        {vidaSub === 'habitos' ? (
-          <HabitsView />
-        ) : vidaSub === 'semana' ? (
-          <WeekView />
-        ) : (
-          <TasksView />
-        )}
+        {vidaSub === 'habitos' ? <HabitsView /> : <WeekView />}
       </>
     )
   } else if (tab === 'dinero') {

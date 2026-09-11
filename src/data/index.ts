@@ -75,7 +75,7 @@ export {
   listTasks,
   createTask,
   setTaskDone,
-  updateTask,
+  updateTaskText,
   archiveTask,
   bucketTasks,
 } from './tasks'

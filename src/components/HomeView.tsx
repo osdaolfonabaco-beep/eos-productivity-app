@@ -1,5 +1,14 @@
 import { useCallback, useState, type KeyboardEvent } from 'react'
-import { bucketTasks, createTask, listTasks, setTaskDone, todayISO } from '../data'
+import {
+  archiveTask,
+  bucketTasks,
+  createTask,
+  listTasks,
+  setTaskDone,
+  todayISO,
+  updateTaskText,
+  type Task,
+} from '../data'
 import { useAsyncData } from '../useAsyncData'
 import TaskRow from './TaskRow'
 import TodayHabits from './TodayHabits'
@@ -17,9 +26,10 @@ function formatToday(iso: string): string {
 }
 
 /**
- * La sección de tareas de la pantalla Hoy: alta rápida (sin fecha, asume hoy),
- * las de hoy y las atrasadas NO hechas. Si no hay ninguna de las dos, no se
- * muestra nada (salvo el campo de alta).
+ * La sección de tareas de la pantalla Hoy: alta rápida (la tarea es de hoy),
+ * las de hoy y las atrasadas (días anteriores sin hacer, que se arrastran).
+ * Cada fila permite marcar, editar el texto y archivar. Si no hay tareas en
+ * ninguno de los dos grupos, no se muestra nada salvo el campo de alta.
  */
 function TasksToday() {
   const today = todayISO()
@@ -48,12 +58,22 @@ function TasksToday() {
     const clean = text.trim()
     if (!clean || busy) return
     setText('')
-    void run(() => createTask(clean, today), 'No se pudo crear la tarea.')
+    void run(() => createTask(clean), 'No se pudo crear la tarea.')
+  }
+
+  function rowProps(t: Task) {
+    return {
+      onToggle: () =>
+        void run(() => setTaskDone(t.id, !t.done), 'No se pudo actualizar.'),
+      onSaveText: (next: string) =>
+        void run(() => updateTaskText(t.id, next), 'No se pudo guardar.'),
+      onArchive: () => void run(() => archiveTask(t.id), 'No se pudo archivar.'),
+    }
   }
 
   const buckets = data ? bucketTasks(data, today) : null
   const hoy = buckets?.hoy ?? []
-  const atrasadas = (buckets?.atrasadas ?? []).filter((t) => !t.done)
+  const atrasadas = buckets?.atrasadas ?? []
 
   return (
     <section className="px-4 pt-6 text-gray-900">
@@ -102,15 +122,7 @@ function TasksToday() {
               <ul className="flex flex-col gap-2">
                 {hoy.map((t) => (
                   <li key={t.id}>
-                    <TaskRow
-                      task={t}
-                      onToggle={() =>
-                        void run(
-                          () => setTaskDone(t.id, !t.done),
-                          'No se pudo actualizar.',
-                        )
-                      }
-                    />
+                    <TaskRow task={t} {...rowProps(t)} />
                   </li>
                 ))}
               </ul>
@@ -124,16 +136,7 @@ function TasksToday() {
               <ul className="flex flex-col gap-2">
                 {atrasadas.map((t) => (
                   <li key={t.id}>
-                    <TaskRow
-                      task={t}
-                      showDate
-                      onToggle={() =>
-                        void run(
-                          () => setTaskDone(t.id, !t.done),
-                          'No se pudo actualizar.',
-                        )
-                      }
-                    />
+                    <TaskRow task={t} {...rowProps(t)} />
                   </li>
                 ))}
               </ul>
