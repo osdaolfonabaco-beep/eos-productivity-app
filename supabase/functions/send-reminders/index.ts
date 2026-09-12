@@ -1,8 +1,10 @@
 // Edge Function "send-reminders": la llama el cron de Postgres (pg_cron +
 // pg_net, ver supabase/reminders-cron.sql) cada 5 minutos. No decide nada por
 // sí sola: revisa a quién le toca un recordatorio AHORA MISMO en su zona
-// horaria, qué hábitos le quedan sin responder hoy, y envía un push si hay
-// alguno. Si no queda ninguno sin responder, no se envía nada.
+// horaria -- cada persona puede tener hasta dos horarios independientes,
+// cada uno evaluado por separado -- qué hábitos le quedan sin responder hoy,
+// y envía un push si hay alguno. Si no queda ninguno sin responder, no se
+// envía nada.
 //
 // No hay JWT de usuario -- la llama el cron, no una persona -- así que se
 // despliega con --no-verify-jwt y se protege con su propio secreto
@@ -15,9 +17,10 @@
 // (../_shared/reminderToken.ts) para el botón "Ya los hice", que el service
 // worker invoca sin tener sesión.
 //
-// reminder_log (una fila por usuario y día) garantiza como mucho un
-// recordatorio al día por persona. La ventana de "es la hora" se ensancha a
-// 10 minutos (el doble de la cadencia del cron) para que un tick retrasado o
+// reminder_log (una fila por usuario, día y slot) garantiza como mucho un
+// recordatorio al día POR SLOT: los dos horarios pueden dispararse el mismo
+// día sin pisarse entre sí. La ventana de "es la hora" se ensancha a 10
+// minutos (el doble de la cadencia del cron) para que un tick retrasado o
 // fallido no le haga perder el recordatorio del día a nadie -- reminder_log
 // es lo que evita que ese margen termine mandándolo dos veces.
 
@@ -39,11 +42,35 @@ function json(body: unknown, status: number): Response {
 }
 
 const REMINDER_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+// Cuántos recordatorios independientes admite la app. Duplicado a propósito
+// del REMINDER_SLOT_COUNT de src/data/preferences.ts: son runtimes
+// separados (Deno vs. el bundle del cliente), no comparten imports.
+const SLOT_COUNT = 2
 
 // El cron corre cada 5 minutos; la ventana se ensancha al doble (10) para que
 // un tick retrasado o fallido no le haga perder el recordatorio del día a
 // alguien. reminder_log evita que esto lo mande dos veces.
 const WINDOW_MINUTES = 10
+
+/**
+ * Los horarios configurados por un usuario, ya en la forma nueva
+ * (array de longitud SLOT_COUNT). Entiende también la forma de la versión
+ * anterior (un solo `horaRecordatorio`) como respaldo: la migración a la
+ * forma nueva la dispara el cliente la próxima vez que abra Ajustes, y hasta
+ * entonces un recordatorio ya configurado no debe dejar de sonar.
+ */
+function horariosDe(meta: Record<string, unknown> | undefined): (string | null)[] {
+  const nuevo = meta?.horariosRecordatorio
+  if (Array.isArray(nuevo)) {
+    return Array.from({ length: SLOT_COUNT }, (_, i) => {
+      const v = nuevo[i]
+      return typeof v === 'string' && REMINDER_TIME_RE.test(v) ? v : null
+    })
+  }
+  const viejo = meta?.horaRecordatorio
+  const primero = typeof viejo === 'string' && REMINDER_TIME_RE.test(viejo) ? viejo : null
+  return [primero, ...Array(SLOT_COUNT - 1).fill(null)]
+}
 
 /** La fecha (YYYY-MM-DD) y los minutos del día, en hora local de `tz`, ahora mismo. */
 function localDateAndMinutes(tz: string, now: Date): { date: string; minutes: number } {
@@ -103,13 +130,13 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Faltan secretos de configuración.' }, 500)
   }
 
-  // Service role: esta función lee datos de TODOS los usuarios (hora de
+  // Service role: esta función lee datos de TODOS los usuarios (horarios de
   // recordatorio, hábitos, suscripciones), no solo los de quien llama --
   // porque quien llama es el cron, no una persona con sesión.
   const supabase = createClient(supabaseUrl, serviceRoleKey)
   const now = new Date()
 
-  const usersToRemind: { id: string; hora: string; tz: string }[] = []
+  const usersToRemind: { id: string; horarios: (string | null)[]; tz: string }[] = []
   for (let page = 1; ; page++) {
     const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 })
     if (error) {
@@ -117,17 +144,18 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'No se pudieron listar los usuarios.', detail: error.message }, 500)
     }
     for (const u of data.users) {
-      const hora = u.user_metadata?.horaRecordatorio
-      const tz = u.user_metadata?.zonaHorariaRecordatorio
-      if (typeof hora === 'string' && REMINDER_TIME_RE.test(hora) && typeof tz === 'string') {
-        usersToRemind.push({ id: u.id, hora, tz })
+      const meta = u.user_metadata as Record<string, unknown> | undefined
+      const tz = meta?.zonaHorariaRecordatorio
+      const horarios = horariosDe(meta)
+      if (typeof tz === 'string' && horarios.some((h) => h !== null)) {
+        usersToRemind.push({ id: u.id, horarios, tz })
       }
     }
     if (data.users.length < 200) break
   }
 
-  let usuariosEnVentana = 0
-  let usuariosNotificados = 0
+  let slotsEnVentana = 0
+  let slotsNotificados = 0
   let totalEnviados = 0
   let totalFallidos = 0
 
@@ -144,102 +172,108 @@ Deno.serve(async (req: Request) => {
       continue
     }
 
-    if (minutesSince(local.minutes, minutesOf(user.hora)) > WINDOW_MINUTES) continue
-    usuariosEnVentana++
+    for (let slot = 0; slot < user.horarios.length; slot++) {
+      const hora = user.horarios[slot]
+      if (hora === null) continue
+      if (minutesSince(local.minutes, minutesOf(hora)) > WINDOW_MINUTES) continue
+      slotsEnVentana++
 
-    const { data: already } = await supabase
-      .from('reminder_log')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .eq('date', local.date)
-      .maybeSingle()
-    if (already) continue // ya se le mandó el recordatorio de hoy
+      const { data: already } = await supabase
+        .from('reminder_log')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .eq('date', local.date)
+        .eq('slot', slot)
+        .maybeSingle()
+      if (already) continue // este slot ya se envió hoy
 
-    const { data: habits, error: habitsError } = await supabase
-      .from('habits')
-      .select('id, name')
-      .eq('user_id', user.id)
-      .eq('archived', false)
-    if (habitsError) {
-      console.error('send-reminders: error leyendo hábitos', { userId: user.id, error: habitsError })
-      continue
-    }
-    if (!habits || habits.length === 0) continue
+      const { data: habits, error: habitsError } = await supabase
+        .from('habits')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .eq('archived', false)
+      if (habitsError) {
+        console.error('send-reminders: error leyendo hábitos', { userId: user.id, error: habitsError })
+        continue
+      }
+      if (!habits || habits.length === 0) continue
 
-    const { data: entries, error: entriesError } = await supabase
-      .from('habit_entries')
-      .select('habit_id')
-      .eq('user_id', user.id)
-      .eq('date', local.date)
-    if (entriesError) {
-      console.error('send-reminders: error leyendo registros', {
-        userId: user.id,
-        error: entriesError,
+      const { data: entries, error: entriesError } = await supabase
+        .from('habit_entries')
+        .select('habit_id')
+        .eq('user_id', user.id)
+        .eq('date', local.date)
+      if (entriesError) {
+        console.error('send-reminders: error leyendo registros', {
+          userId: user.id,
+          error: entriesError,
+        })
+        continue
+      }
+
+      const answered = new Set((entries ?? []).map((e) => e.habit_id))
+      const unanswered = habits.filter((h) => !answered.has(h.id))
+      if (unanswered.length === 0) continue // regla: nada sin responder, no se envía nada
+
+      // Se registra aquí, antes de enviar: "hoy le tocaba este recordatorio"
+      // es cierto sin importar si el envío a algún dispositivo falla.
+      await supabase
+        .from('reminder_log')
+        .upsert({ user_id: user.id, date: local.date, slot }, { onConflict: 'user_id,date,slot' })
+
+      const { data: subs, error: subsError } = await supabase
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth')
+        .eq('user_id', user.id)
+      if (subsError) {
+        console.error('send-reminders: error leyendo suscripciones', {
+          userId: user.id,
+          error: subsError,
+        })
+        continue
+      }
+      if (!subs || subs.length === 0) continue
+
+      const token = await signReminderToken(user.id, local.date, tokenSecret)
+      const payload = {
+        title: 'Productividad',
+        body: habitsMessage(unanswered.map((h) => h.name)),
+        url: '/',
+        token,
+        completeUrl: `${supabaseUrl}/functions/v1/complete-habits`,
+        apikey: supabaseAnonKey,
+      }
+
+      const result = await sendPushToAll(subs as PushSubscriptionRow[], payload, {
+        publicKey: vapidPublicKey,
+        privateKey: vapidPrivateKey,
+        subject: vapidSubject,
       })
-      continue
-    }
 
-    const answered = new Set((entries ?? []).map((e) => e.habit_id))
-    const unanswered = habits.filter((h) => !answered.has(h.id))
-    if (unanswered.length === 0) continue // regla: nada sin responder, no se envía nada
+      if (result.expirados.length > 0) {
+        await supabase.from('push_subscriptions').delete().in('endpoint', result.expirados)
+      }
 
-    // Se registra aquí, antes de enviar: "hoy le tocaba un recordatorio" es
-    // cierto sin importar si el envío a algún dispositivo concreto falla.
-    await supabase
-      .from('reminder_log')
-      .upsert({ user_id: user.id, date: local.date }, { onConflict: 'user_id,date' })
+      slotsNotificados++
+      totalEnviados += result.enviados
+      totalFallidos += result.fallidos
 
-    const { data: subs, error: subsError } = await supabase
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth')
-      .eq('user_id', user.id)
-    if (subsError) {
-      console.error('send-reminders: error leyendo suscripciones', {
+      console.log('send-reminders: recordatorio enviado', {
         userId: user.id,
-        error: subsError,
+        slot,
+        habitos: unanswered.length,
+        enviados: result.enviados,
+        fallidos: result.fallidos,
       })
-      continue
     }
-    if (!subs || subs.length === 0) continue
-
-    const token = await signReminderToken(user.id, local.date, tokenSecret)
-    const payload = {
-      title: 'Productividad',
-      body: habitsMessage(unanswered.map((h) => h.name)),
-      url: '/',
-      token,
-      completeUrl: `${supabaseUrl}/functions/v1/complete-habits`,
-      apikey: supabaseAnonKey,
-    }
-
-    const result = await sendPushToAll(subs as PushSubscriptionRow[], payload, {
-      publicKey: vapidPublicKey,
-      privateKey: vapidPrivateKey,
-      subject: vapidSubject,
-    })
-
-    if (result.expirados.length > 0) {
-      await supabase.from('push_subscriptions').delete().in('endpoint', result.expirados)
-    }
-
-    usuariosNotificados++
-    totalEnviados += result.enviados
-    totalFallidos += result.fallidos
-
-    console.log('send-reminders: recordatorio enviado', {
-      userId: user.id,
-      habitos: unanswered.length,
-      enviados: result.enviados,
-      fallidos: result.fallidos,
-    })
   }
 
   return json(
     {
       ok: true,
-      usuariosConHoraConfigurada: usersToRemind.length,
-      usuariosEnVentana,
-      usuariosNotificados,
+      usuariosConRecordatorio: usersToRemind.length,
+      slotsEnVentana,
+      slotsNotificados,
       totalEnviados,
       totalFallidos,
     },

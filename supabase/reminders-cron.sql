@@ -20,7 +20,9 @@ select vault.create_secret('https://TU-PROYECTO.supabase.co', 'project_url');
 select vault.create_secret('EL-VALOR-DE-TU-CRON-SECRET', 'cron_secret');
 select vault.create_secret('EL-VALOR-DE-TU-ANON-KEY', 'anon_key');
 
--- Como mucho un recordatorio por usuario y día. send-reminders la consulta
+-- Como mucho un recordatorio por usuario, día Y SLOT (hay hasta dos horarios
+-- independientes por persona; cada uno se registra por separado, así pueden
+-- dispararse los dos el mismo día sin pisarse). send-reminders la consulta
 -- antes de enviar y la marca antes de intentar el envío (para no reintentar
 -- en el siguiente tick aunque el push falle). Sin políticas: solo la usa la
 -- función con la service role (que ignora RLS); una persona no tiene por qué
@@ -28,8 +30,9 @@ select vault.create_secret('EL-VALOR-DE-TU-ANON-KEY', 'anon_key');
 create table public.reminder_log (
   user_id  uuid not null references auth.users (id) on delete cascade,
   date     date not null,
+  slot     smallint not null check (slot in (0, 1)),
   sent_at  timestamptz not null default now(),
-  primary key (user_id, date)
+  primary key (user_id, date, slot)
 );
 
 alter table public.reminder_log enable row level security;

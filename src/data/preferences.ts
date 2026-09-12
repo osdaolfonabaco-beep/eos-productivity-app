@@ -30,45 +30,83 @@ export async function setTone(tone: Tone): Promise<void> {
   if (error) throw new Error(`setTone: ${error.message}`)
 }
 
-// --- Recordatorio diario (primer paso: solo la preferencia, sin notificar) --
+// --- Recordatorios diarios (dos, cada uno activable por separado) --------
 
-export interface ReminderTime {
-  /** "HH:MM", 24 horas, hora local. */
-  hora: string
-  /** Zona horaria IANA capturada del navegador al guardar, p. ej. "America/Bogota". */
-  zonaHoraria: string
+/** Cuántos recordatorios independientes admite la app. */
+export const REMINDER_SLOT_COUNT = 2
+
+export interface ReminderTimes {
+  /** Longitud fija `REMINDER_SLOT_COUNT`; cada posición es "HH:MM" o `null` (desactivado). */
+  horarios: (string | null)[]
+  /** Zona horaria IANA, compartida por los dos. `null` si ninguno se ha configurado nunca. */
+  zonaHoraria: string | null
 }
 
 function isReminderTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
 }
 
-/** El recordatorio guardado, o `null` si está desactivado o no se ha configurado. */
-export async function getReminderTime(): Promise<ReminderTime | null> {
-  const { data, error } = await supabase.auth.getUser()
-  if (error) throw new Error(`getReminderTime: ${error.message}`)
-  const meta = data.user?.user_metadata as Record<string, unknown> | undefined
-  const hora = meta?.horaRecordatorio
-  const zonaHoraria = meta?.zonaHorariaRecordatorio
-  if (typeof hora === 'string' && isReminderTime(hora) && typeof zonaHoraria === 'string') {
-    return { hora, zonaHoraria }
-  }
-  return null
+/** A longitud `REMINDER_SLOT_COUNT`, descartando lo que no sea una hora válida. */
+function normalizeHorarios(value: unknown): (string | null)[] {
+  const arr = Array.isArray(value) ? value : []
+  return Array.from({ length: REMINDER_SLOT_COUNT }, (_, i) => {
+    const v = arr[i]
+    return typeof v === 'string' && isReminderTime(v) ? v : null
+  })
 }
 
 /**
- * Guarda la hora del recordatorio ("HH:MM", 24h, local), o `null` para
- * desactivarlo. La zona horaria se captura sola del navegador, no la elige
- * quien usa la app: para eso está aquí, para que la futura tarea programada
- * sepa a qué hora UTC corresponde tu hora local.
+ * Los dos recordatorios y su zona horaria compartida.
+ *
+ * Migra sola, la primera vez que se llama tras esta versión, el valor único
+ * de la versión anterior (`horaRecordatorio`) al primer recordatorio de la
+ * lista nueva, y limpia esa clave vieja. El servidor (`send-reminders`) hace
+ * la misma lectura de respaldo por su cuenta, para que un recordatorio ya
+ * configurado no deje de sonar mientras nadie abre Ajustes para disparar
+ * esta migración.
  */
-export async function setReminderTime(hora: string | null): Promise<void> {
+export async function getReminderTimes(): Promise<ReminderTimes> {
+  const { data, error } = await supabase.auth.getUser()
+  if (error) throw new Error(`getReminderTimes: ${error.message}`)
+  const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>
+  const zonaHoraria = typeof meta.zonaHorariaRecordatorio === 'string' ? meta.zonaHorariaRecordatorio : null
+
+  if (meta.horariosRecordatorio !== undefined) {
+    return { horarios: normalizeHorarios(meta.horariosRecordatorio), zonaHoraria }
+  }
+
+  const oldHora = meta.horaRecordatorio
+  if (typeof oldHora === 'string' && isReminderTime(oldHora)) {
+    const horarios = normalizeHorarios([oldHora])
+    // Reescritura de una sola vez a la forma nueva; se limpia la clave vieja
+    // para no dejarla rondando con una forma que el resto del código ya no lee.
+    await supabase.auth.updateUser({ data: { horariosRecordatorio: horarios, horaRecordatorio: null } })
+    return { horarios, zonaHoraria }
+  }
+
+  return { horarios: normalizeHorarios(undefined), zonaHoraria }
+}
+
+/**
+ * Guarda la hora de un recordatorio ("HH:MM", 24h, local), o `null` para
+ * desactivar ese en concreto; el otro no se toca. La zona horaria (una sola,
+ * compartida) se recaptura del navegador cada vez que se activa cualquiera
+ * de los dos, no la elige quien usa la app: es lo que necesita el servidor
+ * para saber a qué hora UTC corresponde cada hora local.
+ */
+export async function setReminderSlot(slot: number, hora: string | null): Promise<void> {
   if (hora !== null && !isReminderTime(hora)) {
     throw new Error('Hora inválida (se espera HH:MM)')
   }
-  const zonaHoraria = hora === null ? null : Intl.DateTimeFormat().resolvedOptions().timeZone
+  const current = await getReminderTimes()
+  const horarios = [...current.horarios]
+  horarios[slot] = hora
+
+  const zonaHoraria =
+    hora !== null ? Intl.DateTimeFormat().resolvedOptions().timeZone : current.zonaHoraria
+
   const { error } = await supabase.auth.updateUser({
-    data: { horaRecordatorio: hora, zonaHorariaRecordatorio: zonaHoraria },
+    data: { horariosRecordatorio: horarios, zonaHorariaRecordatorio: zonaHoraria },
   })
-  if (error) throw new Error(`setReminderTime: ${error.message}`)
+  if (error) throw new Error(`setReminderSlot: ${error.message}`)
 }

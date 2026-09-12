@@ -6,19 +6,20 @@ import {
   exportAll,
   exportLocal,
   getPushPermission,
-  getReminderTime,
+  getReminderTimes,
   getTone,
   hasActiveSubscription,
   isPushSupported,
   parseBackup,
   readLocalCounts,
+  REMINDER_SLOT_COUNT,
   sendTestPush,
-  setReminderTime,
+  setReminderSlot,
   setTone,
   todayISO,
   uploadLocalData,
   type BackupData,
-  type ReminderTime,
+  type ReminderTimes,
   type TableReport,
   type Tone,
   type UploadReport,
@@ -39,6 +40,56 @@ const TONE_OPTIONS: { value: Tone; label: string; description: string }[] = [
   },
   { value: 'breve', label: 'Breve', description: 'Dos o tres frases, solo lo esencial.' },
 ]
+
+/** Etiqueta y valor de partida (solo para mostrar, no se guarda hasta que se toca) de cada slot. */
+const REMINDER_SLOT_META = [
+  { label: 'Primer recordatorio', placeholder: '08:00' },
+  { label: 'Segundo recordatorio', placeholder: '20:00' },
+]
+
+/** Una fila de recordatorio: hora + "Desactivar" cuando ya hay una guardada. */
+function ReminderSlotRow({
+  label,
+  placeholder,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string
+  placeholder: string
+  value: string | null | undefined // undefined = cargando
+  disabled: boolean
+  onChange: (hora: string | null) => void
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-sm font-medium text-gray-700">{label}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="time"
+          value={value ?? placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={value === undefined || disabled}
+          aria-label={label}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-base disabled:opacity-60"
+        />
+        {value != null && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            disabled={disabled}
+            className="text-sm font-medium text-gray-500 disabled:opacity-60"
+          >
+            Desactivar
+          </button>
+        )}
+      </div>
+      {value === null && (
+        <p className="mt-1 text-xs text-gray-500">Desactivado. Elige una hora para activarlo.</p>
+      )}
+    </div>
+  )
+}
 
 interface SettingsViewProps {
   onClose: () => void
@@ -144,28 +195,31 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
     }
   }
 
-  // --- Recordatorio diario (solo la preferencia, sin notificar todavía) ---
-  // undefined = cargando; null = desactivado; el valor = activado con esa hora.
-  const [reminder, setReminderState] = useState<ReminderTime | null | undefined>(undefined)
+  // --- Recordatorios diarios (dos, cada uno activable por separado) ---
+  // undefined = cargando todavía.
+  const [reminders, setRemindersState] = useState<ReminderTimes | undefined>(undefined)
   const [reminderBusy, setReminderBusy] = useState(false)
   const [reminderError, setReminderError] = useState<string | null>(null)
 
   useEffect(() => {
-    getReminderTime()
-      .then(setReminderState)
-      .catch(() => setReminderState(null))
+    getReminderTimes()
+      .then(setRemindersState)
+      .catch(() => setRemindersState({ horarios: [null, null], zonaHoraria: null }))
   }, [])
 
-  async function updateReminder(hora: string | null) {
+  async function updateReminderSlot(slot: number, hora: string | null) {
     setReminderBusy(true)
     setReminderError(null)
     try {
-      await setReminderTime(hora)
-      setReminderState(
-        hora === null
-          ? null
-          : { hora, zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone },
-      )
+      await setReminderSlot(slot, hora)
+      setRemindersState((prev) => {
+        const horarios = [...(prev?.horarios ?? Array(REMINDER_SLOT_COUNT).fill(null))]
+        horarios[slot] = hora
+        return {
+          horarios,
+          zonaHoraria: hora !== null ? Intl.DateTimeFormat().resolvedOptions().timeZone : (prev?.zonaHoraria ?? null),
+        }
+      })
     } catch (err) {
       setReminderError(err instanceof Error ? err.message : 'No se pudo guardar la hora.')
     } finally {
@@ -555,12 +609,13 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
         </div>
       </section>
 
-      {/* -------- Recordatorio diario -------- */}
+      {/* -------- Recordatorios diarios -------- */}
       <section className="mt-8 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-700">Recordatorio diario</h2>
+        <h2 className="text-sm font-semibold text-gray-700">Recordatorios diarios</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Hora a la que te gustaría un recordatorio para revisar tus hábitos. Por ahora
-          solo se guarda la hora; la notificación llega en un paso posterior.
+          Hasta dos horas al día para un recordatorio de revisar tus hábitos, cada una
+          activable por separado. Por ahora solo se guarda la hora; la notificación llega
+          en un paso posterior.
         </p>
 
         {reminderError && (
@@ -569,31 +624,18 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <input
-            type="time"
-            value={reminder?.hora ?? '20:00'}
-            onChange={(e) => void updateReminder(e.target.value)}
-            disabled={reminder === undefined || reminderBusy}
-            aria-label="Hora del recordatorio"
-            className="rounded-lg border border-gray-300 px-3 py-2 text-base disabled:opacity-60"
-          />
-          {reminder && (
-            <button
-              type="button"
-              onClick={() => void updateReminder(null)}
+        <div className="mt-4 flex flex-col gap-4">
+          {REMINDER_SLOT_META.map((meta, slot) => (
+            <ReminderSlotRow
+              key={slot}
+              label={meta.label}
+              placeholder={meta.placeholder}
+              value={reminders?.horarios[slot]}
               disabled={reminderBusy}
-              className="text-sm font-medium text-gray-500 disabled:opacity-60"
-            >
-              Desactivar
-            </button>
-          )}
+              onChange={(hora) => void updateReminderSlot(slot, hora)}
+            />
+          ))}
         </div>
-        {reminder === null && (
-          <p className="mt-1 text-xs text-gray-500">
-            Desactivado. Elige una hora para activarlo.
-          </p>
-        )}
       </section>
 
       {/* -------- Notificaciones push -------- */}

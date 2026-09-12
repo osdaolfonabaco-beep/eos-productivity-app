@@ -95,9 +95,15 @@ export {
 
 export { requestAnalysis } from './analysis'
 
-export type { Tone, ReminderTime } from './preferences'
+export type { Tone, ReminderTimes } from './preferences'
 
-export { getTone, setTone, getReminderTime, setReminderTime } from './preferences'
+export {
+  getTone,
+  setTone,
+  getReminderTimes,
+  setReminderSlot,
+  REMINDER_SLOT_COUNT,
+} from './preferences'
 
 export {
   isPushSupported,
