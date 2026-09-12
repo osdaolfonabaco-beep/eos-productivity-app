@@ -3,12 +3,7 @@
 // completa (permiso -> service worker -> suscripción guardada -> firma y
 // envío del lado del servidor) antes de montar la tarea programada.
 //
-// Usa `npm:web-push`, el paquete estándar de Node para esto: acepta las
-// claves VAPID tal cual las da `npx web-push generate-vapid-keys` (base64url),
-// sin conversión de formato. Es la primera vez que este proyecto depende de
-// un paquete npm dentro de una Edge Function (Deno) para algo más que fetch;
-// si Supabase no lo soporta bien en la práctica, el error debería verse
-// completo aquí abajo (se loguea) y en lo que devuelve la función.
+// El envío en sí vive en ../_shared/push.ts, compartido con send-reminders.
 //
 // Lee y escribe en la base de datos con el JWT de quien llama (no con la
 // service role key): RLS hace que solo se lean SUS propias suscripciones.
@@ -18,7 +13,7 @@
 // Supabase solo, en toda Edge Function.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import webpush from 'npm:web-push@3'
+import { sendPushToAll, type PushSubscriptionRow } from '../_shared/push.ts'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -31,13 +26,6 @@ function json(body: unknown, status: number): Response {
     status,
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   })
-}
-
-interface SubscriptionRow {
-  id: string
-  endpoint: string
-  p256dh: string
-  auth: string
 }
 
 Deno.serve(async (req: Request) => {
@@ -83,7 +71,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: subs, error: subsError } = await supabase
     .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth')
+    .select('endpoint, p256dh, auth')
 
   if (subsError) {
     console.error('send-test-push: error leyendo suscripciones', subsError)
@@ -93,40 +81,27 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'No tienes ninguna suscripción activa en esta cuenta.' }, 400)
   }
 
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
-
-  const payload = JSON.stringify({
-    title: 'Productividad',
-    body: 'Aviso de prueba: si ves esto, la tubería de notificaciones funciona.',
-  })
-
-  const results = await Promise.allSettled(
-    (subs as SubscriptionRow[]).map((s) =>
-      webpush.sendNotification(
-        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        payload,
-      ),
-    ),
+  const result = await sendPushToAll(
+    subs as PushSubscriptionRow[],
+    {
+      title: 'Productividad',
+      body: 'Aviso de prueba: si ves esto, la tubería de notificaciones funciona.',
+    },
+    { publicKey: vapidPublicKey, privateKey: vapidPrivateKey, subject: vapidSubject },
   )
 
-  const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
-  for (const f of failed) {
-    console.error('send-test-push: fallo al enviar a una suscripción', String(f.reason))
+  // Limpieza: si alguna suscripción ya no existe en el navegador (404/410),
+  // no tiene sentido conservarla.
+  if (result.expirados.length > 0) {
+    await supabase.from('push_subscriptions').delete().in('endpoint', result.expirados)
   }
 
-  const enviados = results.length - failed.length
-
-  if (enviados === 0) {
+  if (result.enviados === 0) {
     return json(
-      {
-        error: 'No se pudo enviar a ninguna suscripción.',
-        detail: String(failed[0]?.reason ?? '(sin detalle)'),
-        enviados: 0,
-        fallidos: failed.length,
-      },
+      { error: 'No se pudo enviar a ninguna suscripción.', enviados: 0, fallidos: result.fallidos },
       502,
     )
   }
 
-  return json({ ok: true, enviados, fallidos: failed.length }, 200)
+  return json({ ok: true, enviados: result.enviados, fallidos: result.fallidos }, 200)
 })

@@ -11,24 +11,73 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || 'Productividad'
+
+  // Botones de la notificación ("Ya los hice" / "Responder"): solo si el
+  // navegador los soporta de verdad. Safari (escritorio e iOS) descarta el
+  // array entero sin avisar; Notification.maxActions es el único dato fiable
+  // en tiempo de ejecución (no hay forma de "detectar" el soporte de otro
+  // modo). Sin token no hay nada que completar sin abrir la app, así que
+  // tampoco se ofrecen botones (p. ej. el aviso de prueba, que no trae uno).
+  const supportsActions = typeof Notification !== 'undefined' && (Notification.maxActions || 0) >= 2
+  const actions =
+    supportsActions && data.token
+      ? [
+          { action: 'complete', title: 'Ya los hice' },
+          { action: 'respond', title: 'Responder' },
+        ]
+      : undefined
+
   const options = {
     body: data.body || '',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
+    data,
+    actions,
   }
 
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
+/** Enfoca una ventana ya abierta de la app, o abre una nueva. */
+function openApp(url) {
+  return clients.matchAll({ type: 'window' }).then((all) => {
+    for (const client of all) {
+      if ('focus' in client) return client.focus()
+    }
+    if (clients.openWindow) return clients.openWindow(url || '/')
+    return undefined
+  })
+}
+
 self.addEventListener('notificationclick', (event) => {
+  const data = event.notification.data || {}
   event.notification.close()
-  event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((all) => {
-      for (const client of all) {
-        if ('focus' in client) return client.focus()
-      }
-      if (clients.openWindow) return clients.openWindow('/')
-      return undefined
-    }),
-  )
+
+  if (event.action === 'complete' && data.token && data.completeUrl) {
+    event.waitUntil(
+      fetch(data.completeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: data.apikey || '' },
+        body: JSON.stringify({ token: data.token }),
+      })
+        .then((res) =>
+          res.ok
+            ? self.registration.showNotification('Productividad', {
+                body: 'Hábitos marcados como hechos.',
+                icon: '/icons/icon-192.png',
+              })
+            : Promise.reject(new Error('HTTP ' + res.status)),
+        )
+        .catch(() =>
+          self.registration.showNotification('Productividad', {
+            body: 'No se pudo marcar. Abre la app para responder.',
+            icon: '/icons/icon-192.png',
+          }),
+        ),
+    )
+    return
+  }
+
+  // Tocar el cuerpo (action === "") o el botón "Responder": abrir/enfocar la app.
+  event.waitUntil(openApp(data.url))
 })
