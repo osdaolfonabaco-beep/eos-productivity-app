@@ -54,3 +54,31 @@ export function startOfWeekISO(isoDate: string): string {
   const sinceMonday = (dayOfWeek + 6) % 7
   return addDays(isoDate, -sinceMonday)
 }
+
+/** El último día del mes que contiene `isoDate`, como `YYYY-MM-DD`. */
+function endOfMonthISO(isoDate: string): string {
+  const [y, m] = isoDate.split('-').map(Number)
+  return toISODate(new Date(y, m, 0)) // día 0 del mes siguiente = último día de este mes
+}
+
+/**
+ * La quincena a la que pertenece `isoDate`, según el día del mes:
+ * 1–15 es la primera, 16 en adelante la segunda.
+ */
+export function quincenaLabel(isoDate: string): 'primera' | 'segunda' {
+  const day = Number(isoDate.split('-')[2])
+  return day <= 15 ? 'primera' : 'segunda'
+}
+
+/**
+ * El rango (`start`, `end`, ambos `YYYY-MM-DD`) de la quincena que contiene
+ * `isoDate`. La primera va del 1 al 15; la segunda, del 16 al último día del
+ * mes (28 a 31 según el mes).
+ */
+export function quincenaRange(isoDate: string): { start: string; end: string } {
+  const [y, m] = isoDate.split('-').map(Number)
+  const monthPrefix = `${y}-${String(m).padStart(2, '0')}`
+  return quincenaLabel(isoDate) === 'primera'
+    ? { start: `${monthPrefix}-01`, end: `${monthPrefix}-15` }
+    : { start: `${monthPrefix}-16`, end: endOfMonthISO(isoDate) }
+}

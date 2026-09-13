@@ -11,6 +11,7 @@ import type {
   DayComment,
   Debt,
   DebtStatus,
+  FixedExpense,
   GoalDirection,
   GoalResult,
   GoalUpdate,
@@ -20,6 +21,10 @@ import type {
   IdeaStatus,
   JournalNote,
   Payment,
+  Quincena,
+  SalaryPeriod,
+  SavingsContribution,
+  SavingsGoal,
   Task,
   WeeklyGoal,
 } from './types'
@@ -35,6 +40,10 @@ export const JOURNAL_COLS = 'id,date,text,created_at,archived'
 export const GOAL_COLS = 'id,week_start,text,resultado,archived,created_at'
 export const GOAL_UPDATE_COLS = 'id,goal_id,date,text,direction,created_at'
 export const DAY_COMMENT_COLS = 'id,date,text,created_at'
+export const SALARY_PERIOD_COLS = 'id,period_start,period_end,amount,archived,created_at'
+export const FIXED_EXPENSE_COLS = 'id,name,amount,quincena,archived,created_at'
+export const SAVINGS_GOAL_COLS = 'id,name,target_amount,target_date,archived,created_at'
+export const SAVINGS_CONTRIBUTION_COLS = 'id,goal_id,date,amount,archived,created_at'
 
 interface HabitRow {
   id: string
@@ -296,4 +305,128 @@ export function rowToDayComment(r: DayCommentRow): DayComment {
 
 export function dayCommentToRow(c: DayComment) {
   return { id: c.id, date: c.date, text: c.text, created_at: c.createdAt }
+}
+
+interface SalaryPeriodRow {
+  id: string
+  period_start: string
+  period_end: string
+  amount: number | string
+  archived: boolean
+  created_at: string
+}
+
+export function rowToSalaryPeriod(r: SalaryPeriodRow): SalaryPeriod {
+  return {
+    id: r.id,
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+    amount: Number(r.amount),
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function salaryPeriodToRow(p: SalaryPeriod) {
+  return {
+    id: p.id,
+    period_start: p.periodStart,
+    period_end: p.periodEnd,
+    amount: p.amount,
+    archived: p.archived,
+    created_at: p.createdAt,
+  }
+}
+
+interface FixedExpenseRow {
+  id: string
+  name: string
+  amount: number | string
+  quincena: string
+  archived: boolean
+  created_at: string
+}
+
+export function rowToFixedExpense(r: FixedExpenseRow): FixedExpense {
+  return {
+    id: r.id,
+    name: r.name,
+    amount: Number(r.amount),
+    quincena: r.quincena as Quincena,
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function fixedExpenseToRow(e: FixedExpense) {
+  return {
+    id: e.id,
+    name: e.name,
+    amount: e.amount,
+    quincena: e.quincena,
+    archived: e.archived,
+    created_at: e.createdAt,
+  }
+}
+
+interface SavingsGoalRow {
+  id: string
+  name: string
+  target_amount: number | string
+  target_date: string | null
+  archived: boolean
+  created_at: string
+}
+
+export function rowToSavingsGoal(r: SavingsGoalRow): SavingsGoal {
+  return {
+    id: r.id,
+    name: r.name,
+    targetAmount: Number(r.target_amount),
+    targetDate: r.target_date,
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function savingsGoalToRow(g: SavingsGoal) {
+  return {
+    id: g.id,
+    name: g.name,
+    target_amount: g.targetAmount,
+    target_date: g.targetDate,
+    archived: g.archived,
+    created_at: g.createdAt,
+  }
+}
+
+interface SavingsContributionRow {
+  id: string
+  goal_id: string
+  date: string
+  amount: number | string
+  archived: boolean
+  created_at: string
+}
+
+export function rowToSavingsContribution(r: SavingsContributionRow): SavingsContribution {
+  return {
+    id: r.id,
+    goalId: r.goal_id,
+    date: r.date,
+    amount: Number(r.amount),
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function savingsContributionToRow(c: SavingsContribution) {
+  return {
+    id: c.id,
+    goal_id: c.goalId,
+    date: c.date,
+    amount: c.amount,
+    archived: c.archived,
+    created_at: c.createdAt,
+  }
 }

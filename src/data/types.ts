@@ -191,3 +191,71 @@ export interface DayComment {
   text: string
   createdAt: string
 }
+
+// --- Sueldo -------------------------------------------------------------
+
+/**
+ * Cuándo se cobra un gasto fijo. `'ambas'` es cada quincena (mismo monto
+ * completo las dos veces); `'primera'`/`'segunda'` es una vez al mes, en esa
+ * mitad. No hay un campo de cadencia separado: ver `FixedExpenseCadence`.
+ */
+export type Quincena = 'primera' | 'segunda' | 'ambas'
+
+/**
+ * El sueldo registrado para una quincena concreta (`periodStart` es único).
+ * `periodStart`/`periodEnd` en `YYYY-MM-DD`: 1–15 o 16–fin de mes.
+ */
+export interface SalaryPeriod {
+  id: string
+  periodStart: string
+  periodEnd: string
+  /** Pesos colombianos, entero ≥ 0. */
+  amount: number
+  createdAt: string
+  archived: boolean
+}
+
+/**
+ * Cómo se etiqueta la cadencia de un gasto fijo en la interfaz. Es un dato
+ * derivado de `FixedExpense.quincena` (ver `fixedExpenseCadence`); nunca se
+ * guarda, para que no pueda desincronizarse de `quincena`.
+ */
+export type FixedExpenseCadence = 'mensual' | 'quincenal'
+
+/** Un gasto fijo recurrente. */
+export interface FixedExpense {
+  id: string
+  name: string
+  /** Pesos colombianos, entero > 0. */
+  amount: number
+  quincena: Quincena
+  createdAt: string
+  archived: boolean
+}
+
+/** La meta de ahorro (una sola activa a la vez en la v1). */
+export interface SavingsGoal {
+  id: string
+  name: string
+  /** Pesos colombianos, entero > 0. */
+  targetAmount: number
+  /** Fecha `YYYY-MM-DD`, o `null` si no se fijó una. */
+  targetDate: string | null
+  createdAt: string
+  archived: boolean
+}
+
+/**
+ * Un aporte anotado bajo una meta de ahorro. A diferencia de `Payment`, un
+ * aporte mal registrado se archiva en vez de borrarse.
+ */
+export interface SavingsContribution {
+  id: string
+  goalId: string
+  /** Fecha local en formato `YYYY-MM-DD`. */
+  date: string
+  /** Pesos colombianos, entero > 0. */
+  amount: number
+  createdAt: string
+  archived: boolean
+}

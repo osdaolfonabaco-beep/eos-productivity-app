@@ -23,9 +23,23 @@ export type {
   GoalUpdate,
   GoalDirection,
   DayComment,
+  Quincena,
+  SalaryPeriod,
+  FixedExpenseCadence,
+  FixedExpense,
+  SavingsGoal,
+  SavingsContribution,
 } from './types'
 
-export { isISODate, toISODate, todayISO, addDays, startOfWeekISO } from './dates'
+export {
+  isISODate,
+  toISODate,
+  todayISO,
+  addDays,
+  startOfWeekISO,
+  quincenaLabel,
+  quincenaRange,
+} from './dates'
 
 export {
   listHabits,
@@ -139,3 +153,37 @@ export { clearLocalData } from './storage'
 export type { UploadReport, TableReport } from './migrate'
 
 export { readLocalCounts, uploadLocalData } from './migrate'
+
+export type { PeriodBreakdown } from './salaryPeriods'
+
+export { getSalaryPeriod, setSalaryAmount, getPeriodBreakdown } from './salaryPeriods'
+
+export type { FixedExpenseInput } from './fixedExpenses'
+
+export {
+  listFixedExpenses,
+  createFixedExpense,
+  updateFixedExpense,
+  archiveFixedExpense,
+  fixedExpenseCadence,
+  appliesToQuincena,
+  fixedExpensesForQuincena,
+  sumFixedExpenses,
+} from './fixedExpenses'
+
+export type { SavingsGoalInput } from './savingsGoal'
+
+export {
+  getActiveSavingsGoal,
+  createSavingsGoal,
+  updateSavingsGoal,
+  archiveSavingsGoal,
+} from './savingsGoal'
+
+export {
+  listContributions,
+  addContribution,
+  archiveContribution,
+  sumContributions,
+  savingsProgress,
+} from './savingsContributions'
