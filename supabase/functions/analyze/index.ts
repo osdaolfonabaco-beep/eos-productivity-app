@@ -2,12 +2,13 @@
 // devuelve un análisis breve en español.
 //
 // Sirve DOS tipos de análisis, discriminados por "tipo" en el payload:
-// "diario" (hábitos de los últimos 14 días + tareas de hoy/atrasadas, el
-// original) y "semanal" (el dashboard de Vida -> Semana: cumplimiento de
-// esta semana por hábito y comparación con la anterior, más las metas de la
-// semana y sus avances). Se reutiliza la
-// misma función -- y el mismo TONE_INSTRUCTIONS -- en vez de crear una
-// segunda; solo cambia qué prompt se construye antes de llamar a Gemini.
+// "diario" (hábitos de los últimos 14 días + tareas de hoy/atrasadas + el
+// comentario del día, el original) y "semanal" (el dashboard de Vida ->
+// Semana: cumplimiento de esta semana por hábito y comparación con la
+// anterior, las metas de la semana y sus avances, y los comentarios del día
+// de esta semana). Se reutiliza la misma función -- y el mismo
+// TONE_INSTRUCTIONS -- en vez de crear una segunda; solo cambia qué prompt
+// se construye antes de llamar a Gemini.
 //
 // No toca la base de datos: el cliente (src/data/analysis.ts) arma el JSON
 // y se lo manda ya listo. El journal nunca pasa por aquí, en ninguno de los
@@ -81,10 +82,15 @@ interface DailyPayload {
   tareasDeHoyHechas: TaskItem[]
   tareasAtrasadasDeDiasAnteriores: OverdueTaskItem[]
   totalTareasAtrasadas: number
+  /** El comentario del día, o `null`/ausente si no se escribió ninguno. Distinto del journal, que nunca llega aquí. */
+  comentarioDelDia?: string | null
   tono: Tone
 }
 
 function isDailyPayload(v: Record<string, unknown>): v is DailyPayload {
+  if (v.comentarioDelDia !== undefined && v.comentarioDelDia !== null && typeof v.comentarioDelDia !== 'string') {
+    return false
+  }
   return (
     typeof v.fechaDeHoy === 'string' &&
     Array.isArray(v.habitos) &&
@@ -134,6 +140,11 @@ interface PastGoalSummary {
   resultado: GoalResult | null
 }
 
+interface DayCommentSummary {
+  fecha: string
+  texto: string
+}
+
 interface WeeklyPayload {
   tipo: 'semanal'
   semanaActual: { inicio: string; fin: string }
@@ -143,6 +154,8 @@ interface WeeklyPayload {
   habitos: WeeklyHabitSummary[]
   metas: GoalSummary[]
   metasSemanaAnterior: PastGoalSummary[]
+  /** Los comentarios del día de esta semana que sí se escribieron. Opcional por lo mismo que el resto: tolerancia defensiva. */
+  comentariosDeLaSemana?: DayCommentSummary[]
   tono: Tone
 }
 
@@ -184,6 +197,12 @@ function isPastGoalSummary(v: unknown): v is PastGoalSummary {
   return typeof g.texto === 'string' && isGoalResult(g.resultado)
 }
 
+function isDayCommentSummary(v: unknown): v is DayCommentSummary {
+  if (typeof v !== 'object' || v === null) return false
+  const c = v as Record<string, unknown>
+  return typeof c.fecha === 'string' && typeof c.texto === 'string'
+}
+
 function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
   if (v.tipo !== 'semanal') return false
   const semanaActual = v.semanaActual as Record<string, unknown> | undefined
@@ -195,6 +214,11 @@ function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
   if (!Array.isArray(v.metas) || !v.metas.every(isGoalSummary)) return false
   if (!Array.isArray(v.metasSemanaAnterior) || !v.metasSemanaAnterior.every(isPastGoalSummary)) {
     return false
+  }
+  if (v.comentariosDeLaSemana !== undefined) {
+    if (!Array.isArray(v.comentariosDeLaSemana) || !v.comentariosDeLaSemana.every(isDayCommentSummary)) {
+      return false
+    }
   }
   return (v.habitos as unknown[]).every((h) => {
     if (typeof h !== 'object' || h === null) return false
@@ -247,7 +271,9 @@ ${COMMON_CLOSING}
 
 Sobre los datos de tareas: "tareasAtrasadasDeDiasAnteriores" son de días ANTERIORES a hoy y siguen sin hacerse — son las que se acumulan. "tareasDeHoySinHacer" son de HOY: no son atrasadas aunque no estén hechas todavía, no las cuentes como acumuladas. El número de tareas atrasadas es exactamente "totalTareasAtrasadas"; usa ese número tal cual, no cuentes tú los elementos de la lista. Si "tareasAtrasadasDeDiasAnteriores" está vacía, no hay ninguna atrasada: no digas que sí las hay.
 
-En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder, _ = el hábito todavía no existía ese día (se creó el "creadoEl"). Un día marcado "_" NO es un incumplimiento: no lo evalúes, no lo cuentes en contra del hábito, ignóralo como si no estuviera. Si "diasConHistorial" de un hábito es bajo (menos de 5 días, por ejemplo), dilo explícitamente ("llevas pocos días con este hábito, es pronto para ver un patrón") en vez de concluir que el hábito se sostiene o se cae.`
+En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder, _ = el hábito todavía no existía ese día (se creó el "creadoEl"). Un día marcado "_" NO es un incumplimiento: no lo evalúes, no lo cuentes en contra del hábito, ignóralo como si no estuviera. Si "diasConHistorial" de un hábito es bajo (menos de 5 días, por ejemplo), dilo explícitamente ("llevas pocos días con este hábito, es pronto para ver un patrón") en vez de concluir que el hábito se sostiene o se cae.
+
+"comentarioDelDia" es lo que la persona escribió sobre cómo fue hoy (puede ser null si no escribió nada). Es contexto para leer junto a los hábitos y tareas, no el dato principal: úsalo para matizar o explicar lo que ya muestran las casillas, no lo repitas ni lo cites entero. Si es null, no lo menciones — no es un hueco que señalar.`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }
@@ -262,7 +288,9 @@ Estás mirando el dashboard semanal de hábitos, no el resumen de un solo día. 
 
 Si "semanaAnterior" es null en un hábito, ESE HÁBITO es demasiado nuevo para comparar: dilo tal cual ("es muy pronto para comparar este hábito, lleva menos de dos semanas") y NO inventes si mejoró o empeoró. Si "hayHistoriaSuficiente" es false, NINGÚN hábito tiene semana anterior completa todavía: dilo una sola vez de forma general (no lo repitas por cada hábito) y limita el análisis a cómo va esta semana, sin comparar con nada. Cuando sí haya "semanaAnterior", compara los "hecho" de las dos semanas para decir en qué se mejoró y qué empeoró — descríbelo, no te limites a citar los números. Si "diasTranscurridos" de esta semana es bajo (1 o 2), acláralo en vez de sacar conclusiones fuertes sobre una semana que apenas empieza.
 
-Además de los hábitos hay metas de la semana, en "metas": cada una es "texto" (la meta), "resultado" ("cumplida", "no-cumplida" o null si aún no se cierra) y "avances" (la bitácora: cada uno con "fecha", "texto" y "direccion" — "acerca" es un avance, "aleja" es un retroceso). Coméntalas junto con los hábitos: si una meta no tiene avances todavía, dilo ("todavía no has anotado nada sobre esta meta") en vez de suponer que va bien o mal; si tiene avances, di hacia dónde apunta el conjunto (más "acerca" que "aleja", o al revés), sin listar cada avance uno por uno. "metasSemanaAnterior" trae las metas de la semana pasada con su "resultado" final (puede venir vacía, o con "resultado" null si nunca se cerraron) — úsalas solo para dar contexto de continuidad si tiene sentido ("la semana pasada te propusiste X y la cumpliste/no la cumpliste"), sin inventar nada que no diga "resultado". Si tanto "metas" como "metasSemanaAnterior" están vacías, no hables de metas: no es un hueco que haya que señalar, simplemente no se usó esta parte esa semana.`
+Además de los hábitos hay metas de la semana, en "metas": cada una es "texto" (la meta), "resultado" ("cumplida", "no-cumplida" o null si aún no se cierra) y "avances" (la bitácora: cada uno con "fecha", "texto" y "direccion" — "acerca" es un avance, "aleja" es un retroceso). Coméntalas junto con los hábitos: si una meta no tiene avances todavía, dilo ("todavía no has anotado nada sobre esta meta") en vez de suponer que va bien o mal; si tiene avances, di hacia dónde apunta el conjunto (más "acerca" que "aleja", o al revés), sin listar cada avance uno por uno. "metasSemanaAnterior" trae las metas de la semana pasada con su "resultado" final (puede venir vacía, o con "resultado" null si nunca se cerraron) — úsalas solo para dar contexto de continuidad si tiene sentido ("la semana pasada te propusiste X y la cumpliste/no la cumpliste"), sin inventar nada que no diga "resultado". Si tanto "metas" como "metasSemanaAnterior" están vacías, no hables de metas: no es un hueco que haya que señalar, simplemente no se usó esta parte esa semana.
+
+"comentariosDeLaSemana" trae, para los días de esta semana en que la persona escribió algo sobre cómo fue el día, "fecha" y "texto" (los días sin comentario simplemente no aparecen en la lista). Es contexto adicional, igual que en el análisis diario: úsalo para matizar lo que ya muestran los hábitos y las metas, no lo repitas ni lo cites entero, y si la lista viene vacía no lo menciones.`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }

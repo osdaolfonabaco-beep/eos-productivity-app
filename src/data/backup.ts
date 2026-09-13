@@ -6,6 +6,7 @@
  */
 
 import {
+  DAY_COMMENT_COLS,
   DEBT_COLS,
   ENTRY_COLS,
   GOAL_COLS,
@@ -15,6 +16,7 @@ import {
   JOURNAL_COLS,
   PAYMENT_COLS,
   TASK_COLS,
+  dayCommentToRow,
   debtToRow,
   entryToRow,
   goalToRow,
@@ -23,6 +25,7 @@ import {
   ideaToRow,
   journalNoteToRow,
   paymentToRow,
+  rowToDayComment,
   rowToDebt,
   rowToEntry,
   rowToGoal,
@@ -37,6 +40,7 @@ import {
 import { KEYS, readList } from './storage'
 import { assertOk, supabase, unwrap } from './supabase'
 import type {
+  DayComment,
   Debt,
   GoalUpdate,
   Habit,
@@ -51,7 +55,7 @@ import type {
 const APP = 'productividad'
 const VERSION = 1
 
-/** Las nueve colecciones. */
+/** Las diez colecciones. */
 export interface BackupData {
   habits: Habit[]
   entries: HabitEntry[]
@@ -62,6 +66,7 @@ export interface BackupData {
   journal: JournalNote[]
   weeklyGoals: WeeklyGoal[]
   goalUpdates: GoalUpdate[]
+  dayComments: DayComment[]
 }
 
 /** El archivo de respaldo tal como se descarga. */
@@ -78,7 +83,7 @@ function wrap(data: BackupData): BackupFile {
 
 /** Reúne el estado de la nube en un objeto de respaldo. */
 export async function exportAll(): Promise<BackupFile> {
-  const [habits, entries, debts, payments, ideas, tasks, journal, weeklyGoals, goalUpdates] =
+  const [habits, entries, debts, payments, ideas, tasks, journal, weeklyGoals, goalUpdates, dayComments] =
     await Promise.all([
       supabase.from('habits').select(HABIT_COLS),
       supabase.from('habit_entries').select(ENTRY_COLS),
@@ -89,6 +94,7 @@ export async function exportAll(): Promise<BackupFile> {
       supabase.from('journal_entries').select(JOURNAL_COLS),
       supabase.from('weekly_goals').select(GOAL_COLS),
       supabase.from('goal_updates').select(GOAL_UPDATE_COLS),
+      supabase.from('day_comments').select(DAY_COMMENT_COLS),
     ])
   return wrap({
     habits: unwrap(habits, 'exportAll hábitos').map(rowToHabit),
@@ -100,6 +106,7 @@ export async function exportAll(): Promise<BackupFile> {
     journal: unwrap(journal, 'exportAll diario').map(rowToJournalNote),
     weeklyGoals: unwrap(weeklyGoals, 'exportAll metas').map(rowToGoal),
     goalUpdates: unwrap(goalUpdates, 'exportAll avances').map(rowToGoalUpdate),
+    dayComments: unwrap(dayComments, 'exportAll comentarios del día').map(rowToDayComment),
   })
 }
 
@@ -110,12 +117,14 @@ export function readLocalBackup(): BackupData {
     entries: readList<HabitEntry>(KEYS.entries),
     debts: readList<Debt>(KEYS.debts),
     payments: readList<Payment>(KEYS.payments),
-    // Ideas, Tareas, Journal y Metas nunca vivieron en localStorage: nacieron en la nube.
+    // Ideas, Tareas, Journal, Metas y el comentario del día nunca vivieron en
+    // localStorage: nacieron en la nube.
     ideas: [],
     tasks: [],
     journal: [],
     weeklyGoals: [],
     goalUpdates: [],
+    dayComments: [],
   }
 }
 
@@ -151,9 +160,16 @@ export function parseBackup(value: unknown): BackupData {
       throw new Error(`El respaldo no contiene la lista "${key}".`)
     }
   }
-  // `ideas`, `tasks`, `journal`, `weeklyGoals` y `goalUpdates` son opcionales:
-  // los respaldos anteriores a cada una no las traen.
-  for (const key of ['ideas', 'tasks', 'journal', 'weeklyGoals', 'goalUpdates'] as const) {
+  // `ideas`, `tasks`, `journal`, `weeklyGoals`, `goalUpdates` y `dayComments`
+  // son opcionales: los respaldos anteriores a cada una no las traen.
+  for (const key of [
+    'ideas',
+    'tasks',
+    'journal',
+    'weeklyGoals',
+    'goalUpdates',
+    'dayComments',
+  ] as const) {
     if (data[key] !== undefined && !Array.isArray(data[key])) {
       throw new Error(`La lista "${key}" del respaldo no es válida.`)
     }
@@ -169,6 +185,7 @@ export function parseBackup(value: unknown): BackupData {
     journal: (data.journal as JournalNote[] | undefined) ?? [],
     weeklyGoals: (data.weeklyGoals as WeeklyGoal[] | undefined) ?? [],
     goalUpdates: (data.goalUpdates as GoalUpdate[] | undefined) ?? [],
+    dayComments: (data.dayComments as DayComment[] | undefined) ?? [],
   }
 }
 
@@ -190,6 +207,7 @@ export async function applyBackup(data: BackupData): Promise<void> {
   assertOk(await clear('ideas'), 'reemplazar: borrar ideas')
   assertOk(await clear('tasks'), 'reemplazar: borrar tareas')
   assertOk(await clear('journal_entries'), 'reemplazar: borrar diario')
+  assertOk(await clear('day_comments'), 'reemplazar: borrar comentarios del día')
 
   if (data.habits.length) {
     assertOk(
@@ -243,6 +261,12 @@ export async function applyBackup(data: BackupData): Promise<void> {
     assertOk(
       await supabase.from('goal_updates').insert(data.goalUpdates.map(goalUpdateToRow)),
       'reemplazar: avances',
+    )
+  }
+  if (data.dayComments.length) {
+    assertOk(
+      await supabase.from('day_comments').insert(data.dayComments.map(dayCommentToRow)),
+      'reemplazar: comentarios del día',
     )
   }
 }

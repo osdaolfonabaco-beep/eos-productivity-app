@@ -174,3 +174,20 @@ export interface GoalUpdate {
   direction: GoalDirection
   createdAt: string
 }
+
+// --- Comentario del día -----------------------------------------------------
+
+/**
+ * Una o dos frases sobre cómo fue el día, en la pantalla Hoy. Uno por día
+ * (`saveDayComment` reemplaza el de esa fecha); solo el de hoy es editable
+ * desde la interfaz, sin historial navegable. A diferencia del journal, ESTE
+ * texto entra en el análisis diario y semanal — por eso la interfaz avisa
+ * junto al campo.
+ */
+export interface DayComment {
+  id: string
+  /** Fecha local en formato `YYYY-MM-DD`. */
+  date: string
+  text: string
+  createdAt: string
+}

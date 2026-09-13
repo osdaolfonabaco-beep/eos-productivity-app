@@ -13,6 +13,25 @@ import {
 import { useAsyncData } from '../useAsyncData'
 import { ActionError, LoadError, Loading } from './ViewState'
 
+/** Candado: "esto se queda aquí". Contraste a propósito con el icono de DayCommentSection. */
+function PrivateIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  )
+}
+
 /** `2026-09-08` → `Lunes, 8 de septiembre`. Solo para mostrar. */
 function formatLongDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
@@ -119,6 +138,11 @@ function NoteEditor({
       </button>
 
       {prompt && <p className="mb-2 text-sm italic text-gray-500">{prompt}</p>}
+
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500">
+        <PrivateIcon />
+        Privado. Nunca se envía a ninguna IA.
+      </p>
 
       <textarea
         value={text}

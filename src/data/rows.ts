@@ -8,6 +8,7 @@
  */
 
 import type {
+  DayComment,
   Debt,
   DebtStatus,
   GoalDirection,
@@ -33,6 +34,7 @@ export const TASK_COLS = 'id,text,date,done,archived,created_at'
 export const JOURNAL_COLS = 'id,date,text,created_at,archived'
 export const GOAL_COLS = 'id,week_start,text,resultado,archived,created_at'
 export const GOAL_UPDATE_COLS = 'id,goal_id,date,text,direction,created_at'
+export const DAY_COMMENT_COLS = 'id,date,text,created_at'
 
 interface HabitRow {
   id: string
@@ -279,4 +281,19 @@ export function goalUpdateToRow(u: GoalUpdate) {
     direction: u.direction,
     created_at: u.createdAt,
   }
+}
+
+interface DayCommentRow {
+  id: string
+  date: string
+  text: string
+  created_at: string
+}
+
+export function rowToDayComment(r: DayCommentRow): DayComment {
+  return { id: r.id, date: r.date, text: r.text, createdAt: r.created_at }
+}
+
+export function dayCommentToRow(c: DayComment) {
+  return { id: c.id, date: c.date, text: c.text, created_at: c.createdAt }
 }

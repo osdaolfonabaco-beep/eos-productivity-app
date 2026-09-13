@@ -13,11 +13,14 @@
  *
  * Los dos payloads usan campos explícitos y sin solapar — nunca inferir de
  * un booleano o de una clave repetida qué es cada cosa — y llevan el tono
- * elegido en Ajustes (`getTone`). El journal nunca entra en este archivo, así
- * que estructuralmente no hay forma de que se cuele en ningún análisis.
+ * elegido en Ajustes (`getTone`). También el comentario del día (uno o dos
+ * frases escritas en Hoy, `./dayComments`) — a diferencia del journal, que
+ * nunca entra en este archivo y así estructuralmente no hay forma de que se
+ * cuele en ningún análisis.
  */
 
 import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
+import { getDayComment, getDayCommentsInRange } from './dayComments'
 import { listGoalUpdates, listWeeklyGoals } from './goals'
 import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
@@ -62,6 +65,8 @@ interface DailyAnalysisPayload {
   tareasAtrasadasDeDiasAnteriores: OverdueTaskItem[]
   /** Se manda calculado para que el modelo no tenga que contar la lista él mismo. */
   totalTareasAtrasadas: number
+  /** El comentario del día, o `null` si no se escribió ninguno. Distinto del journal, que no entra aquí. */
+  comentarioDelDia: string | null
   /** El tono elegido en Ajustes; decide qué instrucción usa la función. */
   tono: Tone
 }
@@ -104,6 +109,11 @@ interface PastGoalPayload {
   resultado: GoalResult | null
 }
 
+interface DayCommentPayload {
+  fecha: string
+  texto: string
+}
+
 interface WeeklyAnalysisPayload {
   tipo: 'semanal'
   semanaActual: WeekRangePayload
@@ -112,6 +122,8 @@ interface WeeklyAnalysisPayload {
   habitos: WeeklyHabitPayload[]
   metas: GoalPayload[]
   metasSemanaAnterior: PastGoalPayload[]
+  /** Los comentarios del día de esta semana que sí se escribieron (los que no, no aparecen). */
+  comentariosDeLaSemana: DayCommentPayload[]
   tono: Tone
 }
 
@@ -159,7 +171,10 @@ async function buildHabitsSummary(today: string): Promise<HabitSummary[]> {
   })
 }
 
-type TasksSummary = Omit<DailyAnalysisPayload, 'tipo' | 'fechaDeHoy' | 'habitos' | 'tono'>
+type TasksSummary = Omit<
+  DailyAnalysisPayload,
+  'tipo' | 'fechaDeHoy' | 'habitos' | 'comentarioDelDia' | 'tono'
+>
 
 async function buildTasksSummary(today: string): Promise<TasksSummary> {
   const tasks = await listTasks()
@@ -247,13 +262,21 @@ async function invokeAnalyze(payload: DailyAnalysisPayload | WeeklyAnalysisPaylo
 /** El análisis diario: hábitos de los últimos 14 días + tareas de hoy y atrasadas. */
 export async function requestAnalysis(): Promise<string> {
   const today = todayISO()
-  const [habitos, tareas, tono] = await Promise.all([
+  const [habitos, tareas, comentario, tono] = await Promise.all([
     buildHabitsSummary(today),
     buildTasksSummary(today),
+    getDayComment(today),
     getTone(),
   ])
 
-  const payload: DailyAnalysisPayload = { tipo: 'diario', fechaDeHoy: today, habitos, ...tareas, tono }
+  const payload: DailyAnalysisPayload = {
+    tipo: 'diario',
+    fechaDeHoy: today,
+    habitos,
+    ...tareas,
+    comentarioDelDia: comentario?.text ?? null,
+    tono,
+  }
   return invokeAnalyze(payload)
 }
 
@@ -266,9 +289,12 @@ export async function requestAnalysis(): Promise<string> {
  */
 export async function requestWeeklyAnalysis(): Promise<string> {
   const today = todayISO()
-  const [stats, goals, tono] = await Promise.all([
+  const thisMonday = startOfWeekISO(today)
+
+  const [stats, goals, comentarios, tono] = await Promise.all([
     getWeeklyHabitStats(today),
     buildGoalsSummary(today),
+    getDayCommentsInRange(thisMonday, today),
     getTone(),
   ])
 
@@ -285,6 +311,7 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     })),
     metas: goals.metas,
     metasSemanaAnterior: goals.metasSemanaAnterior,
+    comentariosDeLaSemana: comentarios.map((c) => ({ fecha: c.date, texto: c.text })),
     tono,
   }
   return invokeAnalyze(payload)

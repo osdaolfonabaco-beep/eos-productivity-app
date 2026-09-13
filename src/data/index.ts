@@ -22,6 +22,7 @@ export type {
   GoalResult,
   GoalUpdate,
   GoalDirection,
+  DayComment,
 } from './types'
 
 export { isISODate, toISODate, todayISO, addDays, startOfWeekISO } from './dates'
@@ -106,6 +107,8 @@ export {
   listGoalUpdates,
   addGoalUpdate,
 } from './goals'
+
+export { getDayComment, getDayCommentsInRange, saveDayComment } from './dayComments'
 
 export { requestAnalysis, requestWeeklyAnalysis } from './analysis'
 
