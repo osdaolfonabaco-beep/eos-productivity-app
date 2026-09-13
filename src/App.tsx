@@ -5,6 +5,7 @@ import HomeView from './components/HomeView'
 import IdeasView from './components/IdeasView'
 import JournalView from './components/JournalView'
 import LoginScreen from './components/LoginScreen'
+import SalaryView from './components/SalaryView'
 import SectionNav from './components/SectionNav'
 import SettingsView from './components/SettingsView'
 import WeekView from './components/WeekView'
@@ -12,6 +13,7 @@ import { useSession } from './useSession'
 
 type Tab = 'hoy' | 'vida' | 'dinero' | 'ideas'
 type VidaSub = 'habitos' | 'semana' | 'journal'
+type DineroSub = 'deudas' | 'sueldo'
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'hoy', label: 'Hoy' },
@@ -24,6 +26,11 @@ const VIDA_ITEMS: { value: VidaSub; label: string }[] = [
   { value: 'semana', label: 'Semana' },
   { value: 'journal', label: 'Journal' },
   { value: 'habitos', label: 'Hábitos' },
+]
+
+const DINERO_ITEMS: { value: DineroSub; label: string }[] = [
+  { value: 'deudas', label: 'Deudas' },
+  { value: 'sueldo', label: 'Sueldo' },
 ]
 
 function GearIcon() {
@@ -61,6 +68,7 @@ export default function App() {
   const { session, loading } = useSession()
   const [tab, setTab] = useState<Tab>('hoy')
   const [vidaSub, setVidaSub] = useState<VidaSub>('semana')
+  const [dineroSub, setDineroSub] = useState<DineroSub>('deudas')
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   function go(next: Tab) {
@@ -89,7 +97,12 @@ export default function App() {
       </>
     )
   } else if (tab === 'dinero') {
-    content = <DebtsView />
+    content = (
+      <>
+        <SectionNav items={DINERO_ITEMS} active={dineroSub} onChange={setDineroSub} />
+        {dineroSub === 'sueldo' ? <SalaryView /> : <DebtsView />}
+      </>
+    )
   } else {
     content = <IdeasView />
   }
