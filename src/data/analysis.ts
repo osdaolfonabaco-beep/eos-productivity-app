@@ -1,7 +1,7 @@
 /**
- * Pide un análisis a la Edge Function `analyze`, que lo manda a Gemini. Dos
+ * Pide un análisis a la Edge Function `analyze`, que lo manda a Gemini. Tres
  * variantes, discriminadas por "tipo" en el payload (debe coincidir con
- * `supabase/functions/analyze/index.ts`, que sirve las dos):
+ * `supabase/functions/analyze/index.ts`, que sirve las tres):
  *
  * - `requestAnalysis` (diario): nombres de hábito, su patrón de los últimos
  *   14 días y desde cuándo existen (para no evaluar como incumplimiento días
@@ -10,13 +10,16 @@
  * - `requestWeeklyAnalysis` (semanal): el desglose de `./weeklyStats` y las
  *   metas de la semana con sus avances (`./goals`), para el dashboard de
  *   Vida -> Semana. También la semana anterior de ambos, para comparar.
+ * - `requestIdeaAnalysis` (idea): una sola idea de la pestaña Ideas, con
+ *   nada más que su texto y su estado — a propósito no lleva ni la lista de
+ *   ideas ni ningún otro dato de la cuenta.
  *
- * Los dos payloads usan campos explícitos y sin solapar — nunca inferir de
- * un booleano o de una clave repetida qué es cada cosa — y llevan el tono
- * elegido en Ajustes (`getTone`). También el comentario del día (uno o dos
- * frases escritas en Hoy, `./dayComments`) — a diferencia del journal, que
- * nunca entra en este archivo y así estructuralmente no hay forma de que se
- * cuele en ningún análisis.
+ * Los payloads usan campos explícitos y sin solapar — nunca inferir de un
+ * booleano o de una clave repetida qué es cada cosa — y llevan el tono
+ * elegido en Ajustes (`getTone`). El diario y el semanal también el
+ * comentario del día (uno o dos frases escritas en Hoy, `./dayComments`) —
+ * a diferencia del journal, que nunca entra en este archivo y así
+ * estructuralmente no hay forma de que se cuele en ningún análisis.
  */
 
 import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
@@ -124,6 +127,17 @@ interface WeeklyAnalysisPayload {
   metasSemanaAnterior: PastGoalPayload[]
   /** Los comentarios del día de esta semana que sí se escribieron (los que no, no aparecen). */
   comentariosDeLaSemana: DayCommentPayload[]
+  tono: Tone
+}
+
+/** Los dos estados desde los que se puede pedir análisis ("descartada" no ofrece el botón en la interfaz). */
+type AnalyzableIdeaStatus = 'pendiente' | 'en-marcha'
+
+/** Deliberadamente mínimo: solo el texto de ESA idea y su estado, nada más de la cuenta. */
+interface IdeaAnalysisPayload {
+  tipo: 'idea'
+  texto: string
+  estado: AnalyzableIdeaStatus
   tono: Tone
 }
 
@@ -237,11 +251,14 @@ function messageFromBody(body: Record<string, unknown> | null | undefined): stri
 }
 
 /**
- * Llama a la Edge Function `analyze` con un payload ya armado (diario o
- * semanal — ambos comparten esta misma función y este mismo manejo de
- * errores). No guarda nada: el texto vive solo en el estado de quien lo pidió.
+ * Llama a la Edge Function `analyze` con un payload ya armado (diario,
+ * semanal o idea — los tres comparten esta misma función y este mismo
+ * manejo de errores). No guarda nada: el texto vive solo en el estado de
+ * quien lo pidió.
  */
-async function invokeAnalyze(payload: DailyAnalysisPayload | WeeklyAnalysisPayload): Promise<string> {
+async function invokeAnalyze(
+  payload: DailyAnalysisPayload | WeeklyAnalysisPayload | IdeaAnalysisPayload,
+): Promise<string> {
   const { data, error } = await supabase.functions.invoke<{
     analysis?: string
     error?: string
@@ -314,5 +331,21 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     comentariosDeLaSemana: comentarios.map((c) => ({ fecha: c.date, texto: c.text })),
     tono,
   }
+  return invokeAnalyze(payload)
+}
+
+/**
+ * El análisis de una sola idea (pestaña Ideas): "Mejoras y huecos" y "Primer
+ * paso", nada más — la estructura la fija el prompt del lado de la función.
+ * Solo se manda el texto y el estado de esa idea, nunca la lista completa ni
+ * ningún otro dato de la cuenta. El resultado no se guarda: vive en el
+ * estado de quien lo pidió (`IdeaCard`), igual que el resto de análisis.
+ */
+export async function requestIdeaAnalysis(
+  texto: string,
+  estado: AnalyzableIdeaStatus,
+): Promise<string> {
+  const tono = await getTone()
+  const payload: IdeaAnalysisPayload = { tipo: 'idea', texto, estado, tono }
   return invokeAnalyze(payload)
 }

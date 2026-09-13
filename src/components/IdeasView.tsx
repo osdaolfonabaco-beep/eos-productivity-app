@@ -3,17 +3,26 @@ import {
   archiveIdea,
   createIdea,
   listIdeas,
+  requestIdeaAnalysis,
   setIdeaStatus,
   updateIdeaText,
+  type Idea,
 } from '../data'
 import { useAsyncData } from '../useAsyncData'
-import IdeaCard from './IdeaCard'
+import IdeaCard, { type IdeaAnalysisState } from './IdeaCard'
 import { ActionError, LoadError, Loading } from './ViewState'
+
+/** Quita la clave `id` de un registro, sin tocar las demás. */
+function without<T>(record: Record<string, T>, id: string): Record<string, T> {
+  const { [id]: _drop, ...rest } = record
+  return rest
+}
 
 /**
  * La pantalla "Ideas": un campo para anotar (mínima fricción) y la lista,
  * más recientes primero. Cada idea tiene sus tres pastillas de estado, edición
- * del texto en línea y archivado con confirmación.
+ * del texto en línea, archivado con confirmación, y (si no está descartada)
+ * un análisis de IA a pedido.
  */
 export default function IdeasView() {
   const fetcher = useCallback(() => listIdeas(), [])
@@ -23,6 +32,12 @@ export default function IdeasView() {
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const fieldRef = useRef<HTMLTextAreaElement>(null)
+
+  // El análisis de IA es independiente del resto de acciones (crear/editar/
+  // archivar): no se guarda en Supabase, vive aquí y se pierde al recargar.
+  // Solo una idea a la vez: `analyzingId` es la que está en curso.
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null)
+  const [analysisResults, setAnalysisResults] = useState<Record<string, IdeaAnalysisState>>({})
 
   async function run(action: () => Promise<unknown>, message: string) {
     setBusy(true)
@@ -51,6 +66,23 @@ export default function IdeasView() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       submit()
+    }
+  }
+
+  async function analyze(idea: Idea) {
+    if (analyzingId || idea.status === 'descartada') return
+    setAnalyzingId(idea.id)
+    setAnalysisResults((prev) => without(prev, idea.id))
+    try {
+      const analysisText = await requestIdeaAnalysis(idea.text, idea.status)
+      setAnalysisResults((prev) => ({ ...prev, [idea.id]: { text: analysisText } }))
+    } catch (err) {
+      setAnalysisResults((prev) => ({
+        ...prev,
+        [idea.id]: { error: err instanceof Error ? err.message : 'No se pudo analizar la idea.' },
+      }))
+    } finally {
+      setAnalyzingId(null)
     }
   }
 
@@ -108,11 +140,19 @@ export default function IdeasView() {
                   )
                 }
                 onSaveText={(t) =>
-                  void run(() => updateIdeaText(idea.id, t), 'No se pudo guardar el texto.')
+                  void run(async () => {
+                    await updateIdeaText(idea.id, t)
+                    // El análisis que hubiera quedaba de un texto que ya no existe.
+                    setAnalysisResults((prev) => without(prev, idea.id))
+                  }, 'No se pudo guardar el texto.')
                 }
                 onArchive={() =>
                   void run(() => archiveIdea(idea.id), 'No se pudo archivar.')
                 }
+                analyzing={analyzingId === idea.id}
+                analyzeDisabled={analyzingId !== null && analyzingId !== idea.id}
+                analysisResult={analysisResults[idea.id]}
+                onAnalyze={() => void analyze(idea)}
               />
             </li>
           ))}

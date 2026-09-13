@@ -110,7 +110,7 @@ export {
 
 export { getDayComment, getDayCommentsInRange, saveDayComment } from './dayComments'
 
-export { requestAnalysis, requestWeeklyAnalysis } from './analysis'
+export { requestAnalysis, requestWeeklyAnalysis, requestIdeaAnalysis } from './analysis'
 
 export type { WeekRange, HabitWeekStats, HabitWeeklyBreakdown, WeeklyStats } from './weeklyStats'
 

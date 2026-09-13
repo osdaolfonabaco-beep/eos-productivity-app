@@ -1,18 +1,22 @@
 // Edge Function "analyze": manda un resumen de hábitos y tareas a Gemini y
 // devuelve un análisis breve en español.
 //
-// Sirve DOS tipos de análisis, discriminados por "tipo" en el payload:
+// Sirve TRES tipos de análisis, discriminados por "tipo" en el payload:
 // "diario" (hábitos de los últimos 14 días + tareas de hoy/atrasadas + el
-// comentario del día, el original) y "semanal" (el dashboard de Vida ->
+// comentario del día, el original), "semanal" (el dashboard de Vida ->
 // Semana: cumplimiento de esta semana por hábito y comparación con la
 // anterior, las metas de la semana y sus avances, y los comentarios del día
-// de esta semana). Se reutiliza la misma función -- y el mismo
-// TONE_INSTRUCTIONS -- en vez de crear una segunda; solo cambia qué prompt
-// se construye antes de llamar a Gemini.
+// de esta semana), y "idea" (una sola idea de la pestaña Ideas, con su
+// texto y su estado -- ver buildIdeaPrompt). Se reutiliza la misma función
+// -- y el mismo mecanismo de tono (toneOf/getTone) -- en vez de crear una
+// nueva; solo cambia qué prompt se construye antes de llamar a Gemini. Los
+// prompts diario y semanal (buildDailyPrompt/buildWeeklyPrompt,
+// TONE_INSTRUCTIONS) no se tocan para añadir "idea".
 //
 // No toca la base de datos: el cliente (src/data/analysis.ts) arma el JSON
 // y se lo manda ya listo. El journal nunca pasa por aquí, en ninguno de los
-// dos tipos.
+// tres tipos; el modo "idea" además no recibe la lista de ideas, hábitos,
+// tareas ni comentarios -- solo el texto y el estado de la idea que se pidió.
 //
 // Requiere el secreto GEMINI_API_KEY:
 //   supabase secrets set GEMINI_API_KEY=tu-clave
@@ -232,6 +236,29 @@ function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
   })
 }
 
+/** Los dos estados desde los que se puede pedir análisis ("descartada" no ofrece el botón en la interfaz). */
+type IdeaStatusForAnalysis = 'pendiente' | 'en-marcha'
+
+/**
+ * Payload de "idea": deliberadamente mínimo -- solo el texto de ESA idea y su
+ * estado, nada de la lista de ideas ni de ningún otro dato de la cuenta.
+ */
+interface IdeaPayload {
+  tipo: 'idea'
+  texto: string
+  estado: IdeaStatusForAnalysis
+  tono: Tone
+}
+
+function isIdeaPayload(v: Record<string, unknown>): v is IdeaPayload {
+  return (
+    v.tipo === 'idea' &&
+    typeof v.texto === 'string' &&
+    v.texto.trim().length > 0 &&
+    (v.estado === 'pendiente' || v.estado === 'en-marcha')
+  )
+}
+
 /** "tono" es defensivo: si falta o llega algo raro (cliente viejo, etc.), cae a "equilibrado". */
 function toneOf(value: unknown): Tone {
   const v = (value as { tono?: unknown } | null)?.tono
@@ -293,6 +320,47 @@ Además de los hábitos hay metas de la semana, en "metas": cada una es "texto" 
 "comentariosDeLaSemana" trae, para los días de esta semana en que la persona escribió algo sobre cómo fue el día, "fecha" y "texto" (los días sin comentario simplemente no aparecen en la lista). Es contexto adicional, igual que en el análisis diario: úsalo para matizar lo que ya muestran los hábitos y las metas, no lo repitas ni lo cites entero, y si la lista viene vacía no lo menciones.`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
+}
+
+/**
+ * Cómo modula el tono la crítica de una idea. Deliberadamente distinto de
+ * TONE_INSTRUCTIONS: aquí la estructura de salida ya está fijada (dos
+ * secciones exactas), así que el tono solo ajusta cuánto se suaviza o se
+ * abrevia el texto dentro de esas secciones -- no vuelve a definir la
+ * estructura ni impone límites de palabras pensados para hábitos/tareas.
+ */
+const IDEA_TONE_HINTS: Record<Tone, string> = {
+  directo: 'Sé directo y sin rodeos: nombra los huecos sin suavizarlos ni matizarlos de más.',
+  equilibrado: 'Sé honesto y concreto, sin ser duro ni tampoco condescendiente.',
+  breve: 'Sé lo más breve posible en cada sección: una o dos frases por sección, nada más.',
+}
+
+/**
+ * El texto de la idea se manda inline en el propio prompt (no como "Datos"
+ * en JSON, a diferencia de diario/semanal): aquí solo hay dos valores
+ * escalares, no una estructura que valga la pena serializar.
+ */
+function buildIdeaPrompt(payload: IdeaPayload): string {
+  const { tono, texto, estado } = payload
+  const instrucciones = `Eres un mentor honesto que revisa ideas y planes personales antes de que alguien invierta tiempo en ellos. ${IDEA_TONE_HINTS[tono]}
+
+Vas a analizar UNA idea junto con su estado actual ("pendiente" o "en-marcha"). El estado es solo contexto de en qué punto está -- no lo evalúes ni lo comentes por separado.
+
+Responde con EXACTAMENTE estas dos secciones, en este orden, sin nada antes, sin nada después, y sin ningún encabezado ni sección adicional:
+
+Mejoras y huecos
+(Qué le falta al plan, qué no está pensado todavía, qué podría afinarse -- concreto y específico a ESTA idea, nunca una observación genérica que serviría para cualquier idea. Sin elogios de relleno.)
+
+Primer paso
+(Una sola acción concreta para arrancar hoy mismo. Un paso, no una lista ni varias opciones.)
+
+Si el texto de la idea es una sola frase corta o muy vaga (por ejemplo, solo un nombre o una intención sin detalle), NO inventes un plan completo ni supongas alcance, público o enfoque que no está escrito: en "Mejoras y huecos" di qué haría falta definir antes de poder evaluarla en serio, y en "Primer paso" propone la acción más pequeña para empezar a definir eso -- no un paso de ejecución de un plan que no existe.
+
+${COMMON_CLOSING}
+
+Escribe en segunda persona (tú). Sin markdown pesado: nada de negritas, asteriscos, numeración ni viñetas -- los dos títulos de sección van tal cual, en texto plano, seguidos de su párrafo.`
+
+  return `${instrucciones}\n\nIdea (estado: ${estado}):\n${texto}`
 }
 
 function json(body: unknown, status: number): Response {
@@ -377,6 +445,11 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Faltan datos del dashboard semanal.' }, 400)
     }
     prompt = buildWeeklyPrompt({ ...v, tono })
+  } else if (v.tipo === 'idea') {
+    if (!isIdeaPayload(v)) {
+      return json({ error: 'Faltan datos de la idea.' }, 400)
+    }
+    prompt = buildIdeaPrompt({ ...v, tono })
   } else {
     if (!isDailyPayload(v)) {
       return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)

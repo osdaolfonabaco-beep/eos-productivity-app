@@ -7,24 +7,38 @@ const STATUSES: { value: IdeaStatus; label: string }[] = [
   { value: 'descartada', label: 'Descartada' },
 ]
 
+/** El resultado de pedir el análisis de IA de esta idea, o `undefined` si nunca se pidió. */
+export type IdeaAnalysisState = { text: string } | { error: string }
+
 interface IdeaCardProps {
   idea: Idea
   onSetStatus: (status: IdeaStatus) => void
   onSaveText: (text: string) => void
   onArchive: () => void
+  /** `true` mientras se espera la respuesta del análisis de ESTA idea. */
+  analyzing: boolean
+  /** `true` si hay otra idea analizándose ahora mismo (solo una a la vez). */
+  analyzeDisabled: boolean
+  analysisResult: IdeaAnalysisState | undefined
+  onAnalyze: () => void
 }
 
 type Mode = 'view' | 'edit' | 'confirm-archive'
 
 /**
- * Una idea en la lista: texto, las tres pastillas de estado y las acciones
- * (editar el texto en línea, archivar con confirmación).
+ * Una idea en la lista: texto, las tres pastillas de estado, las acciones
+ * (editar el texto en línea, archivar con confirmación) y, en pendiente/en
+ * marcha, el botón de análisis con IA y su resultado (o error) debajo.
  */
 export default function IdeaCard({
   idea,
   onSetStatus,
   onSaveText,
   onArchive,
+  analyzing,
+  analyzeDisabled,
+  analysisResult,
+  onAnalyze,
 }: IdeaCardProps) {
   const [mode, setMode] = useState<Mode>('view')
   const [draft, setDraft] = useState(idea.text)
@@ -106,49 +120,84 @@ export default function IdeaCard({
           </div>
         </div>
       ) : (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="flex gap-1">
-            {STATUSES.map((s) => {
-              const active = idea.status === s.value
-              return (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => {
-                    if (!active) onSetStatus(s.value)
-                  }}
-                  aria-pressed={active}
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    active
-                      ? 'bg-gray-900 text-white'
-                      : 'border border-gray-300 text-gray-600'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              )
-            })}
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex gap-1">
+              {STATUSES.map((s) => {
+                const active = idea.status === s.value
+                return (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => {
+                      if (!active) onSetStatus(s.value)
+                    }}
+                    aria-pressed={active}
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      active
+                        ? 'bg-gray-900 text-white'
+                        : 'border border-gray-300 text-gray-600'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="ml-auto flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(idea.text)
+                  setMode('edit')
+                }}
+                className="text-sm font-medium text-gray-500"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('confirm-archive')}
+                className="text-sm font-medium text-gray-500"
+              >
+                Archivar
+              </button>
+            </div>
           </div>
-          <div className="ml-auto flex gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setDraft(idea.text)
-                setMode('edit')
-              }}
-              className="text-sm font-medium text-gray-500"
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('confirm-archive')}
-              className="text-sm font-medium text-gray-500"
-            >
-              Archivar
-            </button>
-          </div>
-        </div>
+
+          {!discarded && (
+            <div className="mt-3 border-t border-gray-100 pt-3">
+              <button
+                type="button"
+                onClick={onAnalyze}
+                disabled={analyzing || analyzeDisabled}
+                className="text-sm font-medium text-indigo-700 disabled:opacity-40"
+              >
+                {analyzing ? 'Analizando…' : 'Analizar con IA'}
+              </button>
+
+              {analysisResult && 'text' in analysisResult && (
+                <p className="mt-2 whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800">
+                  {analysisResult.text}
+                </p>
+              )}
+
+              {analysisResult && 'error' in analysisResult && (
+                <div className="mt-2 rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700">
+                  <p>{analysisResult.error}</p>
+                  <button
+                    type="button"
+                    onClick={onAnalyze}
+                    disabled={analyzing || analyzeDisabled}
+                    className="mt-2 text-sm font-medium underline disabled:opacity-40"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
