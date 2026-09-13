@@ -1,9 +1,13 @@
-// Token de un solo propósito: "quien lo tenga puede marcar los hábitos sin
-// responder de <userId> en <date> como hechos", con caducidad. Viaja dentro
-// del payload de la notificación push -- que el propio protocolo Web Push ya
-// entrega cifrado de extremo a extremo -- y permite que el botón "Ya los
-// hice" del service worker actúe sin tener la sesión de la persona: el
-// service worker no tiene acceso a localStorage ni al JWT de supabase-js.
+// Token de un solo propósito: "quien lo tenga puede responder por los
+// hábitos sin contestar de <userId> en <date>", con caducidad. CUÁL de las
+// dos respuestas (hecho / no hecho) no va firmado aquí -- viaja como campo
+// aparte en la petición a complete-habits -- porque es la misma familia de
+// acción en los dos casos, no una ampliación de lo que el token permite.
+// Viaja dentro del payload de la notificación push -- que el propio
+// protocolo Web Push ya entrega cifrado de extremo a extremo -- y permite
+// que los botones "Ya los hice" / "No los hice hoy" del service worker
+// actúen sin tener la sesión de la persona: el service worker no tiene
+// acceso a localStorage ni al JWT de supabase-js.
 //
 // Formato: <base64url(json)>.<base64url(hmac-sha256 del json)>. No es un JWT
 // estándar (no hace falta esa complejidad para un solo caso de uso interno),

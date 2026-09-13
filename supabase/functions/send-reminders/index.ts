@@ -14,8 +14,9 @@
 //
 // Reutiliza el envío de ../_shared/push.ts (el mismo camino que ya probó
 // send-test-push) y firma un token de un solo propósito
-// (../_shared/reminderToken.ts) para el botón "Ya los hice", que el service
-// worker invoca sin tener sesión.
+// (../_shared/reminderToken.ts), compartido por los dos botones de la
+// notificación ("Ya los hice" / "No los hice hoy"), que el service worker
+// invoca sin tener sesión.
 //
 // reminder_log (una fila por usuario, día y slot) garantiza como mucho un
 // recordatorio al día POR SLOT: los dos horarios pueden dispararse el mismo

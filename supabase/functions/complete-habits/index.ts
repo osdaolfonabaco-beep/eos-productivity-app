@@ -1,10 +1,17 @@
-// Edge Function "complete-habits": la invoca el botón "Ya los hice" de la
-// notificación, desde el service worker -- sin sesión de usuario, porque el
-// service worker no tiene acceso al localStorage donde vive el JWT de
-// supabase-js. La autoridad para actuar aquí es el token firmado que generó
-// send-reminders (../_shared/reminderToken.ts), no un JWT de Supabase.
+// Edge Function "complete-habits": la invocan los dos botones de la
+// notificación ("Ya los hice" / "No los hice hoy"), desde el service worker
+// -- sin sesión de usuario, porque el service worker no tiene acceso al
+// localStorage donde vive el JWT de supabase-js. La autoridad para actuar
+// aquí es el token firmado que generó send-reminders
+// (../_shared/reminderToken.ts), no un JWT de Supabase.
 //
-// Marca como hechos los hábitos que seguían sin responder cuando se generó
+// El token solo dice "quien lo tenga puede responder por los hábitos sin
+// contestar de este usuario, este día"; CUÁL de las dos respuestas (hecho o
+// no hecho) no va firmado -- es la misma familia de acción en los dos casos,
+// así que se recibe como campo `done` en el cuerpo y se valida aquí que sea
+// estrictamente `true` o `false`, nada más.
+//
+// Fija ese valor en los hábitos que seguían sin responder cuando se generó
 // el token; si alguno ya se respondió desde entonces (por ejemplo, desde la
 // app), no lo toca -- solo rellena huecos, nunca sobreescribe una respuesta.
 //
@@ -39,7 +46,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Falta configuración del servidor.' }, 500)
   }
 
-  let body: { token?: unknown }
+  let body: { token?: unknown; done?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -48,6 +55,10 @@ Deno.serve(async (req: Request) => {
   if (typeof body.token !== 'string') {
     return json({ error: 'Falta el token.' }, 400)
   }
+  if (typeof body.done !== 'boolean') {
+    return json({ error: "El campo 'done' debe ser true o false." }, 400)
+  }
+  const done = body.done
 
   let userId: string
   let date: string
@@ -91,7 +102,7 @@ Deno.serve(async (req: Request) => {
       unanswered.map((h) => ({
         habit_id: h.id,
         date,
-        done: true,
+        done,
         user_id: userId,
       })),
     )
@@ -101,5 +112,5 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return json({ ok: true, marcados: unanswered.length }, 200)
+  return json({ ok: true, marcados: unanswered.length, done }, 200)
 })
