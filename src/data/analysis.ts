@@ -7,8 +7,9 @@
  *   14 días y desde cuándo existen (para no evaluar como incumplimiento días
  *   previos a su creación), y las tareas de hoy (separadas en hechas/sin
  *   hacer) y las atrasadas de días anteriores.
- * - `requestWeeklyAnalysis` (semanal): el desglose de `./weeklyStats`, para
- *   el dashboard de Vida -> Semana.
+ * - `requestWeeklyAnalysis` (semanal): el desglose de `./weeklyStats` y las
+ *   metas de la semana con sus avances (`./goals`), para el dashboard de
+ *   Vida -> Semana. También la semana anterior de ambos, para comparar.
  *
  * Los dos payloads usan campos explícitos y sin solapar — nunca inferir de
  * un booleano o de una clave repetida qué es cada cosa — y llevan el tono
@@ -16,11 +17,13 @@
  * que estructuralmente no hay forma de que se cuele en ningún análisis.
  */
 
-import { addDays, toISODate, todayISO } from './dates'
+import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
+import { listGoalUpdates, listWeeklyGoals } from './goals'
 import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
 import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
 import { bucketTasks, listTasks } from './tasks'
+import type { GoalDirection, GoalResult } from './types'
 import { getWeeklyHabitStats } from './weeklyStats'
 
 const DAYS_BACK = 14
@@ -82,12 +85,33 @@ interface WeeklyHabitPayload {
   semanaAnterior: WeeklyHabitStatsPayload | null
 }
 
+interface GoalUpdatePayload {
+  fecha: string
+  texto: string
+  direccion: GoalDirection
+}
+
+interface GoalPayload {
+  texto: string
+  /** `null` mientras la meta no se cierra. */
+  resultado: GoalResult | null
+  avances: GoalUpdatePayload[]
+}
+
+/** Metas de una semana ya cerrada: solo el veredicto, sin la bitácora de avances. */
+interface PastGoalPayload {
+  texto: string
+  resultado: GoalResult | null
+}
+
 interface WeeklyAnalysisPayload {
   tipo: 'semanal'
   semanaActual: WeekRangePayload
   semanaAnterior: WeekRangePayload
   hayHistoriaSuficiente: boolean
   habitos: WeeklyHabitPayload[]
+  metas: GoalPayload[]
+  metasSemanaAnterior: PastGoalPayload[]
   tono: Tone
 }
 
@@ -152,6 +176,38 @@ async function buildTasksSummary(today: string): Promise<TasksSummary> {
 }
 
 /**
+ * Metas de esta semana (con su bitácora de avances) y de la anterior (solo su
+ * veredicto final, sin avances: para una semana ya cerrada eso es lo que
+ * importa para el análisis, no el detalle día a día).
+ */
+async function buildGoalsSummary(
+  today: string,
+): Promise<{ metas: GoalPayload[]; metasSemanaAnterior: PastGoalPayload[] }> {
+  const thisMonday = startOfWeekISO(today)
+  const lastMonday = addDays(thisMonday, -7)
+
+  const [currentGoals, pastGoals] = await Promise.all([
+    listWeeklyGoals(thisMonday),
+    listWeeklyGoals(lastMonday),
+  ])
+
+  const metas = await Promise.all(
+    currentGoals.map(async (g) => ({
+      texto: g.text,
+      resultado: g.resultado,
+      avances: (await listGoalUpdates(g.id)).map((u) => ({
+        fecha: u.date,
+        texto: u.text,
+        direccion: u.direction,
+      })),
+    })),
+  )
+  const metasSemanaAnterior = pastGoals.map((g) => ({ texto: g.text, resultado: g.resultado }))
+
+  return { metas, metasSemanaAnterior }
+}
+
+/**
  * Mensaje a partir del cuerpo de error de la función. Si es saturación de
  * Gemini (`code: 'overloaded'`), un mensaje entendible y nada más — el
  * detalle técnico no ayuda ahí y solo confunde. Para cualquier otro error,
@@ -209,7 +265,12 @@ export async function requestAnalysis(): Promise<string> {
  * distintos del mismo dato.
  */
 export async function requestWeeklyAnalysis(): Promise<string> {
-  const [stats, tono] = await Promise.all([getWeeklyHabitStats(todayISO()), getTone()])
+  const today = todayISO()
+  const [stats, goals, tono] = await Promise.all([
+    getWeeklyHabitStats(today),
+    buildGoalsSummary(today),
+    getTone(),
+  ])
 
   const payload: WeeklyAnalysisPayload = {
     tipo: 'semanal',
@@ -222,6 +283,8 @@ export async function requestWeeklyAnalysis(): Promise<string> {
       estaSemana: h.estaSemana,
       semanaAnterior: h.semanaAnterior,
     })),
+    metas: goals.metas,
+    metasSemanaAnterior: goals.metasSemanaAnterior,
     tono,
   }
   return invokeAnalyze(payload)

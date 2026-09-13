@@ -136,3 +136,41 @@ export interface Idea {
   createdAt: string
   archived: boolean
 }
+
+// --- Metas semanales --------------------------------------------------------
+
+/** El resultado de una meta al cerrar la semana. `null` mientras no se cierra. */
+export type GoalResult = 'cumplida' | 'no-cumplida'
+
+/**
+ * Una meta para una semana concreta (hasta 3 activas por semana; lo valida
+ * `createWeeklyGoal`, no una restricción de la base de datos). El texto solo
+ * se puede editar en el sitio — no archivar y recrear — porque los avances
+ * cuelgan de este id y se perderían.
+ */
+export interface WeeklyGoal {
+  id: string
+  /** El lunes de la semana a la que pertenece, `YYYY-MM-DD`. */
+  weekStart: string
+  text: string
+  resultado: GoalResult | null
+  createdAt: string
+  archived: boolean
+}
+
+/** Si un avance acerca a la meta o aleja de ella. */
+export type GoalDirection = 'acerca' | 'aleja'
+
+/**
+ * Un avance o retroceso anotado bajo una meta. Bitácora de solo-añadir, igual
+ * que `HabitEntry` o `Payment`: sin edición ni borrado en la v1.
+ */
+export interface GoalUpdate {
+  id: string
+  goalId: string
+  /** Fecha local en formato `YYYY-MM-DD`. Nunca un objeto `Date`. */
+  date: string
+  text: string
+  direction: GoalDirection
+  createdAt: string
+}

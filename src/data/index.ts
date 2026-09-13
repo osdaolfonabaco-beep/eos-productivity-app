@@ -18,6 +18,10 @@ export type {
   IdeaStatus,
   Task,
   JournalNote,
+  WeeklyGoal,
+  GoalResult,
+  GoalUpdate,
+  GoalDirection,
 } from './types'
 
 export { isISODate, toISODate, todayISO, addDays, startOfWeekISO } from './dates'
@@ -92,6 +96,16 @@ export {
   groupNotesByDate,
   promptForDate,
 } from './journal'
+
+export {
+  listWeeklyGoals,
+  createWeeklyGoal,
+  updateGoalText,
+  setGoalResult,
+  archiveGoal,
+  listGoalUpdates,
+  addGoalUpdate,
+} from './goals'
 
 export { requestAnalysis, requestWeeklyAnalysis } from './analysis'
 

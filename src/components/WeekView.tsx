@@ -13,6 +13,7 @@ import { useAsyncData } from '../useAsyncData'
 import { useMediaQuery } from '../useMediaQuery'
 import { LoadError, Loading } from './ViewState'
 import WeekDashboard from './WeekDashboard'
+import WeeklyGoalsSection from './WeeklyGoalsSection'
 
 /** Iniciales de lunes a domingo. X para miércoles, para no chocar con martes. */
 const DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
@@ -127,6 +128,8 @@ export default function WeekView() {
   return (
     <main className="px-4 pb-6 pt-4 text-gray-900">
       <p className="mb-4 text-sm text-gray-500">{formatRange(monday, sunday)}</p>
+
+      <WeeklyGoalsSection />
 
       {habits.length === 0 ? (
         <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">

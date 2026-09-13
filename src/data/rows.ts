@@ -10,6 +10,9 @@
 import type {
   Debt,
   DebtStatus,
+  GoalDirection,
+  GoalResult,
+  GoalUpdate,
   Habit,
   HabitEntry,
   Idea,
@@ -17,6 +20,7 @@ import type {
   JournalNote,
   Payment,
   Task,
+  WeeklyGoal,
 } from './types'
 
 export const HABIT_COLS = 'id,name,archived,sort_order,created_at'
@@ -27,6 +31,8 @@ export const PAYMENT_COLS = 'id,debt_id,date,amount'
 export const IDEA_COLS = 'id,text,status,created_at,archived'
 export const TASK_COLS = 'id,text,date,done,archived,created_at'
 export const JOURNAL_COLS = 'id,date,text,created_at,archived'
+export const GOAL_COLS = 'id,week_start,text,resultado,archived,created_at'
+export const GOAL_UPDATE_COLS = 'id,goal_id,date,text,direction,created_at'
 
 interface HabitRow {
   id: string
@@ -210,5 +216,67 @@ export function journalNoteToRow(n: JournalNote) {
     text: n.text,
     created_at: n.createdAt,
     archived: n.archived,
+  }
+}
+
+interface GoalRow {
+  id: string
+  week_start: string
+  text: string
+  resultado: string | null
+  archived: boolean
+  created_at: string
+}
+
+export function rowToGoal(r: GoalRow): WeeklyGoal {
+  return {
+    id: r.id,
+    weekStart: r.week_start,
+    text: r.text,
+    resultado: r.resultado as GoalResult | null,
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function goalToRow(g: WeeklyGoal) {
+  return {
+    id: g.id,
+    week_start: g.weekStart,
+    text: g.text,
+    resultado: g.resultado,
+    archived: g.archived,
+    created_at: g.createdAt,
+  }
+}
+
+interface GoalUpdateRow {
+  id: string
+  goal_id: string
+  date: string
+  text: string
+  direction: string
+  created_at: string
+}
+
+export function rowToGoalUpdate(r: GoalUpdateRow): GoalUpdate {
+  return {
+    id: r.id,
+    goalId: r.goal_id,
+    date: r.date,
+    text: r.text,
+    direction: r.direction as GoalDirection,
+    createdAt: r.created_at,
+  }
+}
+
+export function goalUpdateToRow(u: GoalUpdate) {
+  return {
+    id: u.id,
+    goal_id: u.goalId,
+    date: u.date,
+    text: u.text,
+    direction: u.direction,
+    created_at: u.createdAt,
   }
 }
