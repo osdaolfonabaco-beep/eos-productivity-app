@@ -12,6 +12,7 @@ import {
 import { useAsyncData } from '../useAsyncData'
 import { useMediaQuery } from '../useMediaQuery'
 import { LoadError, Loading } from './ViewState'
+import WeekDashboard from './WeekDashboard'
 
 /** Iniciales de lunes a domingo. X para miércoles, para no chocar con martes. */
 const DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
@@ -205,6 +206,8 @@ export default function WeekView() {
           </p>
         </>
       )}
+
+      <WeekDashboard />
     </main>
   )
 }

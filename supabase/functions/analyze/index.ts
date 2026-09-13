@@ -1,8 +1,16 @@
 // Edge Function "analyze": manda un resumen de hábitos y tareas a Gemini y
 // devuelve un análisis breve en español.
 //
+// Sirve DOS tipos de análisis, discriminados por "tipo" en el payload:
+// "diario" (hábitos de los últimos 14 días + tareas de hoy/atrasadas, el
+// original) y "semanal" (el dashboard de Vida -> Semana: cumplimiento de
+// esta semana por hábito y comparación con la anterior). Se reutiliza la
+// misma función -- y el mismo TONE_INSTRUCTIONS -- en vez de crear una
+// segunda; solo cambia qué prompt se construye antes de llamar a Gemini.
+//
 // No toca la base de datos: el cliente (src/data/analysis.ts) arma el JSON
-// y se lo manda ya listo. El journal nunca pasa por aquí.
+// y se lo manda ya listo. El journal nunca pasa por aquí, en ninguno de los
+// dos tipos.
 //
 // Requiere el secreto GEMINI_API_KEY:
 //   supabase secrets set GEMINI_API_KEY=tu-clave
@@ -64,7 +72,8 @@ type Tone = 'directo' | 'equilibrado' | 'breve'
  * contar la lista él mismo. `tono` es la preferencia elegida en Ajustes
  * (guardada en `user_metadata`, no en una tabla).
  */
-interface AnalysisPayload {
+interface DailyPayload {
+  tipo?: 'diario'
   fechaDeHoy: string
   habitos: HabitSummary[]
   tareasDeHoySinHacer: TaskItem[]
@@ -74,9 +83,7 @@ interface AnalysisPayload {
   tono: Tone
 }
 
-function isAnalysisPayload(value: unknown): value is Omit<AnalysisPayload, 'tono'> {
-  if (typeof value !== 'object' || value === null) return false
-  const v = value as Record<string, unknown>
+function isDailyPayload(v: Record<string, unknown>): v is DailyPayload {
   return (
     typeof v.fechaDeHoy === 'string' &&
     Array.isArray(v.habitos) &&
@@ -85,6 +92,64 @@ function isAnalysisPayload(value: unknown): value is Omit<AnalysisPayload, 'tono
     Array.isArray(v.tareasAtrasadasDeDiasAnteriores) &&
     typeof v.totalTareasAtrasadas === 'number'
   )
+}
+
+/** Conteos de un hábito dentro de una semana (siempre suman los días de esa semana ya transcurridos). */
+interface WeeklyHabitStats {
+  hecho: number
+  noHecho: number
+  sinResponder: number
+  diasTranscurridos: number
+}
+
+interface WeeklyHabitSummary {
+  nombre: string
+  /** Fecha local (YYYY-MM-DD) en que se creó el hábito. */
+  creadoEl: string
+  estaSemana: WeeklyHabitStats
+  /** `null` si el hábito es demasiado nuevo para tener la semana anterior completa. */
+  semanaAnterior: WeeklyHabitStats | null
+}
+
+interface WeeklyPayload {
+  tipo: 'semanal'
+  semanaActual: { inicio: string; fin: string }
+  semanaAnterior: { inicio: string; fin: string }
+  /** `false` si NINGÚN hábito tiene semana anterior completa todavía. */
+  hayHistoriaSuficiente: boolean
+  habitos: WeeklyHabitSummary[]
+  tono: Tone
+}
+
+function isWeeklyHabitStats(v: unknown): v is WeeklyHabitStats {
+  if (typeof v !== 'object' || v === null) return false
+  const s = v as Record<string, unknown>
+  return (
+    typeof s.hecho === 'number' &&
+    typeof s.noHecho === 'number' &&
+    typeof s.sinResponder === 'number' &&
+    typeof s.diasTranscurridos === 'number'
+  )
+}
+
+function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
+  if (v.tipo !== 'semanal') return false
+  const semanaActual = v.semanaActual as Record<string, unknown> | undefined
+  const semanaAnterior = v.semanaAnterior as Record<string, unknown> | undefined
+  if (typeof semanaActual?.inicio !== 'string' || typeof semanaActual?.fin !== 'string') return false
+  if (typeof semanaAnterior?.inicio !== 'string' || typeof semanaAnterior?.fin !== 'string') return false
+  if (typeof v.hayHistoriaSuficiente !== 'boolean') return false
+  if (!Array.isArray(v.habitos)) return false
+  return (v.habitos as unknown[]).every((h) => {
+    if (typeof h !== 'object' || h === null) return false
+    const hh = h as Record<string, unknown>
+    return (
+      typeof hh.nombre === 'string' &&
+      typeof hh.creadoEl === 'string' &&
+      isWeeklyHabitStats(hh.estaSemana) &&
+      (hh.semanaAnterior === null || isWeeklyHabitStats(hh.semanaAnterior))
+    )
+  })
 }
 
 /** "tono" es defensivo: si falta o llega algo raro (cliente viejo, etc.), cae a "equilibrado". */
@@ -111,19 +176,35 @@ Nada de signos de exclamación ni relleno motivacional genérico.`,
 Escribe SOLO 2 o 3 frases — nada más. La observación más importante que muestren los datos (sea buena o mala, la que más importe) y, si cabe en esas frases, una sugerencia concreta. Sin exclamaciones, sin relleno, sin frases de ánimo genéricas.`,
 }
 
-function buildPrompt(payload: AnalysisPayload): string {
+/** Cierre común a los dos tipos de análisis: idioma y límites generales. */
+const COMMON_CLOSING = `Todo el texto EN ESPAÑOL, sin mezclar palabras ni frases en inglés, sin importar en qué idioma "pienses" internamente.
+
+No inventes datos que no estén aquí. No repitas los datos tal cual ni cites los nombres de los campos del JSON. No des consejos médicos ni psicológicos.`
+
+function buildDailyPrompt(payload: DailyPayload): string {
   // "tono" ya se tradujo a instrucción; no hace falta que también viaje en
   // los "Datos", donde solo confundiría (no es algo que haya que analizar).
-  const { tono, ...data } = payload
+  const { tono, tipo: _tipo, ...data } = payload
   const instrucciones = `${TONE_INSTRUCTIONS[tono]}
 
-Todo el texto EN ESPAÑOL, sin mezclar palabras ni frases en inglés, sin importar en qué idioma "pienses" internamente.
+${COMMON_CLOSING}
 
 Sobre los datos de tareas: "tareasAtrasadasDeDiasAnteriores" son de días ANTERIORES a hoy y siguen sin hacerse — son las que se acumulan. "tareasDeHoySinHacer" son de HOY: no son atrasadas aunque no estén hechas todavía, no las cuentes como acumuladas. El número de tareas atrasadas es exactamente "totalTareasAtrasadas"; usa ese número tal cual, no cuentes tú los elementos de la lista. Si "tareasAtrasadasDeDiasAnteriores" está vacía, no hay ninguna atrasada: no digas que sí las hay.
 
-En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder, _ = el hábito todavía no existía ese día (se creó el "creadoEl"). Un día marcado "_" NO es un incumplimiento: no lo evalúes, no lo cuentes en contra del hábito, ignóralo como si no estuviera. Si "diasConHistorial" de un hábito es bajo (menos de 5 días, por ejemplo), dilo explícitamente ("llevas pocos días con este hábito, es pronto para ver un patrón") en vez de concluir que el hábito se sostiene o se cae.
+En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder, _ = el hábito todavía no existía ese día (se creó el "creadoEl"). Un día marcado "_" NO es un incumplimiento: no lo evalúes, no lo cuentes en contra del hábito, ignóralo como si no estuviera. Si "diasConHistorial" de un hábito es bajo (menos de 5 días, por ejemplo), dilo explícitamente ("llevas pocos días con este hábito, es pronto para ver un patrón") en vez de concluir que el hábito se sostiene o se cae.`
 
-No inventes datos que no estén aquí. No repitas los datos tal cual ni cites los nombres de los campos del JSON. No des consejos médicos ni psicológicos.`
+  return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
+}
+
+function buildWeeklyPrompt(payload: WeeklyPayload): string {
+  const { tono, tipo: _tipo, ...data } = payload
+  const instrucciones = `${TONE_INSTRUCTIONS[tono]}
+
+${COMMON_CLOSING}
+
+Estás mirando el dashboard semanal de hábitos, no el resumen de un solo día. Por cada hábito hay "estaSemana" (conteos hecho/noHecho/sinResponder sobre "diasTranscurridos" días ya pasados de esta semana, que puede estar apenas empezando) y, solo si el hábito ya existía la semana completa anterior, "semanaAnterior" (los mismos conteos, siempre sobre 7 días).
+
+Si "semanaAnterior" es null en un hábito, ESE HÁBITO es demasiado nuevo para comparar: dilo tal cual ("es muy pronto para comparar este hábito, lleva menos de dos semanas") y NO inventes si mejoró o empeoró. Si "hayHistoriaSuficiente" es false, NINGÚN hábito tiene semana anterior completa todavía: dilo una sola vez de forma general (no lo repitas por cada hábito) y limita el análisis a cómo va esta semana, sin comparar con nada. Cuando sí haya "semanaAnterior", compara los "hecho" de las dos semanas para decir en qué se mejoró y qué empeoró — descríbelo, no te limites a citar los números. Si "diasTranscurridos" de esta semana es bajo (1 o 2), acláralo en vez de sacar conclusiones fuertes sobre una semana que apenas empieza.`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }
@@ -192,23 +273,36 @@ Deno.serve(async (req: Request) => {
     )
   }
 
-  let payload: unknown
+  let rawPayload: unknown
   try {
-    payload = await req.json()
+    rawPayload = await req.json()
   } catch {
     return json({ error: 'El cuerpo de la petición no es JSON válido.' }, 400)
   }
-
-  if (!isAnalysisPayload(payload)) {
-    return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)
+  if (typeof rawPayload !== 'object' || rawPayload === null) {
+    return json({ error: 'Faltan datos.' }, 400)
   }
-  const fullPayload: AnalysisPayload = { ...payload, tono: toneOf(payload) }
+  const v = rawPayload as Record<string, unknown>
+  const tono = toneOf(v)
+
+  let prompt: string
+  if (v.tipo === 'semanal') {
+    if (!isWeeklyPayload(v)) {
+      return json({ error: 'Faltan datos del dashboard semanal.' }, 400)
+    }
+    prompt = buildWeeklyPrompt({ ...v, tono })
+  } else {
+    if (!isDailyPayload(v)) {
+      return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)
+    }
+    prompt = buildDailyPrompt({ ...v, tono })
+  }
 
   // La URL no lleva la clave (va en la cabecera x-goog-api-key), así que es
   // segura de mostrar en los logs y de devolver a la app.
   let geminiRes: Response
   try {
-    geminiRes = await callGemini(buildPrompt(fullPayload), apiKey)
+    geminiRes = await callGemini(prompt, apiKey)
   } catch (err) {
     console.error('analyze: fallo de red al llamar a Gemini', {
       model: GEMINI_MODEL,

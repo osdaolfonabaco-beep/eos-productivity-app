@@ -93,7 +93,11 @@ export {
   promptForDate,
 } from './journal'
 
-export { requestAnalysis } from './analysis'
+export { requestAnalysis, requestWeeklyAnalysis } from './analysis'
+
+export type { WeekRange, HabitWeekStats, HabitWeeklyBreakdown, WeeklyStats } from './weeklyStats'
+
+export { getWeeklyHabitStats } from './weeklyStats'
 
 export type { Tone, ReminderTimes } from './preferences'
 

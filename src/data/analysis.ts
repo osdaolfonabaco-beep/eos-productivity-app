@@ -1,15 +1,19 @@
 /**
- * Pide un análisis breve de hábitos y tareas a la Edge Function `analyze`,
- * que lo manda a Gemini. El payload se arma aquí, con lo mínimo necesario:
- * nombres de hábito, su patrón de los últimos 14 días y desde cuándo existen
- * (para no evaluar como incumplimiento días previos a su creación), y las
- * tareas de hoy (separadas en hechas/sin hacer) y las atrasadas de días
- * anteriores, cada grupo en su propio campo con nombre explícito — para que
- * no haya que inferir de un booleano o de una clave "hoy" repetida qué es
- * cada cosa. También el tono elegido en Ajustes (`getTone`), para que la
- * función sepa qué instrucción de tono usar.
- * El journal nunca entra en este archivo, así que estructuralmente no hay
- * forma de que se cuele en el análisis.
+ * Pide un análisis a la Edge Function `analyze`, que lo manda a Gemini. Dos
+ * variantes, discriminadas por "tipo" en el payload (debe coincidir con
+ * `supabase/functions/analyze/index.ts`, que sirve las dos):
+ *
+ * - `requestAnalysis` (diario): nombres de hábito, su patrón de los últimos
+ *   14 días y desde cuándo existen (para no evaluar como incumplimiento días
+ *   previos a su creación), y las tareas de hoy (separadas en hechas/sin
+ *   hacer) y las atrasadas de días anteriores.
+ * - `requestWeeklyAnalysis` (semanal): el desglose de `./weeklyStats`, para
+ *   el dashboard de Vida -> Semana.
+ *
+ * Los dos payloads usan campos explícitos y sin solapar — nunca inferir de
+ * un booleano o de una clave repetida qué es cada cosa — y llevan el tono
+ * elegido en Ajustes (`getTone`). El journal nunca entra en este archivo, así
+ * que estructuralmente no hay forma de que se cuele en ningún análisis.
  */
 
 import { addDays, toISODate, todayISO } from './dates'
@@ -17,6 +21,7 @@ import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
 import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
 import { bucketTasks, listTasks } from './tasks'
+import { getWeeklyHabitStats } from './weeklyStats'
 
 const DAYS_BACK = 14
 
@@ -45,7 +50,8 @@ interface OverdueTaskItem {
  * modelo llegó a confundir tareas de hoy sin hacer con atrasadas. Debe
  * coincidir con `AnalysisPayload` de `supabase/functions/analyze/index.ts`.
  */
-interface AnalysisPayload {
+interface DailyAnalysisPayload {
+  tipo: 'diario'
   fechaDeHoy: string
   habitos: HabitSummary[]
   tareasDeHoySinHacer: TaskItem[]
@@ -54,6 +60,34 @@ interface AnalysisPayload {
   /** Se manda calculado para que el modelo no tenga que contar la lista él mismo. */
   totalTareasAtrasadas: number
   /** El tono elegido en Ajustes; decide qué instrucción usa la función. */
+  tono: Tone
+}
+
+interface WeekRangePayload {
+  inicio: string
+  fin: string
+}
+
+interface WeeklyHabitStatsPayload {
+  hecho: number
+  noHecho: number
+  sinResponder: number
+  diasTranscurridos: number
+}
+
+interface WeeklyHabitPayload {
+  nombre: string
+  creadoEl: string
+  estaSemana: WeeklyHabitStatsPayload
+  semanaAnterior: WeeklyHabitStatsPayload | null
+}
+
+interface WeeklyAnalysisPayload {
+  tipo: 'semanal'
+  semanaActual: WeekRangePayload
+  semanaAnterior: WeekRangePayload
+  hayHistoriaSuficiente: boolean
+  habitos: WeeklyHabitPayload[]
   tono: Tone
 }
 
@@ -101,7 +135,7 @@ async function buildHabitsSummary(today: string): Promise<HabitSummary[]> {
   })
 }
 
-type TasksSummary = Omit<AnalysisPayload, 'fechaDeHoy' | 'habitos' | 'tono'>
+type TasksSummary = Omit<DailyAnalysisPayload, 'tipo' | 'fechaDeHoy' | 'habitos' | 'tono'>
 
 async function buildTasksSummary(today: string): Promise<TasksSummary> {
   const tasks = await listTasks()
@@ -131,17 +165,12 @@ function messageFromBody(body: Record<string, unknown> | null | undefined): stri
   return joinErrorDetail(body)
 }
 
-/** Pide el análisis. No guarda nada: el texto vive solo en el estado de quien lo pidió. */
-export async function requestAnalysis(): Promise<string> {
-  const today = todayISO()
-  const [habitos, tareas, tono] = await Promise.all([
-    buildHabitsSummary(today),
-    buildTasksSummary(today),
-    getTone(),
-  ])
-
-  const payload: AnalysisPayload = { fechaDeHoy: today, habitos, ...tareas, tono }
-
+/**
+ * Llama a la Edge Function `analyze` con un payload ya armado (diario o
+ * semanal — ambos comparten esta misma función y este mismo manejo de
+ * errores). No guarda nada: el texto vive solo en el estado de quien lo pidió.
+ */
+async function invokeAnalyze(payload: DailyAnalysisPayload | WeeklyAnalysisPayload): Promise<string> {
   const { data, error } = await supabase.functions.invoke<{
     analysis?: string
     error?: string
@@ -157,4 +186,43 @@ export async function requestAnalysis(): Promise<string> {
     throw new Error(messageFromBody(data) ?? 'No se pudo obtener el análisis.')
   }
   return data.analysis
+}
+
+/** El análisis diario: hábitos de los últimos 14 días + tareas de hoy y atrasadas. */
+export async function requestAnalysis(): Promise<string> {
+  const today = todayISO()
+  const [habitos, tareas, tono] = await Promise.all([
+    buildHabitsSummary(today),
+    buildTasksSummary(today),
+    getTone(),
+  ])
+
+  const payload: DailyAnalysisPayload = { tipo: 'diario', fechaDeHoy: today, habitos, ...tareas, tono }
+  return invokeAnalyze(payload)
+}
+
+/**
+ * El análisis del dashboard semanal (Vida -> Semana): en qué mejoró cada
+ * hábito y qué debería mejorar, comparando con la semana anterior cuando hay
+ * suficiente historia. Usa exactamente los mismos números que los gráficos
+ * del dashboard (`getWeeklyHabitStats`, en `./weeklyStats`) — no dos cálculos
+ * distintos del mismo dato.
+ */
+export async function requestWeeklyAnalysis(): Promise<string> {
+  const [stats, tono] = await Promise.all([getWeeklyHabitStats(todayISO()), getTone()])
+
+  const payload: WeeklyAnalysisPayload = {
+    tipo: 'semanal',
+    semanaActual: stats.semanaActual,
+    semanaAnterior: stats.semanaAnterior,
+    hayHistoriaSuficiente: stats.hayHistoriaSuficiente,
+    habitos: stats.habitos.map((h) => ({
+      nombre: h.habit.name,
+      creadoEl: toISODate(new Date(h.habit.createdAt)),
+      estaSemana: h.estaSemana,
+      semanaAnterior: h.semanaAnterior,
+    })),
+    tono,
+  }
+  return invokeAnalyze(payload)
 }
