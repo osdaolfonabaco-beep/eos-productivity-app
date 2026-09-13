@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import {
   addContribution,
+  addDays,
   archiveContribution,
   archiveFixedExpense,
   archiveSavingsGoal,
@@ -42,9 +43,16 @@ interface SalaryData {
  * período, así que editarlos en su sección tiene que refrescar también el
  * desglose de arriba. Las tres secciones son presentacionales — reciben sus
  * datos y avisan con callbacks; toda la carga y las mutaciones viven aquí.
+ *
+ * Se puede navegar entre quincenas (sin límite hacia atrás, nunca hacia el
+ * futuro). La meta de ahorro y sus aportes no dependen del período visitado
+ * — se cargan una sola vez y no cambian al navegar.
  */
 export default function SalaryView() {
-  const { start: periodStart, end: periodEnd } = quincenaRange(todayISO())
+  const [viewedDate, setViewedDate] = useState(todayISO())
+  const { start: periodStart, end: periodEnd } = quincenaRange(viewedDate)
+  const { start: todayPeriodStart } = quincenaRange(todayISO())
+  const isCurrentPeriod = periodStart === todayPeriodStart
 
   const fetcher = useCallback(async (): Promise<SalaryData> => {
     const [breakdown, fixedExpenses, goal] = await Promise.all([
@@ -80,17 +88,24 @@ export default function SalaryView() {
   if (!data) return null
 
   const { breakdown, fixedExpenses, goal, contributions } = data
-  const currentLabel = quincenaLabel(periodStart)
+  const periodLabel = quincenaLabel(periodStart)
 
   return (
     <main className="px-4 pb-6 pt-4 text-gray-900">
       {actionError && <ActionError message={actionError} onDismiss={() => setActionError(null)} />}
 
       <PeriodSection
+        key={periodStart}
         periodStart={periodStart}
         periodEnd={periodEnd}
         breakdown={breakdown}
         busy={busy}
+        isCurrentPeriod={isCurrentPeriod}
+        onPrevious={() => setViewedDate(addDays(periodStart, -1))}
+        onNext={() => {
+          if (!isCurrentPeriod) setViewedDate(addDays(periodEnd, 1))
+        }}
+        onGoToToday={() => setViewedDate(todayISO())}
         onSetSalary={(amount) =>
           void run(
             () => setSalaryAmount(periodStart, periodEnd, amount),
@@ -101,7 +116,7 @@ export default function SalaryView() {
 
       <FixedExpensesSection
         expenses={fixedExpenses}
-        currentLabel={currentLabel}
+        periodLabel={periodLabel}
         busy={busy}
         onCreate={(input) => void run(() => createFixedExpense(input), 'No se pudo crear el gasto.')}
         onUpdate={(id, input) =>

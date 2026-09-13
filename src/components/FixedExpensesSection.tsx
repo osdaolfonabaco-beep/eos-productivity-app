@@ -5,8 +5,12 @@ import FixedExpenseRow, { QuincenaPicker } from './FixedExpenseRow'
 
 interface FixedExpensesSectionProps {
   expenses: FixedExpense[]
-  /** La quincena en curso, para atenuar los gastos que no le aplican. */
-  currentLabel: 'primera' | 'segunda'
+  /**
+   * La quincena visitada (no siempre la de hoy: se puede navegar), para
+   * atenuar los gastos que no le aplican. Los gastos en sí no son
+   * históricos — son siempre los actuales, solo cambia cuáles se atenúan.
+   */
+  periodLabel: 'primera' | 'segunda'
   busy: boolean
   onCreate: (input: FixedExpenseInput) => void
   onUpdate: (id: string, input: FixedExpenseInput) => void
@@ -19,7 +23,7 @@ interface FixedExpensesSectionProps {
  */
 export default function FixedExpensesSection({
   expenses,
-  currentLabel,
+  periodLabel,
   busy,
   onCreate,
   onUpdate,
@@ -88,7 +92,7 @@ export default function FixedExpensesSection({
             <li key={expense.id}>
               <FixedExpenseRow
                 expense={expense}
-                currentLabel={currentLabel}
+                periodLabel={periodLabel}
                 busy={busy}
                 onUpdate={(input) => onUpdate(expense.id, input)}
                 onArchive={() => onArchive(expense.id)}

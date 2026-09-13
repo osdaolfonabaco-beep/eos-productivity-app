@@ -7,6 +7,12 @@ interface PeriodSectionProps {
   periodEnd: string
   breakdown: PeriodBreakdown
   busy: boolean
+  /** `false` mientras se navega a una quincena pasada. */
+  isCurrentPeriod: boolean
+  onPrevious: () => void
+  /** No hace nada si ya se está en la quincena en curso (no hay futuro). */
+  onNext: () => void
+  onGoToToday: () => void
   onSetSalary: (amount: number) => void
 }
 
@@ -22,16 +28,22 @@ function formatShortDate(iso: string): string {
 }
 
 /**
- * Bloque 1 de la vista Sueldo: la quincena en curso, el sueldo (registrarlo o
- * corregirlo en línea) y el desglose completo del disponible, siempre
- * visible — es el número que más se va a mirar, así que nunca queda detrás
- * de un desplegable. Si da negativo se muestra en rojo, no se esconde.
+ * Bloque 1 de la vista Sueldo: la quincena visitada (con flechas para
+ * navegar; sin límite hacia atrás, nunca hacia el futuro), el sueldo
+ * (registrarlo o corregirlo en línea) y el desglose completo del disponible,
+ * siempre visible — es el número que más se va a mirar, así que nunca queda
+ * detrás de un desplegable. Si da negativo se muestra en rojo, no se
+ * esconde.
  */
 export default function PeriodSection({
   periodStart,
   periodEnd,
   breakdown,
   busy,
+  isCurrentPeriod,
+  onPrevious,
+  onNext,
+  onGoToToday,
   onSetSalary,
 }: PeriodSectionProps) {
   const salary = breakdown.salary
@@ -52,10 +64,42 @@ export default function PeriodSection({
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">
-        {QUINCENA_TITLE[quincenaLabel(periodStart)]} · {formatShortDate(periodStart)} –{' '}
-        {formatShortDate(periodEnd)}
-      </h2>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onPrevious}
+          aria-label="Quincena anterior"
+          className="shrink-0 rounded-lg border border-gray-300 px-2.5 py-1.5 text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800"
+        >
+          ‹
+        </button>
+
+        <div className="min-w-0 flex-1 text-center">
+          <h2 className="text-sm font-semibold text-gray-700">
+            {QUINCENA_TITLE[quincenaLabel(periodStart)]} · {formatShortDate(periodStart)} –{' '}
+            {formatShortDate(periodEnd)}
+          </h2>
+          {!isCurrentPeriod && (
+            <button
+              type="button"
+              onClick={onGoToToday}
+              className="mt-0.5 text-xs font-medium text-gray-500 underline underline-offset-2"
+            >
+              Quincena pasada · Volver a hoy
+            </button>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={isCurrentPeriod}
+          aria-label="Quincena siguiente"
+          className="shrink-0 rounded-lg border border-gray-300 px-2.5 py-1.5 text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800 disabled:opacity-30"
+        >
+          ›
+        </button>
+      </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4">
         {!salary || editing ? (

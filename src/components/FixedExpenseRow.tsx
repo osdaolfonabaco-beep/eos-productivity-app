@@ -53,8 +53,8 @@ export function QuincenaPicker({
 
 interface FixedExpenseRowProps {
   expense: FixedExpense
-  /** La quincena en curso, para atenuar los gastos que no le aplican. */
-  currentLabel: 'primera' | 'segunda'
+  /** La quincena visitada, para atenuar los gastos que no le aplican. */
+  periodLabel: 'primera' | 'segunda'
   busy: boolean
   onUpdate: (input: FixedExpenseInput) => void
   onArchive: () => void
@@ -63,13 +63,13 @@ interface FixedExpenseRowProps {
 type Mode = 'view' | 'edit' | 'confirm-archive'
 
 /**
- * Una fila de "Gastos fijos": ver (atenuada si no aplica a la quincena en
- * curso), editar en línea y archivar con confirmación de dos toques — mismo
- * patrón que `HabitManageRow`.
+ * Una fila de "Gastos fijos": ver (atenuada si no aplica a la quincena
+ * visitada), editar en línea y archivar con confirmación de dos toques —
+ * mismo patrón que `HabitManageRow`.
  */
 export default function FixedExpenseRow({
   expense,
-  currentLabel,
+  periodLabel,
   busy,
   onUpdate,
   onArchive,
@@ -167,7 +167,7 @@ export default function FixedExpenseRow({
     )
   }
 
-  const applies = appliesToQuincena(expense, currentLabel)
+  const applies = appliesToQuincena(expense, periodLabel)
   const cadence = fixedExpenseCadence(expense)
   const whenLabel =
     cadence === 'quincenal'
