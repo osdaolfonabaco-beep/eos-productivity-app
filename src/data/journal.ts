@@ -6,11 +6,39 @@
  * ordenar por `created_at`. Solo la interfaz decide que las notas de hoy son
  * editables y las de antes no; la base de datos no lo impone. `promptForDate`
  * es pura: no toca la red ni se guarda en ningún sitio, solo decora la pantalla.
+ *
+ * Este módulo no cifra ni descifra nada: eso vive en `src/lib/journalCrypto.ts`,
+ * que necesita la DEK (solo en memoria, en la interfaz) y por eso no puede
+ * vivir aquí. `NoteContent` es la forma en que quien llama (con o sin DEK a
+ * mano) entrega el contenido ya resuelto — en claro o ya cifrado.
  */
 
 import { JOURNAL_COLS, journalNoteToRow, rowToJournalNote } from './rows'
 import { supabase, unwrap } from './supabase'
 import type { JournalNote } from './types'
+
+/**
+ * El contenido de una nota, listo para guardar. O bien `text` trae el texto en
+ * claro y `encrypted` es `false`, o bien `ciphertext`/`iv` traen el resultado
+ * de `encryptNote` y `encrypted` es `true` — nunca las dos cosas a la vez, y
+ * si está cifrado `text` va en `null`: el texto en claro no debe llegar aquí.
+ */
+export interface NoteContent {
+  text: string | null
+  ciphertext: string | null
+  iv: string | null
+  encrypted: boolean
+}
+
+function assertValidContent(content: NoteContent): void {
+  if (content.encrypted) {
+    if (!content.ciphertext || !content.iv) {
+      throw new Error('Nota cifrada incompleta: falta ciphertext o iv')
+    }
+  } else if (!content.text || !content.text.trim()) {
+    throw new Error('La nota no puede estar vacía')
+  }
+}
 
 /** Las notas de un día, de la más vieja a la más nueva (Nota 1, Nota 2...). */
 export async function listTodayNotes(date: string): Promise<JournalNote[]> {
@@ -45,14 +73,16 @@ export async function listNotesBefore(date: string): Promise<JournalNote[]> {
 }
 
 /** Añade una nota nueva a un día. */
-export async function createNote(date: string, text: string): Promise<JournalNote> {
-  const clean = text.trim()
-  if (!clean) throw new Error('La nota no puede estar vacía')
+export async function createNote(date: string, content: NoteContent): Promise<JournalNote> {
+  assertValidContent(content)
 
   const note: JournalNote = {
     id: crypto.randomUUID(),
     date,
-    text: clean,
+    text: content.text,
+    ciphertext: content.ciphertext,
+    iv: content.iv,
+    encrypted: content.encrypted,
     createdAt: new Date().toISOString(),
     archived: false,
   }
@@ -64,20 +94,24 @@ export async function createNote(date: string, text: string): Promise<JournalNot
 }
 
 /**
- * Cambia el texto de una nota. Pensada para las de hoy: las de días
+ * Cambia el contenido de una nota. Pensada para las de hoy: las de días
  * anteriores son de solo lectura en la interfaz.
  */
-export async function updateNoteText(id: string, text: string): Promise<JournalNote> {
-  const clean = text.trim()
-  if (!clean) throw new Error('La nota no puede estar vacía')
+export async function updateNoteContent(id: string, content: NoteContent): Promise<JournalNote> {
+  assertValidContent(content)
 
   const rows = unwrap(
     await supabase
       .from('journal_entries')
-      .update({ text: clean })
+      .update({
+        text: content.text,
+        ciphertext: content.ciphertext,
+        iv: content.iv,
+        encrypted: content.encrypted,
+      })
       .eq('id', id)
       .select(JOURNAL_COLS),
-    'updateNoteText',
+    'updateNoteContent',
   )
   if (!rows[0]) throw new Error(`No existe la nota ${id}`)
   return rowToJournalNote(rows[0])

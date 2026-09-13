@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   archiveNote,
   createNote,
@@ -7,10 +7,15 @@ import {
   listTodayNotes,
   promptForDate,
   todayISO,
-  updateNoteText,
+  updateNoteContent,
   type JournalNote,
+  type NoteContent,
 } from '../data'
+import { useJournalLock } from '../journalLock'
+import { decryptNote, encryptNote } from '../lib/journalCrypto'
 import { useAsyncData } from '../useAsyncData'
+import JournalSetup from './JournalSetup'
+import JournalUnlock from './JournalUnlock'
 import { ActionError, LoadError, Loading } from './ViewState'
 
 /** Candado: "esto se queda aquí". Contraste a propósito con el icono de DayCommentSection. */
@@ -51,14 +56,33 @@ interface JournalData {
   past: JournalNote[]
 }
 
+/** Lo que se descifró (o no) de una nota, para mostrarla. */
+interface DecodedText {
+  text: string
+  /** `true` si la nota está cifrada y no se pudo descifrar (DEK equivocada o dato corrupto). */
+  failed: boolean
+}
+
+/**
+ * Resuelve el texto a mostrar de una nota: tal cual si no está cifrada, o
+ * descifrado con la DEK si lo está. Nunca lanza — una nota que no se puede
+ * descifrar se marca `failed`, no rompe el resto de la lista.
+ */
+async function decodeNoteText(note: JournalNote, dek: Uint8Array): Promise<DecodedText> {
+  if (!note.encrypted) return { text: note.text ?? '', failed: false }
+  if (!note.ciphertext || !note.iv) return { text: '', failed: true }
+  const plain = await decryptNote(dek, note.ciphertext, note.iv)
+  return plain === null ? { text: '', failed: true } : { text: plain, failed: false }
+}
+
 /** Una nota de un día anterior: solo lectura, con archivar en dos toques. */
 function PastNote({
   label,
-  note,
+  decoded,
   onArchive,
 }: {
   label: string
-  note: JournalNote
+  decoded: DecodedText | undefined
   onArchive: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
@@ -77,7 +101,11 @@ function PastNote({
           </button>
         )}
       </div>
-      <p className="mt-1 whitespace-pre-wrap break-words text-gray-800">{note.text}</p>
+      {decoded?.failed ? (
+        <p className="mt-1 text-sm italic text-rose-600">No se pudo descifrar esta nota.</p>
+      ) : (
+        <p className="mt-1 whitespace-pre-wrap break-words text-gray-800">{decoded?.text ?? '…'}</p>
+      )}
 
       {confirming && (
         <div className="mt-2 rounded-lg border border-rose-300 bg-rose-50 p-3">
@@ -176,11 +204,16 @@ function NoteEditor({
 }
 
 /**
- * Vida → Journal: la lista de notas de hoy (numeradas, tocar una para
- * editarla) con un botón para añadir, y debajo las de días anteriores,
- * de solo lectura, agrupadas por día y también numeradas.
+ * La lista de notas de hoy (numeradas, tocar una para editarla) con un botón
+ * para añadir, y debajo las de días anteriores, de solo lectura, agrupadas
+ * por día y también numeradas.
+ *
+ * Solo se monta con la DEK ya desenvuelta (ver `JournalView` más abajo): toda
+ * nota que se guarde aquí se guarda cifrada, cree una nueva o edite una vieja
+ * que estuviera en claro — el texto en claro no debe salir hacia Supabase una
+ * vez que el cifrado está activo.
  */
-export default function JournalView() {
+function JournalNotes({ dek }: { dek: Uint8Array }) {
   const today = todayISO()
   const [screen, setScreen] = useState<Screen>({ name: 'list' })
 
@@ -193,6 +226,23 @@ export default function JournalView() {
   }, [today])
 
   const { data, loading, error, reload } = useAsyncData(fetcher, [today])
+
+  // Texto descifrado por id de nota. Se recalcula cuando cambian los datos
+  // cargados; una nota que aún no se resolvió simplemente no está en el mapa.
+  const [decoded, setDecoded] = useState<Record<string, DecodedText>>({})
+  useEffect(() => {
+    if (!data) return
+    let cancelled = false
+    const notes = [...data.today, ...data.past]
+    Promise.all(notes.map(async (note) => [note.id, await decodeNoteText(note, dek)] as const)).then(
+      (entries) => {
+        if (!cancelled) setDecoded(Object.fromEntries(entries))
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [data, dek])
 
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -211,20 +261,23 @@ export default function JournalView() {
     }
   }
 
+  async function save(text: string, editingId: string | null) {
+    const { ciphertext, iv } = await encryptNote(dek, text)
+    const content: NoteContent = { text: null, ciphertext, iv, encrypted: true }
+    if (editingId) await updateNoteContent(editingId, content)
+    else await createNote(today, content)
+  }
+
   if (screen.name === 'compose' || screen.name === 'edit') {
     const editing = screen.name === 'edit' ? screen.note : null
     return (
       <NoteEditor
-        initialText={editing?.text ?? ''}
+        initialText={editing ? (decoded[editing.id]?.text ?? '') : ''}
         prompt={editing ? null : promptForDate(today)}
         busy={busy}
         onCancel={() => setScreen({ name: 'list' })}
         onSave={(text) =>
-          void run(
-            () => (editing ? updateNoteText(editing.id, text) : createNote(today, text)),
-            'No se pudo guardar.',
-            true,
-          )
+          void run(() => save(text, editing?.id ?? null), 'No se pudo guardar.', true)
         }
       />
     )
@@ -258,20 +311,27 @@ export default function JournalView() {
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {todayNotes.map((note, i) => (
-              <li key={note.id}>
-                <button
-                  type="button"
-                  onClick={() => setScreen({ name: 'edit', note })}
-                  className="w-full rounded-xl border border-gray-200 bg-white p-3 text-left"
-                >
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Nota {i + 1}
-                  </p>
-                  <p className="whitespace-pre-wrap break-words text-gray-900">{note.text}</p>
-                </button>
-              </li>
-            ))}
+            {todayNotes.map((note, i) => {
+              const d = decoded[note.id]
+              return (
+                <li key={note.id}>
+                  <button
+                    type="button"
+                    onClick={() => setScreen({ name: 'edit', note })}
+                    className="w-full rounded-xl border border-gray-200 bg-white p-3 text-left"
+                  >
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      Nota {i + 1}
+                    </p>
+                    {d?.failed ? (
+                      <p className="text-sm italic text-rose-600">No se pudo descifrar esta nota.</p>
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words text-gray-900">{d?.text ?? '…'}</p>
+                    )}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
@@ -290,7 +350,7 @@ export default function JournalView() {
                     <PastNote
                       key={note.id}
                       label={`Nota ${i + 1}`}
-                      note={note}
+                      decoded={decoded[note.id]}
                       onArchive={() => void run(() => archiveNote(note.id), 'No se pudo archivar.')}
                     />
                   ))}
@@ -302,4 +362,39 @@ export default function JournalView() {
       )}
     </main>
   )
+}
+
+/**
+ * Vida → Journal. Antes de mostrar nada, resuelve el candado: sin clave
+ * configurada ofrece crearla, con clave pero sin desbloquear pide la
+ * contraseña, y solo con la DEK en memoria muestra las notas.
+ */
+export default function JournalView() {
+  const lock = useJournalLock()
+
+  if (lock.keyRecordStatus === 'loading') return <Loading />
+  if (lock.keyRecordStatus === 'error') return <LoadError onRetry={lock.reloadKeyRecord} />
+
+  if (lock.keyRecord === null) {
+    return (
+      <JournalSetup
+        onCreated={(key, dek) => {
+          lock.setKeyRecord(key)
+          lock.unlock(dek)
+        }}
+      />
+    )
+  }
+
+  if (lock.dek === null) {
+    return (
+      <JournalUnlock
+        keyRecord={lock.keyRecord}
+        onUnlocked={lock.unlock}
+        onPasswordChanged={lock.setKeyRecord}
+      />
+    )
+  }
+
+  return <JournalNotes dek={lock.dek} />
 }

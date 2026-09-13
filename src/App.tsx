@@ -9,6 +9,7 @@ import SalaryView from './components/SalaryView'
 import SectionNav from './components/SectionNav'
 import SettingsView from './components/SettingsView'
 import WeekView from './components/WeekView'
+import { JournalLockProvider } from './journalLock'
 import { useSession } from './useSession'
 
 type Tab = 'hoy' | 'vida' | 'dinero' | 'ideas'
@@ -116,7 +117,7 @@ export default function App() {
       ) : !session ? (
         <LoginScreen />
       ) : (
-        <>
+        <JournalLockProvider active={tab === 'vida' && vidaSub === 'journal'}>
           <header className="flex h-11 items-center justify-end px-2">
             <button
               type="button"
@@ -145,7 +146,7 @@ export default function App() {
               ))}
             </div>
           </nav>
-        </>
+        </JournalLockProvider>
       )}
     </div>
   )

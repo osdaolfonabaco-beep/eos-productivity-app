@@ -38,7 +38,7 @@ export const DEBT_COLS =
 export const PAYMENT_COLS = 'id,debt_id,date,amount'
 export const IDEA_COLS = 'id,text,status,created_at,archived'
 export const TASK_COLS = 'id,text,date,done,archived,created_at'
-export const JOURNAL_COLS = 'id,date,text,created_at,archived'
+export const JOURNAL_COLS = 'id,date,text,ciphertext,iv,encrypted,created_at,archived'
 export const GOAL_COLS = 'id,week_start,text,resultado,archived,created_at'
 export const GOAL_UPDATE_COLS = 'id,goal_id,date,text,direction,created_at'
 export const DAY_COMMENT_COLS = 'id,date,text,created_at'
@@ -209,7 +209,10 @@ export function taskToRow(t: Task) {
 interface JournalRow {
   id: string
   date: string
-  text: string
+  text: string | null
+  ciphertext: string | null
+  iv: string | null
+  encrypted: boolean
   created_at: string
   archived: boolean
 }
@@ -219,6 +222,9 @@ export function rowToJournalNote(r: JournalRow): JournalNote {
     id: r.id,
     date: r.date,
     text: r.text,
+    ciphertext: r.ciphertext,
+    iv: r.iv,
+    encrypted: r.encrypted,
     createdAt: r.created_at,
     archived: r.archived,
   }
@@ -229,6 +235,9 @@ export function journalNoteToRow(n: JournalNote) {
     id: n.id,
     date: n.date,
     text: n.text,
+    ciphertext: n.ciphertext,
+    iv: n.iv,
+    encrypted: n.encrypted,
     created_at: n.createdAt,
     archived: n.archived,
   }

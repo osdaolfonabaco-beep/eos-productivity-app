@@ -18,6 +18,7 @@ export type {
   IdeaStatus,
   Task,
   JournalNote,
+  JournalKey,
   WeeklyGoal,
   GoalResult,
   GoalUpdate,
@@ -100,17 +101,19 @@ export {
   bucketTasks,
 } from './tasks'
 
-export type { DayNotes } from './journal'
+export type { DayNotes, NoteContent } from './journal'
 
 export {
   listTodayNotes,
   listNotesBefore,
   createNote,
-  updateNoteText,
+  updateNoteContent,
   archiveNote,
   groupNotesByDate,
   promptForDate,
 } from './journal'
+
+export { getJournalKey, insertJournalKey, updatePasswordWrapping } from './journalKey'
 
 export {
   listWeeklyGoals,

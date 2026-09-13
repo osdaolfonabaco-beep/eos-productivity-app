@@ -119,9 +119,18 @@ export interface JournalNote {
   id: string
   /** El día al que pertenece la nota, `YYYY-MM-DD`. */
   date: string
-  text: string
+  /**
+   * El texto en claro. `null` cuando `encrypted` es `true`: el contenido real
+   * vive cifrado en `ciphertext`/`iv` y hay que desenvolverlo con la DEK
+   * (`src/lib/journalCrypto.ts`) antes de mostrarlo.
+   */
+  text: string | null
   createdAt: string
   archived: boolean
+  /** `true` si esta nota se guardó cifrada. Las notas de antes de activar el cifrado son `false`. */
+  encrypted: boolean
+  ciphertext: string | null
+  iv: string | null
 }
 
 // --- Ideas ----------------------------------------------------------------

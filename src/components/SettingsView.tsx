@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { updatePasswordWrapping } from '../data/journalKey'
+import { useJournalLock } from '../journalLock'
+import { changePassword } from '../lib/journalCrypto'
 import {
   applyBackup,
   clearLocalData,
@@ -145,6 +148,118 @@ function reportLine(label: string, r: TableReport): string {
 interface Pending {
   fileName: string
   data: BackupData
+}
+
+const JOURNAL_PW_MIN_LENGTH = 8
+
+/**
+ * Cambiar la contraseña del Journal. Usa `changePassword` (no toca la
+ * envoltura de recuperación ni recifra notas) y solo funciona con la DEK ya
+ * desenvuelta — si el Journal está bloqueado o sin configurar, explica por qué.
+ */
+function JournalPasswordSection() {
+  const lock = useJournalLock()
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
+
+  if (lock.keyRecordStatus === 'loading') {
+    return <p className="mt-3 text-sm text-gray-500">Cargando…</p>
+  }
+  if (lock.keyRecordStatus === 'error') {
+    return <p className="mt-3 text-sm text-gray-500">No se pudo comprobar el cifrado del Journal.</p>
+  }
+  if (lock.keyRecord === null) {
+    return (
+      <p className="mt-3 text-sm text-gray-500">
+        Aún no configuras el cifrado del Journal. Ve a Vida → Journal para crearlo.
+      </p>
+    )
+  }
+  if (lock.dek === null) {
+    return (
+      <p className="mt-3 text-sm text-gray-500">
+        Desbloquea el Journal (Vida → Journal) para cambiar la contraseña.
+      </p>
+    )
+  }
+
+  const dek = lock.dek
+  const keyId = lock.keyRecord.id
+  const tooShort = newPassword.length > 0 && newPassword.length < JOURNAL_PW_MIN_LENGTH
+  const mismatched = newPasswordConfirm.length > 0 && newPassword !== newPasswordConfirm
+  const canSubmit =
+    newPassword.length >= JOURNAL_PW_MIN_LENGTH && newPassword === newPasswordConfirm && !busy
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!canSubmit) return
+    setBusy(true)
+    setError(null)
+    setDone(false)
+    try {
+      const wrapping = await changePassword(dek, newPassword)
+      const updated = await updatePasswordWrapping(keyId, wrapping)
+      lock.setKeyRecord(updated)
+      setNewPassword('')
+      setNewPasswordConfirm('')
+      setDone(true)
+    } catch {
+      setError('No se pudo cambiar la contraseña. Intenta de nuevo.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void submit(e)} className="mt-4 flex flex-col gap-3">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="settings-journal-pw">
+          Contraseña nueva
+        </label>
+        <input
+          id="settings-journal-pw"
+          type="password"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base"
+        />
+        {tooShort && (
+          <p className="mt-1 text-xs text-rose-600">Mínimo {JOURNAL_PW_MIN_LENGTH} caracteres.</p>
+        )}
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="settings-journal-pw2">
+          Confirma la contraseña nueva
+        </label>
+        <input
+          id="settings-journal-pw2"
+          type="password"
+          autoComplete="new-password"
+          value={newPasswordConfirm}
+          onChange={(e) => setNewPasswordConfirm(e.target.value)}
+          className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base"
+        />
+        {mismatched && <p className="mt-1 text-xs text-rose-600">No coincide.</p>}
+      </div>
+      <button
+        type="submit"
+        disabled={!canSubmit}
+        className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+      >
+        {busy ? 'Cambiando…' : 'Cambiar contraseña'}
+      </button>
+      {done && <p className="text-sm text-gray-600">Contraseña cambiada.</p>}
+      {error && (
+        <p className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </p>
+      )}
+    </form>
+  )
 }
 
 export default function SettingsView({ onClose, email }: SettingsViewProps) {
@@ -689,6 +804,16 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
         )}
 
         {testResult && <p className="mt-3 text-sm text-gray-600">{testResult}</p>}
+      </section>
+
+      {/* -------- Cifrado del Journal -------- */}
+      <section className="mt-8 border-t border-gray-200 pt-6">
+        <h2 className="text-sm font-semibold text-gray-700">Cifrado del Journal</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Cambia la contraseña. No toca el código de recuperación ni vuelve a cifrar las
+          notas ya guardadas.
+        </p>
+        <JournalPasswordSection />
       </section>
 
       {/* -------- Cuenta -------- */}
