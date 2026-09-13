@@ -3,6 +3,8 @@
  * Solo tipos: sin lógica.
  */
 
+import type { JournalKeyWrapping } from '../lib/journalCrypto'
+
 /**
  * La definición de un hábito. No guarda el historial de cumplimiento:
  * eso son los `HabitEntry`.
@@ -258,4 +260,17 @@ export interface SavingsContribution {
   amount: number
   createdAt: string
   archived: boolean
+}
+
+// --- Cifrado del diario -----------------------------------------------
+
+/**
+ * La fila de cifrado del diario (`journal_key`): una sola por usuario. El
+ * detalle criptográfico de las envolturas vive en `src/lib/journalCrypto.ts`;
+ * aquí solo se añaden el id y las marcas de tiempo que gestiona el servidor.
+ */
+export interface JournalKey extends JournalKeyWrapping {
+  id: string
+  createdAt: string
+  updatedAt: string
 }

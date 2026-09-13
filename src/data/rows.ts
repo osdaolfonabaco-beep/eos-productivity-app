@@ -19,6 +19,7 @@ import type {
   HabitEntry,
   Idea,
   IdeaStatus,
+  JournalKey,
   JournalNote,
   Payment,
   Quincena,
@@ -28,6 +29,7 @@ import type {
   Task,
   WeeklyGoal,
 } from './types'
+import type { JournalKeyWrapping } from '../lib/journalCrypto'
 
 export const HABIT_COLS = 'id,name,archived,sort_order,created_at'
 export const ENTRY_COLS = 'id,habit_id,date,done'
@@ -44,6 +46,8 @@ export const SALARY_PERIOD_COLS = 'id,period_start,period_end,amount,archived,cr
 export const FIXED_EXPENSE_COLS = 'id,name,amount,quincena,archived,created_at'
 export const SAVINGS_GOAL_COLS = 'id,name,target_amount,target_date,archived,created_at'
 export const SAVINGS_CONTRIBUTION_COLS = 'id,goal_id,date,amount,archived,created_at'
+export const JOURNAL_KEY_COLS =
+  'id,wrapped_dek_password,salt_password,iv_password,wrapped_dek_recovery,salt_recovery,iv_recovery,created_at,updated_at'
 
 interface HabitRow {
   id: string
@@ -428,5 +432,42 @@ export function savingsContributionToRow(c: SavingsContribution) {
     amount: c.amount,
     archived: c.archived,
     created_at: c.createdAt,
+  }
+}
+
+interface JournalKeyRow {
+  id: string
+  wrapped_dek_password: string
+  salt_password: string
+  iv_password: string
+  wrapped_dek_recovery: string
+  salt_recovery: string
+  iv_recovery: string
+  created_at: string
+  updated_at: string
+}
+
+export function rowToJournalKey(r: JournalKeyRow): JournalKey {
+  return {
+    id: r.id,
+    wrappedDekPassword: r.wrapped_dek_password,
+    saltPassword: r.salt_password,
+    ivPassword: r.iv_password,
+    wrappedDekRecovery: r.wrapped_dek_recovery,
+    saltRecovery: r.salt_recovery,
+    ivRecovery: r.iv_recovery,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+export function journalKeyWrappingToRow(w: JournalKeyWrapping) {
+  return {
+    wrapped_dek_password: w.wrappedDekPassword,
+    salt_password: w.saltPassword,
+    iv_password: w.ivPassword,
+    wrapped_dek_recovery: w.wrappedDekRecovery,
+    salt_recovery: w.saltRecovery,
+    iv_recovery: w.ivRecovery,
   }
 }
