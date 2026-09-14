@@ -25,15 +25,15 @@ const TABS: { value: Tab; label: string }[] = [
 ]
 
 const VIDA_ITEMS: { value: VidaSub; label: string }[] = [
+  { value: 'plan', label: 'Plan' },
   { value: 'semana', label: 'Semana' },
   { value: 'journal', label: 'Journal' },
   { value: 'habitos', label: 'Hábitos' },
-  { value: 'plan', label: 'Plan' },
 ]
 
 const DINERO_ITEMS: { value: DineroSub; label: string }[] = [
-  { value: 'deudas', label: 'Deudas' },
   { value: 'sueldo', label: 'Sueldo' },
+  { value: 'deudas', label: 'Deudas' },
 ]
 
 function GearIcon() {
@@ -70,8 +70,8 @@ function BottomTab({
 export default function App() {
   const { session, loading } = useSession()
   const [tab, setTab] = useState<Tab>('hoy')
-  const [vidaSub, setVidaSub] = useState<VidaSub>('semana')
-  const [dineroSub, setDineroSub] = useState<DineroSub>('deudas')
+  const [vidaSub, setVidaSub] = useState<VidaSub>('plan')
+  const [dineroSub, setDineroSub] = useState<DineroSub>('sueldo')
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   function go(next: Tab) {
