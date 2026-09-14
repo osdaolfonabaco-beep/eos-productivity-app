@@ -116,7 +116,7 @@ export default function App() {
     <div className="mx-auto min-h-screen w-full max-w-md bg-gray-50">
       {loading ? (
         <div className="flex min-h-screen items-center justify-center">
-          <p className="text-sm text-gray-400">Productividad</p>
+          <p className="text-sm text-gray-400">Eos</p>
         </div>
       ) : !session ? (
         <LoginScreen />

@@ -10,7 +10,7 @@ self.addEventListener('push', (event) => {
     data = { body: event.data ? event.data.text() : '' }
   }
 
-  const title = data.title || 'Productividad'
+  const title = data.title || 'Eos'
 
   // Botones de la notificación ("Ya los hice" / "No los hice hoy"): solo si
   // el navegador los soporta de verdad. Safari (escritorio e iOS) descarta
@@ -31,8 +31,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body || '',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: '/icons/eos-icono-192.png',
+    badge: '/icons/eos-notificacion-96.png',
     data,
     actions,
   }
@@ -60,16 +60,18 @@ function respondToReminder(data, done) {
   })
     .then((res) =>
       res.ok
-        ? self.registration.showNotification('Productividad', {
+        ? self.registration.showNotification('Eos', {
             body: done ? 'Hábitos marcados como hechos.' : 'Hábitos marcados como no hechos.',
-            icon: '/icons/icon-192.png',
+            icon: '/icons/eos-icono-192.png',
+            badge: '/icons/eos-notificacion-96.png',
           })
         : Promise.reject(new Error('HTTP ' + res.status)),
     )
     .catch(() =>
-      self.registration.showNotification('Productividad', {
+      self.registration.showNotification('Eos', {
         body: 'No se pudo guardar. Abre la app para responder.',
-        icon: '/icons/icon-192.png',
+        icon: '/icons/eos-icono-192.png',
+        badge: '/icons/eos-notificacion-96.png',
       }),
     )
 }

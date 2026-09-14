@@ -144,7 +144,7 @@ export function parseBackup(value: unknown): BackupData {
   }
   const file = value as Record<string, unknown>
   if (file.app !== APP) {
-    throw new Error('El archivo no parece un respaldo de Productividad.')
+    throw new Error('El archivo no parece un respaldo de Eos.')
   }
   if (typeof file.version !== 'number') {
     throw new Error('El archivo no es un respaldo válido.')
