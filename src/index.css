@@ -1,1 +1,104 @@
 @import "tailwindcss";
+
+@theme {
+  /*
+   * Tokens de diseño de la app.
+   *
+   * Reglas:
+   * 1. Un color, un oficio. Violeta = activo. Aguamarina = IA. Verde = hecho.
+   *    Rojo = no hecho o mora. Rosa = solo superficie.
+   * 2. Un solo nivel de caja por pantalla: los datos van en tarjeta, los
+   *    formularios no.
+   * 3. Los botones desactivados no se rellenan de gris. Van transparentes
+   *    con texto apagado.
+   * 4. Las tarjetas son blancas y opacas siempre, para que el texto
+   *    conserve contraste sobre el fondo con color.
+   *
+   * Pendientes de aplicar (no se tocan componentes en este paso):
+   * - `text-destacado` no lleva cifras tabulares incluidas: sumar la clase
+   *   `tabular-nums` de Tailwind donde se use.
+   * - `text-etiqueta` no lleva mayúsculas incluidas: sumar la clase
+   *   `uppercase` de Tailwind donde se use.
+   * - Hay colores literales sueltos en componentes que todavía no usan
+   *   estos tokens (ej. #0ca30c y #d03b3b en WeekDashboard.tsx). Migrarlos
+   *   a estos tokens es trabajo posterior, no de este paso.
+   */
+
+  /* Marca y acento (lo activo, lo seleccionado) */
+  --color-acento: #7B5AF0;
+  --color-acento-suave: #EDE8FE;
+  --color-acento-texto: #5B3FD1;
+
+  /* Inteligencia artificial, y nada más */
+  --color-ia: #1391B5;
+  --color-ia-suave: #E2F4F9;
+  --color-ia-texto: #0F7290;
+
+  /* Estados */
+  --color-hecho: #059669;
+  --color-hecho-suave: #ECFDF5;
+  --color-fallado: #DC2626;
+  --color-fallado-suave: #FEF2F2;
+
+  /* Superficie de marca, solo para fondos, nunca para estados */
+  --color-rosa-suave: #FBD3E6;
+
+  /* Neutros */
+  --color-texto: #14161F;
+  --color-texto-cuerpo: #3A3F4E;
+  --color-texto-apagado: #767E8F;
+  --color-texto-tenue: #A8AEBC;
+  --color-borde: #E6E8EE;
+  --color-separador: #F0F1F5;
+  --color-tarjeta: #FFFFFF;
+
+  /* Tipografía: cinco niveles, ni uno más */
+  --text-titulo: 28px;
+  --text-titulo--line-height: 1.15;
+  --text-titulo--font-weight: 600;
+  --text-titulo--letter-spacing: -0.02em;
+
+  --text-destacado: 24px;
+  --text-destacado--font-weight: 600;
+
+  --text-contenido: 15px;
+  --text-contenido--line-height: 1.45;
+  --text-contenido--font-weight: 400;
+
+  --text-meta: 13px;
+  --text-meta--font-weight: 400;
+
+  --text-etiqueta: 11px;
+  --text-etiqueta--font-weight: 600;
+  --text-etiqueta--letter-spacing: 0.08em;
+
+  /*
+   * Espaciado: escala de 4 (4, 8, 12, 16, 24, 32, 48).
+   * La base de Tailwind 4 ya es 0.25rem (4px), así que las utilidades
+   * p-1/p-2/p-3/p-4/p-6/p-8/p-12 (y sus equivalentes m-, gap-, etc.) ya
+   * dan esta escala sin tokens nuevos:
+   *   1 → 4px   2 → 8px   3 → 12px   4 → 16px
+   *   6 → 24px  8 → 32px  12 → 48px
+   * Se declara explícita solo para dejar la base documentada aquí.
+   */
+  --spacing: 0.25rem;
+
+  /* Radios */
+  --radius-campo: 8px;
+  --radius-tarjeta: 10px;
+  --radius-pastilla: 999px;
+
+  /*
+   * Fondo de la app: pila de degradados radiales sobre un color de
+   * respaldo. No se usa el namespace --background-image-* de Tailwind
+   * porque ese namespace solo admite imágenes, no un color sólido al
+   * final de la lista. Se deja como variable suelta pensada para usarse
+   * con la propiedad `background` (shorthand), ej.:
+   *   style={{ background: 'var(--fondo-app)' }}
+   */
+  --fondo-app: radial-gradient(60% 50% at 50% 42%, #FFFFFF 0%, transparent 72%),
+               radial-gradient(50% 42% at 10% 18%, #CFF3EC 0%, transparent 76%),
+               radial-gradient(46% 40% at 90% 80%, #FBDCEA 0%, transparent 76%),
+               radial-gradient(48% 44% at 86% 14%, #E4DCFB 0%, transparent 76%),
+               #F7FDFC;
+}
