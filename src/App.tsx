@@ -70,7 +70,7 @@ function BottomTab({
 export default function App() {
   const { session, loading } = useSession()
   const [tab, setTab] = useState<Tab>('hoy')
-  const [vidaSub, setVidaSub] = useState<VidaSub>('plan')
+  const [vidaSub, setVidaSub] = useState<VidaSub>('semana')
   const [dineroSub, setDineroSub] = useState<DineroSub>('sueldo')
   const [settingsOpen, setSettingsOpen] = useState(false)
 
