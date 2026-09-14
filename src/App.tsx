@@ -113,7 +113,10 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-md bg-gray-50">
+    <div
+      className="mx-auto min-h-screen w-full max-w-md"
+      style={{ background: 'var(--fondo-app)', backgroundAttachment: 'fixed' }}
+    >
       {loading ? (
         <div className="flex min-h-screen items-center justify-center">
           <p className="text-sm text-gray-400">Eos</p>

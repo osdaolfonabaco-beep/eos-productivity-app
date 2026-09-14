@@ -215,7 +215,7 @@ export default function IdeaCard({
                 type="button"
                 onClick={onAnalyze}
                 disabled={analyzing || analyzeDisabled}
-                className="text-sm font-medium text-indigo-700 disabled:opacity-40"
+                className="text-sm font-medium text-ia-texto disabled:opacity-40"
               >
                 {analyzing ? 'Analizando…' : 'Analizar con IA'}
               </button>

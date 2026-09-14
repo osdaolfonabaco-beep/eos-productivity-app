@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/*
+ * Fondo de la app también en `body`, no solo en el contenedor raíz: en
+ * celular, el rebote del scroll (overscroll) deja ver el `body` por debajo
+ * del contenedor un instante, y si el `body` fuera blanco se notaría un
+ * parpadeo. `background-attachment: fixed` evita que el degradado se
+ * estire o se desplace según lo largo que sea cada pantalla.
+ */
+body {
+  background: var(--fondo-app);
+  background-attachment: fixed;
+}
+
 @theme {
   /*
    * Tokens de diseño de la app.

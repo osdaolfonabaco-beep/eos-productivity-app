@@ -24,25 +24,27 @@ export default function AnalysisSection() {
   }
 
   return (
-    <section className="px-4 pt-6 text-gray-900">
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">Análisis</h2>
+    <section className="px-4 pt-6 text-texto">
+      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Análisis</h2>
 
       {error && <ActionError message={error} onDismiss={() => setError(null)} />}
 
-      <button
-        type="button"
-        onClick={() => void run()}
-        disabled={busy}
-        className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 disabled:opacity-40"
-      >
-        {busy ? 'Analizando…' : 'Pedir análisis'}
-      </button>
+      <div className="rounded-tarjeta border border-borde bg-tarjeta p-3">
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={busy}
+          className="w-full rounded-campo bg-acento px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+        >
+          {busy ? 'Analizando…' : 'Pedir análisis'}
+        </button>
 
-      {text && (
-        <p className="mt-3 whitespace-pre-wrap rounded-xl border border-gray-200 bg-white p-3 text-gray-800">
-          {text}
-        </p>
-      )}
+        {text && (
+          <p className="mt-3 whitespace-pre-wrap border-t-[0.5px] border-separador pt-3 text-texto-cuerpo">
+            {text}
+          </p>
+        )}
+      </div>
     </section>
   )
 }

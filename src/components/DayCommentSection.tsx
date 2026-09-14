@@ -74,8 +74,8 @@ export default function DayCommentSection() {
   }
 
   return (
-    <section className="px-4 pt-6 text-gray-900">
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">Comentario del día</h2>
+    <section className="px-4 pt-6 text-texto">
+      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Comentario del día</h2>
 
       {actionError && (
         <div className="mb-2">
@@ -83,29 +83,33 @@ export default function DayCommentSection() {
         </div>
       )}
 
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-indigo-700">
-        <SentIcon />
-        Se envía a la IA en el análisis diario y semanal.
-      </p>
+      <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta">
+        <p className="flex items-center gap-1.5 border-b-[0.5px] border-separador bg-ia-suave px-3 py-2 text-xs font-medium text-ia-texto">
+          <SentIcon />
+          Se envía a la IA en el análisis diario y semanal.
+        </p>
 
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={2}
-        placeholder="Una o dos frases sobre cómo fue el día…"
-        aria-label="Comentario del día"
-        disabled={busy}
-        className="w-full resize-y rounded-lg border border-gray-300 px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800 disabled:opacity-60"
-      />
-      <div className="mt-2 flex justify-end">
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={!text.trim() || busy || !dirty}
-          className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
-        >
-          {busy ? 'Guardando…' : 'Guardar'}
-        </button>
+        <div className="p-3">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={2}
+            placeholder="Una o dos frases sobre cómo fue el día…"
+            aria-label="Comentario del día"
+            disabled={busy}
+            className="w-full resize-y rounded-campo border border-borde px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:opacity-60"
+          />
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={!text.trim() || busy || !dirty}
+              className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta disabled:bg-transparent disabled:text-texto-tenue"
+            >
+              {busy ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   )
