@@ -1,11 +1,25 @@
 import { useState } from 'react'
 import type { Idea, IdeaStatus } from '../data'
 
-const STATUSES: { value: IdeaStatus; label: string }[] = [
+export const STATUSES: { value: IdeaStatus; label: string }[] = [
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'en-marcha', label: 'En marcha' },
   { value: 'descartada', label: 'Descartada' },
+  { value: 'hecha', label: 'Hecha' },
 ]
+
+/**
+ * Color de cada pastilla cuando está activa. 'hecha' y 'descartada' son
+ * desenlaces opuestos y llevan colores que no se confunden entre sí (verde
+ * vs. rosa); pendiente/en-marcha, al no ser un desenlace, comparten el color
+ * neutro de siempre.
+ */
+export const STATUS_ACTIVE_CLASS: Record<IdeaStatus, string> = {
+  pendiente: 'bg-gray-900 text-white',
+  'en-marcha': 'bg-gray-900 text-white',
+  descartada: 'bg-rose-600 text-white',
+  hecha: 'bg-emerald-600 text-white',
+}
 
 /** El resultado de pedir el análisis de IA de esta idea, o `undefined` si nunca se pidió. */
 export type IdeaAnalysisState = { text: string } | { error: string }
@@ -23,12 +37,16 @@ interface IdeaCardProps {
   onAnalyze: () => void
 }
 
-type Mode = 'view' | 'edit' | 'confirm-archive'
+type Mode = 'view' | 'edit' | 'confirm-archive' | 'confirm-hecha'
 
 /**
- * Una idea en la lista: texto, las tres pastillas de estado, las acciones
+ * Una idea en la lista: texto, las cuatro pastillas de estado, las acciones
  * (editar el texto en línea, archivar con confirmación) y, en pendiente/en
  * marcha, el botón de análisis con IA y su resultado (o error) debajo.
+ *
+ * Marcar como 'hecha' pide confirmación de dos toques, igual que archivar
+ * (y de hecho archiva: ver `setIdeaStatus`) -- las demás pastillas cambian
+ * el estado al primer toque, como siempre.
  */
 export default function IdeaCard({
   idea,
@@ -119,6 +137,29 @@ export default function IdeaCard({
             </button>
           </div>
         </div>
+      ) : mode === 'confirm-hecha' ? (
+        <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+          <p className="text-sm text-gray-700">
+            Se marcará como hecha: sale de la lista y se archiva. Se puede volver atrás
+            desde "Ver archivadas".
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => onSetStatus('hecha')}
+              className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white"
+            >
+              Marcar como hecha
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('view')}
+              className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       ) : (
         <>
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -130,13 +171,16 @@ export default function IdeaCard({
                     key={s.value}
                     type="button"
                     onClick={() => {
-                      if (!active) onSetStatus(s.value)
+                      if (active) return
+                      if (s.value === 'hecha') {
+                        setMode('confirm-hecha')
+                      } else {
+                        onSetStatus(s.value)
+                      }
                     }}
                     aria-pressed={active}
                     className={`rounded-full px-3 py-1 text-xs font-medium ${
-                      active
-                        ? 'bg-gray-900 text-white'
-                        : 'border border-gray-300 text-gray-600'
+                      active ? STATUS_ACTIVE_CLASS[s.value] : 'border border-gray-300 text-gray-600'
                     }`}
                   >
                     {s.label}

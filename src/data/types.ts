@@ -141,8 +141,13 @@ export interface JournalNote {
 
 // --- Ideas ----------------------------------------------------------------
 
-/** Estado de una idea. Lo marca la persona; "descartada" no es lo mismo que archivada. */
-export type IdeaStatus = 'pendiente' | 'en-marcha' | 'descartada'
+/**
+ * Estado de una idea. Lo marca la persona. 'descartada' y 'hecha' son los dos
+ * desenlaces posibles de una idea cerrada -- opuestos, nunca se confunden en
+ * la interfaz -- y ninguno de los dos es lo mismo que archivada: marcar como
+ * 'hecha' también archiva (ver `setIdeaStatus`), pero 'descartada' no.
+ */
+export type IdeaStatus = 'pendiente' | 'en-marcha' | 'descartada' | 'hecha'
 
 /** Una idea anotada: un solo campo de texto libre y su estado. */
 export interface Idea {
@@ -152,6 +157,14 @@ export interface Idea {
   /** Fecha ISO completa de creación. Ordena la lista: más recientes primero. */
   createdAt: string
   archived: boolean
+  /**
+   * Fecha ISO completa de cuándo la idea pasó a 'hecha' o a 'descartada';
+   * `null` mientras sigue abierta (pendiente/en-marcha) o si nunca se cerró.
+   * La fija `setIdeaStatus`, no un trigger de la base de datos -- así editar
+   * el texto de una idea ya cerrada no cambia cuándo se cerró (a diferencia
+   * de `updated_at`, que sí cambia con cualquier edición).
+   */
+  closedAt: string | null
 }
 
 // --- Metas semanales --------------------------------------------------------

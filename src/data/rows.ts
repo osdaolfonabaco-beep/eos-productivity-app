@@ -36,7 +36,7 @@ export const ENTRY_COLS = 'id,habit_id,date,done'
 export const DEBT_COLS =
   'id,name,opening_balance,annual_rate,monthly_payment,status,archived,sort_order,created_at'
 export const PAYMENT_COLS = 'id,debt_id,date,amount'
-export const IDEA_COLS = 'id,text,status,created_at,archived'
+export const IDEA_COLS = 'id,text,status,created_at,archived,closed_at'
 export const TASK_COLS = 'id,text,date,planned_for,done,archived,created_at'
 export const JOURNAL_COLS = 'id,date,text,ciphertext,iv,encrypted,created_at,archived'
 export const GOAL_COLS = 'id,week_start,text,resultado,archived,created_at'
@@ -153,6 +153,7 @@ interface IdeaRow {
   status: string
   created_at: string
   archived: boolean
+  closed_at: string | null
 }
 
 export function rowToIdea(r: IdeaRow): Idea {
@@ -162,6 +163,7 @@ export function rowToIdea(r: IdeaRow): Idea {
     status: r.status as IdeaStatus,
     createdAt: r.created_at,
     archived: r.archived,
+    closedAt: r.closed_at,
   }
 }
 
@@ -172,6 +174,7 @@ export function ideaToRow(i: Idea) {
     status: i.status,
     created_at: i.createdAt,
     archived: i.archived,
+    closed_at: i.closedAt,
   }
 }
 

@@ -9,7 +9,9 @@
  *   hacer) y las atrasadas de días anteriores.
  * - `requestWeeklyAnalysis` (semanal): el desglose de `./weeklyStats` y las
  *   metas de la semana con sus avances (`./goals`), para el dashboard de
- *   Vida -> Semana. También la semana anterior de ambos, para comparar.
+ *   Vida -> Semana. También la semana anterior de ambos, para comparar. Y las
+ *   ideas que se cerraron esta semana (pasaron a 'hecha' o a 'descartada',
+ *   `./ideas`), con su texto y en qué quedaron.
  * - `requestIdeaAnalysis` (idea): una sola idea de la pestaña Ideas, con
  *   nada más que su texto y su estado — a propósito no lleva ni la lista de
  *   ideas ni ningún otro dato de la cuenta.
@@ -25,6 +27,7 @@
 import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
 import { getDayComment, getDayCommentsInRange } from './dayComments'
 import { listGoalUpdates, listWeeklyGoals } from './goals'
+import { listClosedIdeas } from './ideas'
 import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
 import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
@@ -33,6 +36,13 @@ import type { GoalDirection, GoalResult } from './types'
 import { getWeeklyHabitStats } from './weeklyStats'
 
 const DAYS_BACK = 14
+
+/**
+ * Por debajo de este número de ideas cerradas en la semana, no hay caso
+ * suficiente para que el análisis afirme un patrón (dos o tres datos no son
+ * una tendencia).
+ */
+const MIN_IDEAS_CERRADAS_PARA_PATRON = 5
 
 interface HabitSummary {
   nombre: string
@@ -117,6 +127,12 @@ interface DayCommentPayload {
   texto: string
 }
 
+/** Una idea que se cerró esta semana: en qué quedó, con su texto. */
+interface ClosedIdeaPayload {
+  texto: string
+  estado: 'hecha' | 'descartada'
+}
+
 interface WeeklyAnalysisPayload {
   tipo: 'semanal'
   semanaActual: WeekRangePayload
@@ -127,6 +143,16 @@ interface WeeklyAnalysisPayload {
   metasSemanaAnterior: PastGoalPayload[]
   /** Los comentarios del día de esta semana que sí se escribieron (los que no, no aparecen). */
   comentariosDeLaSemana: DayCommentPayload[]
+  /** Las ideas que pasaron a 'hecha' o a 'descartada' esta semana (las que siguen abiertas no aparecen). */
+  ideasCerradas: ClosedIdeaPayload[]
+  /**
+   * `true` si el TOTAL histórico de ideas cerradas (de cualquier semana, no
+   * solo esta) llega a `MIN_IDEAS_CERRADAS_PARA_PATRON` -- se manda
+   * calculado para que el modelo no tenga que contar nada él mismo. Cerrar
+   * cinco ideas en una sola semana casi nunca pasa; lo que decide si hay
+   * caso para un patrón es el historial acumulado.
+   */
+  hayIdeasCerradasSuficientes: boolean
   tono: Tone
 }
 
@@ -237,6 +263,32 @@ async function buildGoalsSummary(
 }
 
 /**
+ * `ideasCerradas`: las que pasaron a 'hecha' o a 'descartada' entre
+ * `thisMonday` y `today` (fechas locales, inclusive) -- lo que se cuenta en
+ * el prompt. `totalIdeasCerradas`: TODAS las cerradas alguna vez, sin
+ * importar la semana -- decide si hay caso suficiente para hablar de un
+ * patrón (cerrar cinco ideas en una sola semana casi nunca pasa; lo que
+ * importa es el historial acumulado). Ambas usan `closedAt` -- fijado por
+ * `setIdeaStatus` solo al cambiar el estado -- y no `updatedAt`, que también
+ * cambia al editar el texto: una idea cerrada hace meses no debe parecer
+ * cerrada esta semana solo porque se le corrigió una palabra.
+ */
+async function buildClosedIdeasSummary(
+  thisMonday: string,
+  today: string,
+): Promise<{ ideasCerradas: ClosedIdeaPayload[]; totalIdeasCerradas: number }> {
+  const closed = await listClosedIdeas()
+  const ideasCerradas = closed
+    .filter((i) => {
+      if (i.closedAt == null) return false
+      const closedDate = toISODate(new Date(i.closedAt))
+      return closedDate >= thisMonday && closedDate <= today
+    })
+    .map((i) => ({ texto: i.text, estado: i.status as 'hecha' | 'descartada' }))
+  return { ideasCerradas, totalIdeasCerradas: closed.length }
+}
+
+/**
  * Mensaje a partir del cuerpo de error de la función. Si es saturación de
  * Gemini (`code: 'overloaded'`), un mensaje entendible y nada más — el
  * detalle técnico no ayuda ahí y solo confunde. Para cualquier otro error,
@@ -308,10 +360,11 @@ export async function requestWeeklyAnalysis(): Promise<string> {
   const today = todayISO()
   const thisMonday = startOfWeekISO(today)
 
-  const [stats, goals, comentarios, tono] = await Promise.all([
+  const [stats, goals, comentarios, ideasCerradasInfo, tono] = await Promise.all([
     getWeeklyHabitStats(today),
     buildGoalsSummary(today),
     getDayCommentsInRange(thisMonday, today),
+    buildClosedIdeasSummary(thisMonday, today),
     getTone(),
   ])
 
@@ -329,6 +382,8 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     metas: goals.metas,
     metasSemanaAnterior: goals.metasSemanaAnterior,
     comentariosDeLaSemana: comentarios.map((c) => ({ fecha: c.date, texto: c.text })),
+    ideasCerradas: ideasCerradasInfo.ideasCerradas,
+    hayIdeasCerradasSuficientes: ideasCerradasInfo.totalIdeasCerradas >= MIN_IDEAS_CERRADAS_PARA_PATRON,
     tono,
   }
   return invokeAnalyze(payload)

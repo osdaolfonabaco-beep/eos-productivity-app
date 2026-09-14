@@ -85,6 +85,8 @@ export {
 
 export {
   listIdeas,
+  listArchivedIdeas,
+  listClosedIdeas,
   createIdea,
   updateIdeaText,
   setIdeaStatus,

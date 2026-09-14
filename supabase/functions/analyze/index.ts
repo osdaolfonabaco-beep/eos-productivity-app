@@ -5,9 +5,10 @@
 // "diario" (hábitos de los últimos 14 días + tareas de hoy/atrasadas + el
 // comentario del día, el original), "semanal" (el dashboard de Vida ->
 // Semana: cumplimiento de esta semana por hábito y comparación con la
-// anterior, las metas de la semana y sus avances, y los comentarios del día
-// de esta semana), y "idea" (una sola idea de la pestaña Ideas, con su
-// texto y su estado -- ver buildIdeaPrompt). Se reutiliza la misma función
+// anterior, las metas de la semana y sus avances, los comentarios del día
+// de esta semana, y las ideas que se cerraron esta semana), y "idea" (una
+// sola idea de la pestaña Ideas, con su texto y su estado -- ver
+// buildIdeaPrompt). Se reutiliza la misma función
 // -- y el mismo mecanismo de tono (toneOf/getTone) -- en vez de crear una
 // nueva; solo cambia qué prompt se construye antes de llamar a Gemini. Los
 // prompts diario y semanal (buildDailyPrompt/buildWeeklyPrompt,
@@ -149,6 +150,12 @@ interface DayCommentSummary {
   texto: string
 }
 
+/** Una idea que se cerró esta semana (pasó a 'hecha' o a 'descartada'), con su texto. */
+interface ClosedIdeaSummary {
+  texto: string
+  estado: 'hecha' | 'descartada'
+}
+
 interface WeeklyPayload {
   tipo: 'semanal'
   semanaActual: { inicio: string; fin: string }
@@ -160,6 +167,14 @@ interface WeeklyPayload {
   metasSemanaAnterior: PastGoalSummary[]
   /** Los comentarios del día de esta semana que sí se escribieron. Opcional por lo mismo que el resto: tolerancia defensiva. */
   comentariosDeLaSemana?: DayCommentSummary[]
+  /** Las ideas que se cerraron esta semana. Opcional por lo mismo que el resto: tolerancia defensiva. */
+  ideasCerradas?: ClosedIdeaSummary[]
+  /**
+   * `true` si el TOTAL histórico de ideas cerradas (de cualquier semana, no
+   * solo esta) es suficiente para que comentar un patrón tenga sentido --
+   * cerrar cinco ideas en una sola semana casi nunca pasa.
+   */
+  hayIdeasCerradasSuficientes?: boolean
   tono: Tone
 }
 
@@ -207,6 +222,12 @@ function isDayCommentSummary(v: unknown): v is DayCommentSummary {
   return typeof c.fecha === 'string' && typeof c.texto === 'string'
 }
 
+function isClosedIdeaSummary(v: unknown): v is ClosedIdeaSummary {
+  if (typeof v !== 'object' || v === null) return false
+  const c = v as Record<string, unknown>
+  return typeof c.texto === 'string' && (c.estado === 'hecha' || c.estado === 'descartada')
+}
+
 function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
   if (v.tipo !== 'semanal') return false
   const semanaActual = v.semanaActual as Record<string, unknown> | undefined
@@ -223,6 +244,14 @@ function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
     if (!Array.isArray(v.comentariosDeLaSemana) || !v.comentariosDeLaSemana.every(isDayCommentSummary)) {
       return false
     }
+  }
+  if (v.ideasCerradas !== undefined) {
+    if (!Array.isArray(v.ideasCerradas) || !v.ideasCerradas.every(isClosedIdeaSummary)) {
+      return false
+    }
+  }
+  if (v.hayIdeasCerradasSuficientes !== undefined && typeof v.hayIdeasCerradasSuficientes !== 'boolean') {
+    return false
   }
   return (v.habitos as unknown[]).every((h) => {
     if (typeof h !== 'object' || h === null) return false
@@ -317,7 +346,9 @@ Si "semanaAnterior" es null en un hábito, ESE HÁBITO es demasiado nuevo para c
 
 Además de los hábitos hay metas de la semana, en "metas": cada una es "texto" (la meta), "resultado" ("cumplida", "no-cumplida" o null si aún no se cierra) y "avances" (la bitácora: cada uno con "fecha", "texto" y "direccion" — "acerca" es un avance, "aleja" es un retroceso). Coméntalas junto con los hábitos: si una meta no tiene avances todavía, dilo ("todavía no has anotado nada sobre esta meta") en vez de suponer que va bien o mal; si tiene avances, di hacia dónde apunta el conjunto (más "acerca" que "aleja", o al revés), sin listar cada avance uno por uno. "metasSemanaAnterior" trae las metas de la semana pasada con su "resultado" final (puede venir vacía, o con "resultado" null si nunca se cerraron) — úsalas solo para dar contexto de continuidad si tiene sentido ("la semana pasada te propusiste X y la cumpliste/no la cumpliste"), sin inventar nada que no diga "resultado". Si tanto "metas" como "metasSemanaAnterior" están vacías, no hables de metas: no es un hueco que haya que señalar, simplemente no se usó esta parte esa semana.
 
-"comentariosDeLaSemana" trae, para los días de esta semana en que la persona escribió algo sobre cómo fue el día, "fecha" y "texto" (los días sin comentario simplemente no aparecen en la lista). Es contexto adicional, igual que en el análisis diario: úsalo para matizar lo que ya muestran los hábitos y las metas, no lo repitas ni lo cites entero, y si la lista viene vacía no lo menciones.`
+"comentariosDeLaSemana" trae, para los días de esta semana en que la persona escribió algo sobre cómo fue el día, "fecha" y "texto" (los días sin comentario simplemente no aparecen en la lista). Es contexto adicional, igual que en el análisis diario: úsalo para matizar lo que ya muestran los hábitos y las metas, no lo repitas ni lo cites entero, y si la lista viene vacía no lo menciones.
+
+"ideasCerradas" trae las ideas que se cerraron esta semana (pasaron a "hecha" o a "descartada"), cada una con su "texto" y su "estado" -- las que siguen abiertas (pendiente/en-marcha) no aparecen aquí. "hayIdeasCerradasSuficientes" no cuenta solo esta semana: dice si el TOTAL histórico de ideas cerradas, de cualquier semana, ya es suficiente para que un patrón signifique algo. Si es true, puedes comentar qué tipo de ideas se están ejecutando y cuáles se quedan sin avanzar, describiendo un patrón real a partir de los datos. Si es false, NO afirmes ningún patrón ni tendencia -- como mucho, menciona qué pasó esta semana en concreto con "ideasCerradas" (cuántas se cerraron y en qué quedaron), sin generalizar: dos o tres casos no son un patrón, ni siquiera si son los únicos que hay hasta ahora. Si "ideasCerradas" viene vacía o ausente, no hables de ideas: no es un hueco que señalar, simplemente no se cerró ninguna esta semana (aunque "hayIdeasCerradasSuficientes" sea true por cierres de semanas anteriores).`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }
