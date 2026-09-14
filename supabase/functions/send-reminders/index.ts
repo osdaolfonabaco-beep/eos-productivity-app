@@ -237,7 +237,7 @@ Deno.serve(async (req: Request) => {
 
       const token = await signReminderToken(user.id, local.date, tokenSecret)
       const payload = {
-        title: 'Productividad',
+        title: 'Eos',
         body: habitsMessage(unanswered.map((h) => h.name)),
         url: '/',
         token,

@@ -1,7 +1,7 @@
 {
   "name": "Eos · Personalized Tracker",
   "short_name": "Eos",
-  "description": "Hábitos, tareas, metas, finanzas y journal privado, en un solo sitio.",
+  "description": "Seguimiento diario de hábitos.",
   "lang": "es",
   "start_url": "/",
   "scope": "/",

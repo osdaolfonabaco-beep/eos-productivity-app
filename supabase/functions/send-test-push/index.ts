@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
   const result = await sendPushToAll(
     subs as PushSubscriptionRow[],
     {
-      title: 'Productividad',
+      title: 'Eos',
       body: 'Aviso de prueba: si ves esto, la tubería de notificaciones funciona.',
     },
     { publicKey: vapidPublicKey, privateKey: vapidPrivateKey, subject: vapidSubject },
