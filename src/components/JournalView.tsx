@@ -261,10 +261,22 @@ function JournalNotes({ dek }: { dek: Uint8Array }) {
     }
   }
 
-  async function save(text: string, editingId: string | null) {
+  /**
+   * Una nota nueva siempre nace cifrada. Editar una vieja NO la cifra si ya
+   * estaba en texto: cifrarla es un acto deliberado (el migrador en lote que
+   * falta), no un efecto secundario de tocarla — mientras no exista ese
+   * migrador, las notas en texto son la única vía de recuperación si algo
+   * sale mal con la clave, y no queremos ir cerrando esa vía nota por nota.
+   */
+  async function save(text: string, editing: JournalNote | null) {
+    if (editing && !editing.encrypted) {
+      const content: NoteContent = { text, ciphertext: null, iv: null, encrypted: false }
+      await updateNoteContent(editing.id, content)
+      return
+    }
     const { ciphertext, iv } = await encryptNote(dek, text)
     const content: NoteContent = { text: null, ciphertext, iv, encrypted: true }
-    if (editingId) await updateNoteContent(editingId, content)
+    if (editing) await updateNoteContent(editing.id, content)
     else await createNote(today, content)
   }
 
@@ -276,9 +288,7 @@ function JournalNotes({ dek }: { dek: Uint8Array }) {
         prompt={editing ? null : promptForDate(today)}
         busy={busy}
         onCancel={() => setScreen({ name: 'list' })}
-        onSave={(text) =>
-          void run(() => save(text, editing?.id ?? null), 'No se pudo guardar.', true)
-        }
+        onSave={(text) => void run(() => save(text, editing), 'No se pudo guardar.', true)}
       />
     )
   }
