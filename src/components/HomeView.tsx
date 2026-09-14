@@ -44,16 +44,18 @@ function formatToday(iso: string): string {
 }
 
 /**
- * La sección de tareas de la pantalla Hoy: alta rápida (la tarea es de hoy),
- * las de hoy y las atrasadas (días anteriores sin hacer, que se arrastran).
- * Cada fila permite marcar, editar el texto y archivar. Si no hay tareas en
- * ninguno de los dos grupos, no se muestra nada salvo el campo de alta.
+ * La sección de tareas de la pantalla Hoy: las atrasadas (días anteriores sin
+ * hacer, que se arrastran) primero, luego las de hoy, y al final la línea de
+ * alta rápida (la tarea es de hoy salvo que se elija otro día en el selector).
+ * Cada fila permite marcar, editar el texto y archivar. El contenedor se
+ * muestra siempre, aunque no haya tareas: la línea de alta siempre está.
  */
 function TasksToday() {
   const today = todayISO()
   const fetcher = useCallback(() => listTasks(), [])
   const { data, loading, error, reload } = useAsyncData(fetcher)
 
+  const [formOpen, setFormOpen] = useState(false)
   const [text, setText] = useState('')
   // `null` = hoy, el valor de siempre. Elegir otro día en el selector no toca
   // el gesto de Enter: crea para lo que esté elegido ahí en ese momento.
@@ -79,7 +81,13 @@ function TasksToday() {
     const clean = text.trim()
     if (!clean || busy) return
     setText('')
+    setFormOpen(false)
     void run(() => createTask(clean, plannedFor), 'No se pudo crear la tarea.')
+  }
+
+  function cancelForm() {
+    setText('')
+    setFormOpen(false)
   }
 
   function rowProps(t: Task) {
@@ -95,87 +103,86 @@ function TasksToday() {
   const buckets = data ? bucketTasks(data, today) : null
   const hoy = buckets?.hoy ?? []
   const atrasadas = buckets?.atrasadas ?? []
+  // Atrasadas primero (con su franja roja y su etiqueta de antigüedad), luego
+  // las de hoy: el orden ya distingue los dos grupos, sin subcabeceras.
+  const rows = [
+    ...atrasadas.map((t) => ({ task: t, overdueLabel: overdueLabel(taskDueDate(t)!, today) })),
+    ...hoy.map((t) => ({ task: t, overdueLabel: undefined })),
+  ]
 
   return (
-    <section className="px-4 pt-6 text-gray-900">
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">Tareas</h2>
+    <section className="px-4 pt-6 text-texto">
+      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Tareas de hoy</h2>
 
       {actionError && (
         <ActionError message={actionError} onDismiss={() => setActionError(null)} />
       )}
 
-      <div className="mb-4 flex gap-2">
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              submit()
-            }
-          }}
-          placeholder="Anota una tarea de hoy…"
-          aria-label="Anota una tarea de hoy"
-          className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
-        />
-        <DayPicker
-          value={plannedFor}
-          onChange={setPlannedFor}
-          today={today}
-          disabled={busy}
-          label="Día de la tarea"
-        />
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!text.trim() || busy}
-          className="shrink-0 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-        >
-          Guardar
-        </button>
-      </div>
-
       {loading && !data ? (
         <Loading />
       ) : error && !data ? (
         <LoadError onRetry={reload} />
-      ) : hoy.length === 0 && atrasadas.length === 0 ? null : (
-        <div className="flex flex-col gap-4">
-          {hoy.length > 0 && (
-            <div>
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Hoy
-              </h3>
-              <ul className="flex flex-col gap-2">
-                {hoy.map((t) => (
-                  <li key={t.id}>
-                    <TaskRow task={t} {...rowProps(t)} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {atrasadas.length > 0 && (
-            <div>
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Atrasadas
-              </h3>
-              <ul className="flex flex-col gap-2">
-                {atrasadas.map((t) => {
-                  const due = taskDueDate(t)
-                  return (
-                    <li key={t.id}>
-                      {due && (
-                        <p className="mb-1 text-xs text-gray-400">{overdueLabel(due, today)}</p>
-                      )}
-                      <TaskRow task={t} {...rowProps(t)} />
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          )}
+      ) : (
+        <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta">
+          <ul>
+            {rows.map(({ task: t, overdueLabel: label }) => (
+              <li key={t.id} className="border-b-[0.5px] border-separador">
+                <TaskRow task={t} variant="row" overdueLabel={label} {...rowProps(t)} />
+              </li>
+            ))}
+            <li>
+              {formOpen ? (
+                <div className="flex flex-wrap items-center gap-2 px-3 py-3">
+                  <input
+                    type="text"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        submit()
+                      }
+                    }}
+                    placeholder="Anota una tarea de hoy…"
+                    aria-label="Anota una tarea de hoy"
+                    autoFocus
+                    className="min-w-0 flex-1 rounded-campo border border-borde px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+                  />
+                  <DayPicker
+                    value={plannedFor}
+                    onChange={setPlannedFor}
+                    today={today}
+                    disabled={busy}
+                    label="Día de la tarea"
+                  />
+                  <button
+                    type="button"
+                    onClick={submit}
+                    disabled={!text.trim() || busy}
+                    className="shrink-0 rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta disabled:bg-transparent disabled:text-texto-tenue"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelForm}
+                    className="shrink-0 rounded-campo px-4 py-2 text-sm font-medium text-texto-apagado"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setFormOpen(true)}
+                  className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-texto-tenue"
+                >
+                  <span aria-hidden="true">+</span>
+                  <span>Anota una tarea…</span>
+                </button>
+              )}
+            </li>
+          </ul>
         </div>
       )}
     </section>
