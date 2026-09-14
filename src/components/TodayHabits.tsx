@@ -80,29 +80,40 @@ export default function TodayHabits() {
 
   const habits = data?.habits ?? []
   const statuses = data?.statuses ?? {}
+  const hechos = habits.filter((h) => statuses[h.id] === 'done').length
 
   return (
-    <section className="px-4 pt-3 text-gray-900">
+    <section className="px-4 pt-3 text-texto">
       {actionError && (
         <ActionError message={actionError} onDismiss={() => setActionError(null)} />
       )}
 
       {habits.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">
+        <p className="rounded-tarjeta border border-dashed border-borde px-4 py-8 text-center text-texto-apagado">
           No tienes hábitos todavía.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {habits.map((h) => (
-            <li key={h.id}>
-              <HabitRow
-                name={h.name}
-                status={statuses[h.id] ?? 'unanswered'}
-                onCycle={() => cycle(h.id)}
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="mb-2 text-etiqueta uppercase text-texto-tenue">
+            Hábitos · {hechos} de {habits.length}
+          </p>
+          <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta">
+            <ul>
+              {habits.map((h, i) => (
+                <li
+                  key={h.id}
+                  className={i < habits.length - 1 ? 'border-b-[0.5px] border-separador' : ''}
+                >
+                  <HabitRow
+                    name={h.name}
+                    status={statuses[h.id] ?? 'unanswered'}
+                    onCycle={() => cycle(h.id)}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
       )}
     </section>
   )

@@ -11,35 +11,42 @@ interface HabitRowProps {
  * Todo lo que cambia de un estado a otro, en un solo sitio.
  * `label` / `nextLabel` son solo para el texto accesible; en pantalla el
  * estado lo dice la forma del glifo (y el color, que solo refuerza).
+ *
+ * `stripe` es el color de la franja izquierda de 3px; su ancho es siempre
+ * el mismo (se fija aparte, en el botón) para que las filas nunca queden
+ * desalineadas entre sí, aunque el color sea transparente.
  */
 const STATUS_META: Record<
   EntryStatus,
-  { label: string; nextLabel: string; row: string; badge: string }
+  { label: string; nextLabel: string; stripe: string; badge: string; name: string }
 > = {
   unanswered: {
     label: 'Sin responder',
     nextLabel: 'hecho',
-    row: 'border-dashed border-gray-300 bg-white',
-    badge: 'border-dashed border-gray-400 text-transparent',
+    stripe: 'border-l-transparent',
+    badge: 'border-borde bg-transparent',
+    name: 'text-texto-cuerpo',
   },
   done: {
     label: 'Hecho',
     nextLabel: 'no hecho',
-    row: 'border-solid border-green-300 bg-green-50',
-    badge: 'border-solid border-green-600 bg-green-600 text-white',
+    stripe: 'border-l-hecho',
+    badge: 'border-hecho bg-hecho text-white',
+    name: 'text-texto-apagado line-through',
   },
   'not-done': {
     label: 'No hecho',
     nextLabel: 'sin responder',
-    row: 'border-solid border-rose-300 bg-rose-50',
-    badge: 'border-solid border-rose-600 bg-rose-600 text-white',
+    stripe: 'border-l-fallado',
+    badge: 'border-fallado bg-fallado text-white',
+    name: 'text-texto-cuerpo',
   },
 }
 
 /**
  * El glifo dentro del disco. La forma distingue los estados sin depender del
- * color: check para "hecho", cruz para "no hecho", nada (anillo punteado
- * vacío) para "sin responder".
+ * color: check para "hecho", cruz para "no hecho", nada (anillo vacío) para
+ * "sin responder".
  */
 function Glyph({ status }: { status: EntryStatus }) {
   if (status === 'done') {
@@ -78,8 +85,10 @@ function Glyph({ status }: { status: EntryStatus }) {
 }
 
 /**
- * Un hábito en la pantalla Hoy: una sola línea, glifo + nombre, sin la palabra
- * de estado. Toda la fila es el botón; el área de toque sigue siendo cómoda.
+ * Un hábito en la pantalla Hoy: una fila de la lista de hábitos, glifo +
+ * nombre, sin la palabra de estado. Toda la fila es el botón; el área de
+ * toque se mantiene cómoda aunque el relleno visual sea más bajo (min-h-11
+ * = 44px, el mínimo accesible).
  */
 export default function HabitRow({ name, status, onCycle }: HabitRowProps) {
   const meta = STATUS_META[status]
@@ -89,7 +98,7 @@ export default function HabitRow({ name, status, onCycle }: HabitRowProps) {
       type="button"
       onClick={onCycle}
       aria-label={`${name}, ${meta.label.toLowerCase()}. Tocar para cambiar a ${meta.nextLabel}.`}
-      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-opacity active:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800 ${meta.row}`}
+      className={`flex min-h-11 w-full items-center gap-3 border-l-[3px] py-3 pl-4 pr-4 text-left transition-opacity active:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${meta.stripe}`}
     >
       <span
         className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${meta.badge}`}
@@ -97,9 +106,7 @@ export default function HabitRow({ name, status, onCycle }: HabitRowProps) {
       >
         <Glyph status={status} />
       </span>
-      <span className="min-w-0 flex-1 break-words text-base font-medium text-gray-900">
-        {name}
-      </span>
+      <span className={`min-w-0 flex-1 break-words text-contenido ${meta.name}`}>{name}</span>
     </button>
   )
 }
