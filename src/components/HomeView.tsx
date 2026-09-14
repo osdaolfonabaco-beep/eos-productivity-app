@@ -3,8 +3,10 @@ import {
   archiveTask,
   bucketTasks,
   createTask,
+  daysBetween,
   listTasks,
   setTaskDone,
+  taskDueDate,
   todayISO,
   updateTaskText,
   type Task,
@@ -12,9 +14,23 @@ import {
 import { useAsyncData } from '../useAsyncData'
 import AnalysisSection from './AnalysisSection'
 import DayCommentSection from './DayCommentSection'
+import DayPicker from './DayPicker'
 import TaskRow from './TaskRow'
 import TodayHabits from './TodayHabits'
 import { ActionError, LoadError, Loading } from './ViewState'
+
+/**
+ * De qué día viene una tarea atrasada, discreto: "ayer", "hace N días" si es
+ * reciente, o si no la fecha corta. `dueDate` es anterior a `today` siempre
+ * que se llama desde aquí (son las atrasadas).
+ */
+function overdueLabel(dueDate: string, today: string): string {
+  const diff = daysBetween(dueDate, today)
+  if (diff === 1) return 'ayer'
+  if (diff <= 6) return `hace ${diff} días`
+  const [y, m, d] = dueDate.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es', { day: 'numeric', month: 'short' })
+}
 
 /** `2026-09-08` → `Lunes, 8 de septiembre`. Solo para mostrar. */
 function formatToday(iso: string): string {
@@ -39,6 +55,9 @@ function TasksToday() {
   const { data, loading, error, reload } = useAsyncData(fetcher)
 
   const [text, setText] = useState('')
+  // `null` = hoy, el valor de siempre. Elegir otro día en el selector no toca
+  // el gesto de Enter: crea para lo que esté elegido ahí en ese momento.
+  const [plannedFor, setPlannedFor] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -60,7 +79,7 @@ function TasksToday() {
     const clean = text.trim()
     if (!clean || busy) return
     setText('')
-    void run(() => createTask(clean), 'No se pudo crear la tarea.')
+    void run(() => createTask(clean, plannedFor), 'No se pudo crear la tarea.')
   }
 
   function rowProps(t: Task) {
@@ -100,6 +119,13 @@ function TasksToday() {
           aria-label="Anota una tarea de hoy"
           className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
         />
+        <DayPicker
+          value={plannedFor}
+          onChange={setPlannedFor}
+          today={today}
+          disabled={busy}
+          label="Día de la tarea"
+        />
         <button
           type="button"
           onClick={submit}
@@ -136,11 +162,17 @@ function TasksToday() {
                 Atrasadas
               </h3>
               <ul className="flex flex-col gap-2">
-                {atrasadas.map((t) => (
-                  <li key={t.id}>
-                    <TaskRow task={t} {...rowProps(t)} />
-                  </li>
-                ))}
+                {atrasadas.map((t) => {
+                  const due = taskDueDate(t)
+                  return (
+                    <li key={t.id}>
+                      {due && (
+                        <p className="mb-1 text-xs text-gray-400">{overdueLabel(due, today)}</p>
+                      )}
+                      <TaskRow task={t} {...rowProps(t)} />
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )}

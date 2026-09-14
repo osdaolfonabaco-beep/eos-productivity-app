@@ -37,6 +37,7 @@ export {
   toISODate,
   todayISO,
   addDays,
+  daysBetween,
   startOfWeekISO,
   quincenaLabel,
   quincenaRange,
@@ -90,15 +91,19 @@ export {
   archiveIdea,
 } from './ideas'
 
-export type { TaskBuckets } from './tasks'
+export type { TaskBuckets, PlannedDay } from './tasks'
 
 export {
   listTasks,
   createTask,
   setTaskDone,
   updateTaskText,
+  setTaskPlannedFor,
   archiveTask,
   bucketTasks,
+  groupTasksByWindow,
+  planningWindow,
+  taskDueDate,
 } from './tasks'
 
 export type { DayNotes, NoteContent } from './journal'

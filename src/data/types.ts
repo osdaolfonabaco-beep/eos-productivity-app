@@ -99,6 +99,12 @@ export interface Task {
    * no la muestra ni la deja cambiar. La columna se conserva para el futuro.
    */
   date: string | null
+  /**
+   * El día para el que se planificó, `YYYY-MM-DD`, elegido por el usuario
+   * entre hoy y hoy + 6. `null` significa "tarea de hoy" (el comportamiento
+   * de siempre): al agruparla se usa `date` en su lugar. Ver `taskDueDate`.
+   */
+  plannedFor: string | null
   done: boolean
   /** Fecha ISO completa de creación; ordena dentro de cada grupo. */
   createdAt: string

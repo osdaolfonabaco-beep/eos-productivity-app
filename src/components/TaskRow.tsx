@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import type { Task } from '../data'
+import { todayISO, type Task } from '../data'
+import DayPicker from './DayPicker'
 
 interface TaskRowProps {
   task: Task
   onToggle: () => void
   onSaveText: (text: string) => void
   onArchive: () => void
+  /** Solo en la vista de planificación: mueve la tarea a otro día (o a "hoy", con `null`). */
+  onMove?: (plannedFor: string | null) => void
 }
 
-type Mode = 'view' | 'edit' | 'confirm-archive'
+type Mode = 'view' | 'edit' | 'move' | 'confirm-archive'
 
 const CHECKBOX_BASE =
   'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border'
@@ -17,9 +20,10 @@ const CHECKBOX_BASE =
  * Una tarea en la pantalla Hoy. Tocar el texto o la casilla la marca/desmarca;
  * "Editar" cambia el texto en línea y "Archivar" pide confirmación de dos toques.
  */
-export default function TaskRow({ task, onToggle, onSaveText, onArchive }: TaskRowProps) {
+export default function TaskRow({ task, onToggle, onSaveText, onArchive, onMove }: TaskRowProps) {
   const [mode, setMode] = useState<Mode>('view')
   const [draft, setDraft] = useState(task.text)
+  const [moveTo, setMoveTo] = useState<string | null>(task.plannedFor)
 
   function startEdit() {
     setDraft(task.text)
@@ -57,6 +61,35 @@ export default function TaskRow({ task, onToggle, onSaveText, onArchive }: TaskR
             type="button"
             onClick={() => setMode('view')}
             className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (mode === 'move' && onMove) {
+    const today = todayISO()
+    return (
+      <div className="rounded-xl border border-gray-300 bg-white p-3">
+        <p className="mb-2 text-sm text-gray-700">Mover a:</p>
+        <div className="flex gap-2">
+          <DayPicker value={moveTo} onChange={setMoveTo} today={today} label="Mover la tarea a" />
+          <button
+            type="button"
+            onClick={() => {
+              onMove(moveTo)
+              setMode('view')
+            }}
+            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+          >
+            Mover
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('view')}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700"
           >
             Cancelar
           </button>
@@ -136,6 +169,18 @@ export default function TaskRow({ task, onToggle, onSaveText, onArchive }: TaskR
           >
             Editar
           </button>
+          {onMove && (
+            <button
+              type="button"
+              onClick={() => {
+                setMoveTo(task.plannedFor)
+                setMode('move')
+              }}
+              className="text-sm font-medium text-gray-500"
+            >
+              Mover
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setMode('confirm-archive')}

@@ -45,6 +45,18 @@ export function addDays(isoDate: string, n: number): string {
 }
 
 /**
+ * Días completos entre dos fechas `YYYY-MM-DD`: positivo si `b` es posterior a
+ * `a`. Mediodía local por la misma razón que `addDays`.
+ */
+export function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number)
+  const [by, bm, bd] = b.split('-').map(Number)
+  const da = new Date(ay, am - 1, ad, 12, 0, 0)
+  const db = new Date(by, bm - 1, bd, 12, 0, 0)
+  return Math.round((db.getTime() - da.getTime()) / 86_400_000)
+}
+
+/**
  * El lunes de la semana que contiene `isoDate`, como `YYYY-MM-DD`.
  * La semana va de lunes a domingo.
  */

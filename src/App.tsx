@@ -5,6 +5,7 @@ import HomeView from './components/HomeView'
 import IdeasView from './components/IdeasView'
 import JournalView from './components/JournalView'
 import LoginScreen from './components/LoginScreen'
+import PlanView from './components/PlanView'
 import SalaryView from './components/SalaryView'
 import SectionNav from './components/SectionNav'
 import SettingsView from './components/SettingsView'
@@ -13,7 +14,7 @@ import { JournalLockProvider } from './journalLock'
 import { useSession } from './useSession'
 
 type Tab = 'hoy' | 'vida' | 'dinero' | 'ideas'
-type VidaSub = 'habitos' | 'semana' | 'journal'
+type VidaSub = 'habitos' | 'semana' | 'journal' | 'plan'
 type DineroSub = 'deudas' | 'sueldo'
 
 const TABS: { value: Tab; label: string }[] = [
@@ -27,6 +28,7 @@ const VIDA_ITEMS: { value: VidaSub; label: string }[] = [
   { value: 'semana', label: 'Semana' },
   { value: 'journal', label: 'Journal' },
   { value: 'habitos', label: 'Hábitos' },
+  { value: 'plan', label: 'Plan' },
 ]
 
 const DINERO_ITEMS: { value: DineroSub; label: string }[] = [
@@ -92,6 +94,8 @@ export default function App() {
           <HabitsView />
         ) : vidaSub === 'semana' ? (
           <WeekView />
+        ) : vidaSub === 'plan' ? (
+          <PlanView />
         ) : (
           <JournalView />
         )}

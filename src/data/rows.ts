@@ -37,7 +37,7 @@ export const DEBT_COLS =
   'id,name,opening_balance,annual_rate,monthly_payment,status,archived,sort_order,created_at'
 export const PAYMENT_COLS = 'id,debt_id,date,amount'
 export const IDEA_COLS = 'id,text,status,created_at,archived'
-export const TASK_COLS = 'id,text,date,done,archived,created_at'
+export const TASK_COLS = 'id,text,date,planned_for,done,archived,created_at'
 export const JOURNAL_COLS = 'id,date,text,ciphertext,iv,encrypted,created_at,archived'
 export const GOAL_COLS = 'id,week_start,text,resultado,archived,created_at'
 export const GOAL_UPDATE_COLS = 'id,goal_id,date,text,direction,created_at'
@@ -179,6 +179,7 @@ interface TaskRow {
   id: string
   text: string
   date: string | null
+  planned_for: string | null
   done: boolean
   archived: boolean
   created_at: string
@@ -189,6 +190,7 @@ export function rowToTask(r: TaskRow): Task {
     id: r.id,
     text: r.text,
     date: r.date,
+    plannedFor: r.planned_for,
     done: r.done,
     createdAt: r.created_at,
     archived: r.archived,
@@ -200,6 +202,7 @@ export function taskToRow(t: Task) {
     id: t.id,
     text: t.text,
     date: t.date,
+    planned_for: t.plannedFor,
     done: t.done,
     archived: t.archived,
     created_at: t.createdAt,
