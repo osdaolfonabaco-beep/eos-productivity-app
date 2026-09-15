@@ -18,11 +18,16 @@ import WeeklyGoalsSection from './WeeklyGoalsSection'
 /** Iniciales de lunes a domingo. X para miércoles, para no chocar con martes. */
 const DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
-/** Glifo, texto y fondo de cada estado en una celda. El color solo refuerza. */
+/**
+ * Glifo, texto y fondo de cada estado en una celda. El color solo refuerza.
+ * Fondo "lavado" (el mismo que baña una fila cumplida/fallada en Hoy), sin
+ * sombra ni relieve: son decenas de celdas pequeñas, y ponerle profundidad a
+ * cada una sería ruido. El relieve va en el contenedor de la cuadrícula.
+ */
 const CELL: Record<EntryStatus, { glyph: string; label: string; className: string }> = {
-  done: { glyph: '✓', label: 'hecho', className: 'bg-green-50 text-green-700' },
-  'not-done': { glyph: '✕', label: 'no hecho', className: 'bg-rose-50 text-rose-700' },
-  unanswered: { glyph: '•', label: 'sin responder', className: 'text-gray-300' },
+  done: { glyph: '✓', label: 'hecho', className: 'bg-hecho-lavado text-hecho' },
+  'not-done': { glyph: '✕', label: 'no hecho', className: 'bg-fallado-lavado text-fallado' },
+  unanswered: { glyph: '•', label: 'sin responder', className: 'bg-separador text-texto-tenue' },
 }
 
 /** `2026-09-08` con las opciones dadas, en español. Solo para mostrar. */
@@ -46,13 +51,13 @@ function formatRange(start: string, end: string): string {
 function DayHead({ iso, letter, isToday }: { iso: string; letter: string; isToday: boolean }) {
   return (
     <div
-      className={`pb-2 pt-1 text-sm ${isToday ? 'font-bold text-gray-900' : 'text-gray-500'}`}
+      className={`pb-2 pt-1 text-sm ${isToday ? 'font-bold text-texto' : 'text-texto-tenue'}`}
     >
       <div>{letter}</div>
       <div
         className={
           isToday
-            ? 'mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-white'
+            ? 'mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-acento text-white shadow-[var(--sombra-acento)]'
             : 'mt-0.5'
         }
       >
@@ -76,7 +81,7 @@ function StatusCell({
   return (
     <div
       className={`flex items-center justify-center py-2 ${cell.className} ${
-        isToday ? 'ring-1 ring-inset ring-gray-200' : ''
+        isToday ? 'ring-1 ring-inset ring-borde' : ''
       } ${className}`}
     >
       <span aria-hidden="true">{cell.glyph}</span>
@@ -126,89 +131,95 @@ export default function WeekView() {
   const habits: Habit[] = data?.habits ?? []
 
   return (
-    <main className="px-4 pb-6 pt-4 text-gray-900">
-      <p className="mb-4 text-sm text-gray-500">{formatRange(monday, sunday)}</p>
+    <main className="px-4 pb-6 pt-4 text-texto">
+      <p className="mb-4 text-meta text-texto-tenue">{formatRange(monday, sunday)}</p>
 
       <WeeklyGoalsSection />
 
-      {habits.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">
-          No tienes hábitos. Créalos en Hábitos.
-        </p>
-      ) : (
-        <>
-          {wide ? (
-            <div className="grid grid-cols-[minmax(0,13rem)_repeat(7,minmax(2rem,1fr))] overflow-hidden rounded-lg border border-gray-200 text-center text-base">
-              <div />
-              {days.map((iso, i) => (
-                <DayHead key={iso} iso={iso} letter={DAY_LETTERS[i]} isToday={iso === today} />
-              ))}
+      <section className="mt-8">
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Cuadrícula</h2>
 
-              {habits.map((h) => (
-                <Fragment key={h.id}>
-                  <div
-                    title={h.name}
-                    className="self-center break-words border-t border-gray-100 px-2 py-2 text-right text-sm font-medium text-gray-800"
-                  >
-                    {h.name}
-                  </div>
-                  {days.map((iso) => (
-                    <StatusCell
-                      key={iso}
-                      status={statusAt(h.id, iso)}
-                      isToday={iso === today}
-                      className="border-l border-t border-gray-100"
-                    />
+        {habits.length === 0 ? (
+          <p className="rounded-tarjeta border border-dashed border-borde px-4 py-8 text-center text-texto-apagado">
+            No tienes hábitos. Créalos en Hábitos.
+          </p>
+        ) : (
+          <>
+            <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta p-3 shadow-[var(--sombra-tarjeta)]">
+              {wide ? (
+                <div className="grid grid-cols-[minmax(0,13rem)_repeat(7,minmax(2rem,1fr))] text-center text-base">
+                  <div />
+                  {days.map((iso, i) => (
+                    <DayHead key={iso} iso={iso} letter={DAY_LETTERS[i]} isToday={iso === today} />
                   ))}
-                </Fragment>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center text-base">
-              <div className="grid grid-cols-7">
-                {days.map((iso, i) => (
-                  <DayHead
-                    key={iso}
-                    iso={iso}
-                    letter={DAY_LETTERS[i]}
-                    isToday={iso === today}
-                  />
-                ))}
-              </div>
 
-              {habits.map((h) => (
-                <div key={h.id} className="mt-3 border-t border-gray-100 pt-3">
-                  <p className="mb-1 break-words text-left text-sm font-medium text-gray-800">
-                    {h.name}
-                  </p>
-                  <div className="grid grid-cols-7 overflow-hidden rounded-lg border border-gray-100">
-                    {days.map((iso) => (
-                      <StatusCell
+                  {habits.map((h) => (
+                    <Fragment key={h.id}>
+                      <div
+                        title={h.name}
+                        className="self-center break-words border-t-[0.5px] border-separador px-2 py-2 text-right text-sm font-medium text-texto-cuerpo"
+                      >
+                        {h.name}
+                      </div>
+                      {days.map((iso) => (
+                        <StatusCell
+                          key={iso}
+                          status={statusAt(h.id, iso)}
+                          isToday={iso === today}
+                          className="border-l-[0.5px] border-t-[0.5px] border-separador"
+                        />
+                      ))}
+                    </Fragment>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-base">
+                  <div className="grid grid-cols-7">
+                    {days.map((iso, i) => (
+                      <DayHead
                         key={iso}
-                        status={statusAt(h.id, iso)}
+                        iso={iso}
+                        letter={DAY_LETTERS[i]}
                         isToday={iso === today}
-                        className="border-l border-gray-100 first:border-l-0"
                       />
                     ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
 
-          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-            <span>
-              <span className="text-green-700">✓</span> hecho
-            </span>
-            <span>
-              <span className="text-rose-700">✕</span> no hecho
-            </span>
-            <span>
-              <span className="text-gray-300">•</span> sin responder
-            </span>
-          </p>
-        </>
-      )}
+                  {habits.map((h) => (
+                    <div key={h.id} className="mt-3 border-t-[0.5px] border-separador pt-3">
+                      <p className="mb-1 break-words text-left text-sm font-medium text-texto-cuerpo">
+                        {h.name}
+                      </p>
+                      <div className="grid grid-cols-7 overflow-hidden rounded-campo">
+                        {days.map((iso) => (
+                          <StatusCell
+                            key={iso}
+                            status={statusAt(h.id, iso)}
+                            isToday={iso === today}
+                            className="border-l-[0.5px] border-separador first:border-l-0"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-texto-apagado">
+              <span>
+                <span className="text-hecho">✓</span> hecho
+              </span>
+              <span>
+                <span className="text-fallado">✕</span> no hecho
+              </span>
+              <span>
+                <span className="text-texto-tenue">•</span> sin responder
+              </span>
+            </p>
+          </>
+        )}
+      </section>
 
       <WeekDashboard />
     </main>
