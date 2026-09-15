@@ -35,7 +35,7 @@ export default function DayPicker({ value, onChange, today, disabled, label }: D
       }}
       disabled={disabled}
       aria-label={label}
-      className="shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm text-gray-700 disabled:opacity-60"
+      className="shrink-0 rounded-campo border border-borde bg-tarjeta px-2 py-2 text-sm text-texto-cuerpo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:opacity-60"
     >
       {days.map((d) => (
         <option key={d} value={d}>

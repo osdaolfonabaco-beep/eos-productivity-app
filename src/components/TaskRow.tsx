@@ -7,13 +7,13 @@ interface TaskRowProps {
   onToggle: () => void
   onSaveText: (text: string) => void
   onArchive: () => void
-  /** Solo en la vista de planificación: mueve la tarea a otro día (o a "hoy", con `null`). */
+  /** Solo si se pasa: mueve la tarea a otro día (o a "hoy", con `null`). Solo Plan la pasa; por eso "Mover" solo aparece ahí. */
   onMove?: (plannedFor: string | null) => void
   /**
-   * `'card'` (por defecto) es la fila-tarjeta de siempre, con Editar/Mover/
-   * Archivar siempre visibles — la usa Plan. `'row'` es la fila compacta de
-   * la pantalla Hoy: casilla + texto, y Editar/Archivar ocultos tras el menú
-   * "⋯". Cambiar esto no debe alterar nada quien no pasa `variant`.
+   * `'row'` es la fila compacta del patrón (casilla + texto, con Editar/
+   * Mover/Archivar ocultos tras el menú "⋯") — la usan Hoy y Plan.
+   * `'card'` es el diseño anterior, sin ningún uso ahora mismo; se deja tal
+   * cual (código muerto, a propósito) hasta un paso de limpieza aparte.
    */
   variant?: 'card' | 'row'
   /** Solo `variant="row"`: si la tarea está atrasada, su etiqueta ("ayer", "hace 3 días"). */
@@ -41,11 +41,10 @@ const CHECK_GLYPH = (
 )
 
 /**
- * Una tarea, en dos presentaciones (`variant`). Tocar el texto o la casilla
- * la marca/desmarca en ambas; "Editar" cambia el texto en línea y "Archivar"
- * pide confirmación de dos toques. En `variant="row"` (Hoy), Editar/Archivar
- * están detrás del menú "⋯" de la fila; en `variant="card"` (Plan, y el
- * valor por defecto) están siempre a la vista, como siempre.
+ * Una tarea. Tocar el texto o la casilla la marca/desmarca; "Editar" cambia
+ * el texto en línea, "Mover" (si se pasa `onMove`) cambia el día, y
+ * "Archivar" pide confirmación de dos toques. Estas tres viven detrás del
+ * menú "⋯" de la fila (`variant="row"`, usado por Hoy y Plan).
  */
 export default function TaskRow({
   task,
@@ -75,28 +74,28 @@ export default function TaskRow({
 
   if (mode === 'edit') {
     return (
-      <div className="rounded-xl border border-gray-300 bg-white p-3">
+      <div className="px-3 py-3">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={2}
           autoFocus
           aria-label="Texto de la tarea"
-          className="w-full resize-y rounded-lg border border-gray-300 px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
+          className="w-full resize-y rounded-campo border border-borde px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
         />
         <div className="mt-2 flex gap-2">
           <button
             type="button"
             onClick={save}
             disabled={!draft.trim()}
-            className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+            className="rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
           >
             Guardar
           </button>
           <button
             type="button"
             onClick={() => setMode('view')}
-            className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+            className="rounded-campo px-4 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
           >
             Cancelar
           </button>
@@ -108,8 +107,8 @@ export default function TaskRow({
   if (mode === 'move' && onMove) {
     const today = todayISO()
     return (
-      <div className="rounded-xl border border-gray-300 bg-white p-3">
-        <p className="mb-2 text-sm text-gray-700">Mover a:</p>
+      <div className="px-3 py-3">
+        <p className="mb-2 text-sm text-texto-apagado">Mover a:</p>
         <div className="flex gap-2">
           <DayPicker value={moveTo} onChange={setMoveTo} today={today} label="Mover la tarea a" />
           <button
@@ -118,14 +117,14 @@ export default function TaskRow({
               onMove(moveTo)
               setMode('view')
             }}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+            className="rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)]"
           >
             Mover
           </button>
           <button
             type="button"
             onClick={() => setMode('view')}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700"
+            className="rounded-campo px-4 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
           >
             Cancelar
           </button>
@@ -136,22 +135,22 @@ export default function TaskRow({
 
   if (mode === 'confirm-archive') {
     return (
-      <div className="rounded-xl border border-rose-300 bg-rose-50 p-3">
-        <p className="text-sm text-gray-700">
+      <div className="px-3 py-3">
+        <p className="text-sm text-texto-apagado">
           Se archivará: sale de la lista pero se conserva.
         </p>
         <div className="mt-2 flex gap-2">
           <button
             type="button"
             onClick={onArchive}
-            className="rounded-lg bg-rose-600 px-4 py-3 text-sm font-medium text-white"
+            className="rounded-campo bg-acento px-4 py-2 text-sm font-medium text-white transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-acento-toque)]"
           >
             Archivar
           </button>
           <button
             type="button"
             onClick={() => setMode('view')}
-            className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+            className="rounded-campo px-4 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
           >
             Cancelar
           </button>
@@ -216,6 +215,19 @@ export default function TaskRow({
             >
               Editar
             </button>
+            {onMove && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setMoveTo(task.plannedFor)
+                  setMode('move')
+                }}
+                className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+              >
+                Mover
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
