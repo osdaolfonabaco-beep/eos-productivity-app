@@ -29,12 +29,12 @@ export default function AnalysisSection() {
 
       {error && <ActionError message={error} onDismiss={() => setError(null)} />}
 
-      <div className="rounded-tarjeta border border-borde bg-tarjeta p-3">
+      <div className="rounded-tarjeta border border-borde bg-tarjeta p-3 shadow-[var(--sombra-tarjeta)]">
         <button
           type="button"
           onClick={() => void run()}
           disabled={busy}
-          className="w-full rounded-campo bg-acento px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+          className="w-full rounded-campo bg-acento px-4 py-3 text-sm font-semibold text-white shadow-[var(--sombra-principal)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-[var(--color-acento-toque)] active:shadow-[var(--sombra-principal-toque)] disabled:opacity-40"
         >
           {busy ? 'Analizando…' : 'Pedir análisis'}
         </button>

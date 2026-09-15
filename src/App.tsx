@@ -58,7 +58,7 @@ function BottomTab({
       type="button"
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`py-3 text-sm focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-gray-800 ${
+      className={`py-3 text-sm transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-gray-800 ${
         active ? 'font-semibold text-gray-900' : 'font-normal text-gray-500'
       }`}
     >

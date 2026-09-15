@@ -1,10 +1,24 @@
+import { useState, type KeyboardEvent } from 'react'
 import type { EntryStatus } from '../data'
 
 interface HabitRowProps {
   name: string
   status: EntryStatus
+  /**
+   * El estado al que se pasará con el próximo toque. Lo calcula quien nos
+   * llama (mismo ciclo `NEXT` de TodayHabits): aquí no se duplica esa lógica,
+   * solo se usa para pintar el destello del color correcto.
+   */
+  nextStatus: EntryStatus
   /** Avanza el hábito al siguiente estado del ciclo. */
   onCycle: () => void
+}
+
+/** El color de destello por estado siguiente. Neutro cuando el siguiente es "sin responder". */
+const FLASH_COLOR: Record<EntryStatus, string> = {
+  done: 'var(--color-hecho-destello)',
+  'not-done': 'var(--color-fallado-destello)',
+  unanswered: 'var(--color-neutro-destello)',
 }
 
 /**
@@ -90,15 +104,29 @@ function Glyph({ status }: { status: EntryStatus }) {
  * toque se mantiene cómoda aunque el relleno visual sea más bajo (min-h-11
  * = 44px, el mínimo accesible).
  */
-export default function HabitRow({ name, status, onCycle }: HabitRowProps) {
+export default function HabitRow({ name, status, nextStatus, onCycle }: HabitRowProps) {
   const meta = STATUS_META[status]
+
+  // El color del destello se congela al empezar la pulsación (no en cada
+  // render): `onCycle` cambia `status` en cuanto se suelta el dedo, y con
+  // él cambiaría `nextStatus` a mitad de la salida si lo leyéramos en vivo.
+  // Al fijarlo aquí, la salida siempre pinta el color con el que entró.
+  const [flashColor, setFlashColor] = useState(() => FLASH_COLOR[nextStatus])
+
+  function captureFlash() {
+    setFlashColor(FLASH_COLOR[nextStatus])
+  }
 
   return (
     <button
       type="button"
       onClick={onCycle}
+      onPointerDown={captureFlash}
+      onKeyDown={(e: KeyboardEvent<HTMLButtonElement>) => {
+        if (e.key === 'Enter' || e.key === ' ') captureFlash()
+      }}
       aria-label={`${name}, ${meta.label.toLowerCase()}. Tocar para cambiar a ${meta.nextLabel}.`}
-      className={`flex min-h-11 w-full items-center gap-3 border-l-[3px] py-3 pl-4 pr-4 text-left active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${meta.stripe}`}
+      className={`group relative flex min-h-11 w-full items-center gap-3 border-l-[3px] py-3 pl-4 pr-4 text-left active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${meta.stripe}`}
       style={{
         // Dos duraciones en la misma fila: el hundimiento al tocar (transform,
         // background-color) responde casi al instante; el color de la franja
@@ -109,6 +137,18 @@ export default function HabitRow({ name, status, onCycle }: HabitRowProps) {
           'border-color var(--dur-estado) var(--ease-salida)',
       }}
     >
+      {/*
+       * El destello: baña toda la fila con el color del estado siguiente.
+       * Va primero en el DOM para pintarse debajo del indicador y el nombre.
+       * Entra rápido (--dur-toque, al pulsar) y sale lento (--dur-estado, al
+       * soltar) — misma idea que arriba, pero con la duración corta en la
+       * regla :active en vez de en la de reposo.
+       */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-[var(--dur-estado)] ease-salida group-active:opacity-100 group-active:duration-[var(--dur-toque)] group-active:ease-toque"
+        style={{ backgroundColor: flashColor }}
+      />
       <span
         key={status}
         className={`flex h-6 w-6 shrink-0 animate-entrada-indicador items-center justify-center rounded-full border-2 ${meta.badge}`}

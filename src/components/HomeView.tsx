@@ -123,7 +123,7 @@ function TasksToday() {
       ) : error && !data ? (
         <LoadError onRetry={reload} />
       ) : (
-        <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta">
+        <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
           <ul>
             {rows.map(({ task: t, overdueLabel: label }) => (
               <li key={t.id} className="border-b-[0.5px] border-separador">
@@ -159,14 +159,14 @@ function TasksToday() {
                     type="button"
                     onClick={submit}
                     disabled={!text.trim() || busy}
-                    className="shrink-0 rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta disabled:bg-transparent disabled:text-texto-tenue"
+                    className="shrink-0 rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
                   >
                     Guardar
                   </button>
                   <button
                     type="button"
                     onClick={cancelForm}
-                    className="shrink-0 rounded-campo px-4 py-2 text-sm font-medium text-texto-apagado"
+                    className="shrink-0 rounded-campo px-4 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
                   >
                     Cancelar
                   </button>
@@ -175,7 +175,7 @@ function TasksToday() {
                 <button
                   type="button"
                   onClick={() => setFormOpen(true)}
-                  className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-texto-tenue"
+                  className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador"
                 >
                   <span aria-hidden="true">+</span>
                   <span>Anota una tarea…</span>

@@ -83,7 +83,7 @@ export default function DayCommentSection() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta">
+      <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
         <p className="flex items-center gap-1.5 border-b-[0.5px] border-separador bg-ia-suave px-3 py-2 text-xs font-medium text-ia-texto">
           <SentIcon />
           Se envía a la IA en el análisis diario y semanal.
@@ -104,7 +104,7 @@ export default function DayCommentSection() {
               type="button"
               onClick={() => void save()}
               disabled={!text.trim() || busy || !dirty}
-              className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta disabled:bg-transparent disabled:text-texto-tenue"
+              className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
             >
               {busy ? 'Guardando…' : 'Guardar'}
             </button>

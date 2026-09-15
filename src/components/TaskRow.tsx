@@ -173,8 +173,10 @@ export default function TaskRow({
             onClick={onToggle}
             aria-pressed={task.done}
             aria-label={task.done ? 'Marcar como no hecha' : 'Marcar como hecha'}
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
-              task.done ? 'border-texto bg-texto text-tarjeta' : 'border-texto-tenue'
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+              task.done
+                ? 'border-texto bg-texto text-tarjeta active:bg-[var(--color-texto-toque)]'
+                : 'border-texto-tenue active:bg-separador'
             }`}
           >
             {task.done && CHECK_GLYPH}
@@ -183,7 +185,7 @@ export default function TaskRow({
           <button
             type="button"
             onClick={onToggle}
-            className="min-w-0 flex-1 break-words text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+            className="min-w-0 flex-1 break-words rounded-campo text-left transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
           >
             <span className={task.done ? 'text-texto-apagado line-through' : 'text-texto-cuerpo'}>
               {task.text}
@@ -196,7 +198,7 @@ export default function TaskRow({
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-label="Más acciones para esta tarea"
-            className="flex h-11 w-11 shrink-0 items-center justify-center text-texto-tenue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-campo text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
           >
             ⋯
           </button>
@@ -210,7 +212,7 @@ export default function TaskRow({
                 setMenuOpen(false)
                 startEdit()
               }}
-              className="text-sm font-medium text-texto-apagado"
+              className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
             >
               Editar
             </button>
@@ -220,7 +222,7 @@ export default function TaskRow({
                 setMenuOpen(false)
                 setMode('confirm-archive')
               }}
-              className="text-sm font-medium text-texto-apagado"
+              className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
             >
               Archivar
             </button>

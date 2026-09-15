@@ -107,6 +107,7 @@ export default function TodayHabits() {
                   <HabitRow
                     name={h.name}
                     status={statuses[h.id] ?? 'unanswered'}
+                    nextStatus={NEXT[statuses[h.id] ?? 'unanswered']}
                     onCycle={() => cycle(h.id)}
                   />
                 </li>

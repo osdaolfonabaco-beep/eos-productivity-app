@@ -52,6 +52,16 @@ body {
   --color-fallado: #DC2626;
   --color-fallado-suave: #FEF2F2;
 
+  /*
+   * Destello del toque en hábitos: baña la fila entera con el color del
+   * estado SIGUIENTE mientras se mantiene pulsada (ver HabitRow). Tonos
+   * pastel a propósito: cubren toda la fila, así que van más claros que
+   * --color-*-suave, pensados para fondo, no para texto encima.
+   */
+  --color-hecho-destello: #BFEFD9;
+  --color-fallado-destello: #FAD0D0;
+  --color-neutro-destello: #EDEFF3;
+
   /* Superficie de marca, solo para fondos, nunca para estados */
   --color-rosa-suave: #FBD3E6;
 
@@ -63,6 +73,15 @@ body {
   --color-borde: #E6E8EE;
   --color-separador: #F0F1F5;
   --color-tarjeta: #FFFFFF;
+
+  /*
+   * Oscurecimiento leve al tocar, para botones de fondo sólido (Guardar,
+   * Pedir análisis): --color-separador los aclararía en vez de oscurecerlos,
+   * así que estos son la misma marca ~12% más oscura, solo para el estado
+   * :active de esos botones.
+   */
+  --color-texto-toque: #12131B;
+  --color-acento-toque: #6C4FD3;
 
   /* Tipografía: cinco niveles, ni uno más */
   --text-titulo: 28px;
@@ -120,11 +139,21 @@ body {
   --ease-toque: cubic-bezier(0.4, 0, 0.2, 1);
 
   --sombra-tarjeta:
-    0 1px 2px rgba(20, 22, 31, 0.04),
-    0 8px 24px -8px rgba(20, 22, 31, 0.06);
+    0 1px 2px rgba(20, 22, 31, 0.05),
+    0 4px 10px -2px rgba(20, 22, 31, 0.07),
+    0 16px 32px -12px rgba(20, 22, 31, 0.12);
   --sombra-principal:
-    0 2px 4px rgba(123, 90, 240, 0.12),
-    0 12px 28px -8px rgba(123, 90, 240, 0.22);
+    0 2px 6px rgba(123, 90, 240, 0.18),
+    0 10px 20px -4px rgba(123, 90, 240, 0.22),
+    0 20px 40px -12px rgba(123, 90, 240, 0.28);
+  /*
+   * Versión encogida de --sombra-principal para cuando ese botón está
+   * :active: un objeto que baja proyecta menos sombra, así que al hundirse
+   * pierde la capa más lejana y las que quedan se acercan.
+   */
+  --sombra-principal-toque:
+    0 1px 3px rgba(123, 90, 240, 0.14),
+    0 6px 14px -4px rgba(123, 90, 240, 0.2);
 
   /* Animación de entrada del indicador de estado del hábito (ver HabitRow). */
   --animate-entrada-indicador: entrada-indicador var(--dur-estado) var(--ease-salida);

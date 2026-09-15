@@ -32,8 +32,8 @@ export default function SectionNav<T extends string>({
               type="button"
               onClick={() => onChange(item.value)}
               aria-current={isActive ? 'page' : undefined}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800 ${
-                isActive ? 'bg-gray-900 text-white' : 'text-gray-600'
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800 ${
+                isActive ? 'bg-gray-900 text-white active:bg-[var(--color-texto-toque)]' : 'text-gray-600 active:bg-separador'
               }`}
             >
               {item.label}
