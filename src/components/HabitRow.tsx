@@ -29,31 +29,42 @@ const FLASH_COLOR: Record<EntryStatus, string> = {
  * `stripe` es el color de la franja izquierda de 3px; su ancho es siempre
  * el mismo (se fija aparte, en el botón) para que las filas nunca queden
  * desalineadas entre sí, aunque el color sea transparente.
+ *
+ * `badge` lleva también el relieve del disco: hundido (hueco) cuando está
+ * sin responder, y con su sombra de color cuando ya tiene un estado — con
+ * la versión encogida de esa sombra para cuando la fila está `:active`
+ * (el disco no tiene su propio `:active`, hereda el de la fila vía `group`).
+ * `wash` es el lavado de fondo de la fila entera; `undefined` en "sin
+ * responder", que no lleva.
  */
 const STATUS_META: Record<
   EntryStatus,
-  { label: string; nextLabel: string; stripe: string; badge: string; name: string }
+  { label: string; nextLabel: string; stripe: string; badge: string; name: string; wash?: string }
 > = {
   unanswered: {
     label: 'Sin responder',
     nextLabel: 'hecho',
     stripe: 'border-l-transparent',
-    badge: 'border-borde bg-transparent',
+    badge: 'border-[var(--color-campo-borde)] bg-[var(--color-campo)] shadow-[var(--sombra-hundida)]',
     name: 'text-texto-cuerpo',
   },
   done: {
     label: 'Hecho',
     nextLabel: 'no hecho',
     stripe: 'border-l-hecho',
-    badge: 'border-hecho bg-hecho text-white',
+    badge:
+      'border-transparent bg-hecho text-white shadow-[var(--sombra-hecho)] group-active:shadow-[var(--sombra-hecho-toque)]',
     name: 'text-texto-apagado line-through',
+    wash: 'linear-gradient(90deg, var(--color-hecho-lavado), transparent 42%)',
   },
   'not-done': {
     label: 'No hecho',
     nextLabel: 'sin responder',
     stripe: 'border-l-fallado',
-    badge: 'border-fallado bg-fallado text-white',
+    badge:
+      'border-transparent bg-fallado text-white shadow-[var(--sombra-fallado)] group-active:shadow-[var(--sombra-fallado-toque)]',
     name: 'text-texto-cuerpo',
+    wash: 'linear-gradient(90deg, var(--color-fallado-lavado), transparent 42%)',
   },
 }
 
@@ -135,6 +146,9 @@ export default function HabitRow({ name, status, nextStatus, onCycle }: HabitRow
           'transform var(--dur-toque) var(--ease-toque), ' +
           'background-color var(--dur-toque) var(--ease-toque), ' +
           'border-color var(--dur-estado) var(--ease-salida)',
+        // El lavado de fondo de hecho/no-hecho (ver STATUS_META.wash): un
+        // degradado, así que va como estilo en línea igual que --fondo-app.
+        ...(meta.wash ? { background: meta.wash } : {}),
       }}
     >
       {/*

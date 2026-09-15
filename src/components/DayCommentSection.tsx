@@ -84,7 +84,13 @@ export default function DayCommentSection() {
       )}
 
       <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
-        <p className="flex items-center gap-1.5 border-b-[0.5px] border-separador bg-ia-suave px-3 py-2 text-xs font-medium text-ia-texto">
+        <p
+          className="flex items-center gap-1.5 border-b-[0.5px] border-separador px-3 py-2 text-xs font-medium text-ia-texto"
+          style={{
+            background:
+              'linear-gradient(90deg, var(--color-ia-suave), color-mix(in srgb, var(--color-ia-suave) 55%, white))',
+          }}
+        >
           <SentIcon />
           Se envía a la IA en el análisis diario y semanal.
         </p>
@@ -97,14 +103,14 @@ export default function DayCommentSection() {
             placeholder="Una o dos frases sobre cómo fue el día…"
             aria-label="Comentario del día"
             disabled={busy}
-            className="w-full resize-y rounded-campo border border-borde px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:opacity-60"
+            className="w-full resize-y rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-2 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:opacity-60"
           />
           <div className="mt-2 flex justify-end">
             <button
               type="button"
               onClick={() => void save()}
               disabled={!text.trim() || busy || !dirty}
-              className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+              className="rounded-campo bg-acento px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-acento-toque)] active:shadow-[var(--sombra-acento-toque)] disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
             >
               {busy ? 'Guardando…' : 'Guardar'}
             </button>

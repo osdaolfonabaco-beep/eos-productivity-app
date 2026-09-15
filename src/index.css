@@ -53,6 +53,14 @@ body {
   --color-fallado-suave: #FEF2F2;
 
   /*
+   * Lavado de fondo de una fila cumplida/fallada (tarea u hábito): un
+   * degradado horizontal muy leve, más claro que --color-*-suave porque
+   * cubre la fila entera, no un texto encima.
+   */
+  --color-hecho-lavado: #F3FCF8;
+  --color-fallado-lavado: #FEF7F7;
+
+  /*
    * Destello del toque en hábitos: baña la fila entera con el color del
    * estado SIGUIENTE mientras se mantiene pulsada (ver HabitRow). Tonos
    * pastel a propósito: cubren toda la fila, así que van más claros que
@@ -73,6 +81,13 @@ body {
   --color-borde: #E6E8EE;
   --color-separador: #F0F1F5;
   --color-tarjeta: #FFFFFF;
+
+  /* Campo de texto o selector: se lee como un hueco, no como una caja que sobresale. */
+  --color-campo: #F7F9FB;
+  --color-campo-borde: #E3E7ED;
+
+  /* Fondo de la banda de acciones (Editar/Mover/Archivar) de una fila. */
+  --color-menu-fondo: #F5F6F9;
 
   /*
    * Oscurecimiento leve al tocar, para botones de fondo sólido (Guardar,
@@ -139,9 +154,39 @@ body {
   --ease-toque: cubic-bezier(0.4, 0, 0.2, 1);
 
   --sombra-tarjeta:
-    0 1px 2px rgba(20, 22, 31, 0.05),
-    0 4px 10px -2px rgba(20, 22, 31, 0.07),
-    0 16px 32px -12px rgba(20, 22, 31, 0.12);
+    0 1px 2px rgba(20, 22, 31, 0.06),
+    0 6px 14px -3px rgba(20, 22, 31, 0.10),
+    0 22px 40px -14px rgba(20, 22, 31, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  /* Hueco: campos de texto y selectores, y la casilla/indicador sin marcar. */
+  --sombra-hundida:
+    inset 0 2px 4px rgba(20, 22, 31, 0.07),
+    inset 0 1px 1px rgba(20, 22, 31, 0.05);
+
+  /* Relieve de un indicador cumplido (casilla de tarea, disco de hábito). */
+  --sombra-hecho:
+    0 1px 2px rgba(5, 150, 105, 0.35),
+    0 4px 8px -2px rgba(5, 150, 105, 0.30);
+  /* Versión encogida para cuando el indicador está :active. */
+  --sombra-hecho-toque: 0 1px 2px rgba(5, 150, 105, 0.25);
+
+  /* Mismo relieve que --sombra-hecho, en rojo: disco de hábito "no hecho". */
+  --sombra-fallado:
+    0 1px 2px rgba(220, 38, 38, 0.35),
+    0 4px 8px -2px rgba(220, 38, 38, 0.30);
+  --sombra-fallado-toque: 0 1px 2px rgba(220, 38, 38, 0.25);
+
+  /* Botón de acento habilitado (ej. Guardar comentario del día). */
+  --sombra-acento:
+    0 1px 3px rgba(123, 90, 240, 0.32),
+    0 6px 14px -4px rgba(123, 90, 240, 0.42);
+  --sombra-acento-toque: 0 1px 2px rgba(123, 90, 240, 0.22);
+
+  /* Botones-pastilla de una banda de acciones (Editar/Mover/Archivar). */
+  --sombra-pastilla: 0 1px 2px rgba(20, 22, 31, 0.10);
+  --sombra-pastilla-toque: 0 1px 1px rgba(20, 22, 31, 0.06);
+
   --sombra-principal:
     0 2px 6px rgba(123, 90, 240, 0.18),
     0 10px 20px -4px rgba(123, 90, 240, 0.22),

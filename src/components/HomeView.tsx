@@ -146,7 +146,7 @@ function TasksToday() {
                     placeholder="Anota una tarea de hoy…"
                     aria-label="Anota una tarea de hoy"
                     autoFocus
-                    className="min-w-0 flex-1 rounded-campo border border-borde px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+                    className="min-w-0 flex-1 rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-2 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
                   />
                   <DayPicker
                     value={plannedFor}

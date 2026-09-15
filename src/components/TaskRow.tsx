@@ -81,7 +81,7 @@ export default function TaskRow({
           rows={2}
           autoFocus
           aria-label="Texto de la tarea"
-          className="w-full resize-y rounded-campo border border-borde px-3 py-2 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+          className="w-full resize-y rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-2 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
         />
         <div className="mt-2 flex gap-2">
           <button
@@ -160,22 +160,35 @@ export default function TaskRow({
   }
 
   if (variant === 'row') {
-    // La franja izquierda de 3px marca las atrasadas (color fallado) frente a
-    // las de hoy (transparente), igual que el ciclo de hábitos: mismo ancho
-    // siempre, para que las filas no se desalineen entre sí.
-    const stripe = overdueLabel ? 'border-l-fallado' : 'border-l-transparent'
+    // La franja izquierda de 3px: atrasada (fallado) manda sobre hecha
+    // (hecho), y una tarea de hoy sin marcar queda transparente. Mismo
+    // ancho siempre, para que las filas no se desalineen entre sí.
+    const stripe = overdueLabel
+      ? 'border-l-fallado'
+      : task.done
+        ? 'border-l-hecho'
+        : 'border-l-transparent'
+    // El lavado de fondo solo acompaña a "hecho": una atrasada ya lleva su
+    // propia franja roja, y las dos lavadas juntas se pisarían.
+    const wash =
+      task.done && !overdueLabel
+        ? { background: 'linear-gradient(90deg, var(--color-hecho-lavado), transparent 42%)' }
+        : undefined
     return (
-      <div className={`border-l-[3px] ${stripe}`}>
+      <div
+        className={`border-l-[3px] transition-colors duration-[var(--dur-estado)] ease-salida ${stripe}`}
+        style={wash}
+      >
         <div className="flex min-h-11 items-center gap-3 py-2 pl-3 pr-1">
           <button
             type="button"
             onClick={onToggle}
             aria-pressed={task.done}
             aria-label={task.done ? 'Marcar como no hecha' : 'Marcar como hecha'}
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[7px] border transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
               task.done
-                ? 'border-texto bg-texto text-tarjeta active:bg-[var(--color-texto-toque)]'
-                : 'border-texto-tenue active:bg-separador'
+                ? 'border-transparent bg-[var(--color-hecho)] text-tarjeta shadow-[var(--sombra-hecho)] active:shadow-[var(--sombra-hecho-toque)]'
+                : 'border-[var(--color-campo-borde)] bg-[var(--color-campo)] shadow-[var(--sombra-hundida)] active:bg-separador'
             }`}
           >
             {task.done && CHECK_GLYPH}
@@ -204,14 +217,14 @@ export default function TaskRow({
         </div>
 
         {menuOpen && (
-          <div className="flex gap-4 pb-2 pl-3">
+          <div className="flex gap-2 border-y-[0.5px] border-separador bg-[var(--color-menu-fondo)] px-3 py-2">
             <button
               type="button"
               onClick={() => {
                 setMenuOpen(false)
                 startEdit()
               }}
-              className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+              className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
             >
               Editar
             </button>
@@ -223,7 +236,7 @@ export default function TaskRow({
                   setMoveTo(task.plannedFor)
                   setMode('move')
                 }}
-                className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
               >
                 Mover
               </button>
@@ -234,7 +247,7 @@ export default function TaskRow({
                 setMenuOpen(false)
                 setMode('confirm-archive')
               }}
-              className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+              className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
             >
               Archivar
             </button>
