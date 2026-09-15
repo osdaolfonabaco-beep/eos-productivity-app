@@ -6,7 +6,9 @@ import {
   type HabitWeeklyBreakdown,
 } from '../data'
 import { useAsyncData } from '../useAsyncData'
+import { useMounted } from '../useMounted'
 import { ActionError, LoadError, Loading } from './ViewState'
+import WeekProgressRing from './WeekProgressRing'
 
 /**
  * Colores validados por el skill de dataviz del proyecto (references/palette.md
@@ -21,21 +23,19 @@ import { ActionError, LoadError, Loading } from './ViewState'
  * líneas y fondos discretos. Los textos del gráfico (INK_*) usan los tokens
  * de texto de la app por la misma razón.
  *
- * La comparación semana-a-semana usa un solo tono (azul, el slot categórico 1
- * del skill) en dos intensidades: "antes/después por elemento" pide
- * exactamente eso, no dos colores de identidad. Es el único color de la app
- * sin token ni oficio asignado todavía — decisión pendiente, fuera de esta
- * migración — así que se deja como literal.
+ * La comparación semana-a-semana ya no usa el azul suelto que tenía antes
+ * (ni color de identidad propio): la semana anterior es --color-texto-tenue
+ * (un dato de fondo, ya pasado) y esta semana es --color-acento (lo mismo
+ * que ya significa "lo actual/seleccionado" en toda la app). El azul
+ * desaparece del sistema en vez de quedar sin oficio asignado.
  */
 const COLOR_DONE = 'var(--color-hecho)'
 const COLOR_NOT_DONE = 'var(--color-fallado)'
 const COLOR_UNANSWERED = 'var(--color-separador)'
-const COLOR_LAST_WEEK = '#86b6ef'
-const COLOR_THIS_WEEK = '#2a78d6'
+const COLOR_LAST_WEEK = 'var(--color-texto-tenue)'
+const COLOR_THIS_WEEK = 'var(--color-acento)'
 const INK_PRIMARY = 'var(--color-texto)'
 const INK_SECONDARY = 'var(--color-texto-cuerpo)'
-const INK_MUTED = 'var(--color-texto-tenue)'
-const RING = 'var(--color-tarjeta)' // el fondo real de la tarjeta que envuelve cada gráfico
 
 const CHART_WIDTH = 300
 const LABEL_WIDTH = 80
@@ -74,8 +74,17 @@ function Legend({ items }: { items: { color: string; label: string }[] }) {
  * redondeada uniforme en vez de la distinción estricta "cuadrado en el eje,
  * redondeado solo en el extremo final" — en una barra tan compacta no se nota,
  * y evita construir cada segmento como un `path` a mano.
+ *
+ * Cada barra completa (los 3 segmentos como grupo) crece desde cero al
+ * montar, con 60ms de desfase entre una fila y la siguiente. Se anima
+ * `transform: scaleX`, no `width`: escalar es una operación de compositor
+ * (GPU), cambiar `width` fuerza recalcular la maquetación en cada
+ * fotograma. `transform-origin` se fija en coordenadas del propio viewBox
+ * (el borde izquierdo de la barra, LABEL_WIDTH), no en el bounding box del
+ * grupo, para que crezca desde la izquierda y no desde su centro.
  */
 function BreakdownChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
+  const mounted = useMounted()
   const valueWidth = 30
   const barWidth = CHART_WIDTH - LABEL_WIDTH - valueWidth - 8
   const height = habitos.length * ROW_HEIGHT
@@ -114,25 +123,36 @@ function BreakdownChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
                 {truncate(h.habit.name)}
                 <title>{h.habit.name}</title>
               </text>
-              {segments.map((seg) => {
-                const w = seg.count * unit
-                const rectX = x
-                x += w
-                if (w <= 0) return null
-                return (
-                  <rect
-                    key={seg.key}
-                    x={rectX + 1}
-                    y={y}
-                    width={Math.max(0, w - 2)}
-                    height={BAR_HEIGHT}
-                    rx={3}
-                    fill={seg.fill}
-                  >
-                    <title>{`${h.habit.name} — ${seg.label}: ${seg.count} de ${diasTranscurridos} días`}</title>
-                  </rect>
-                )
-              })}
+              <g
+                style={{
+                  transform: mounted ? 'scaleX(1)' : 'scaleX(0)',
+                  transformOrigin: `${LABEL_WIDTH}px ${y + BAR_HEIGHT / 2}px`,
+                  transitionProperty: 'transform',
+                  transitionDuration: 'var(--dur-entrada)',
+                  transitionTimingFunction: 'var(--ease-salida)',
+                  transitionDelay: `${i * 60}ms`,
+                }}
+              >
+                {segments.map((seg) => {
+                  const w = seg.count * unit
+                  const rectX = x
+                  x += w
+                  if (w <= 0) return null
+                  return (
+                    <rect
+                      key={seg.key}
+                      x={rectX + 1}
+                      y={y}
+                      width={Math.max(0, w - 2)}
+                      height={BAR_HEIGHT}
+                      rx={3}
+                      fill={seg.fill}
+                    >
+                      <title>{`${h.habit.name} — ${seg.label}: ${seg.count} de ${diasTranscurridos} días`}</title>
+                    </rect>
+                  )
+                })}
+              </g>
               <text
                 x={LABEL_WIDTH + barWidth + 8}
                 y={y + BAR_HEIGHT / 2}
@@ -159,12 +179,25 @@ function BreakdownChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
   )
 }
 
+/** Flecha hacia arriba: aparece cuando esta semana supera a la anterior. */
+function ImproveArrow({ x, y }: { x: number; y: number }) {
+  return (
+    <path
+      d={`M ${x} ${y + 4} L ${x + 4} ${y - 4} L ${x + 8} ${y + 4} Z`}
+      fill={COLOR_DONE}
+      aria-hidden="true"
+    />
+  )
+}
+
 /**
- * Dumbbell por hábito: % de esta semana vs. % de la anterior. Solo entran los
- * hábitos con las dos semanas completas para comparar; si ninguno califica,
- * se explica en vez de dibujar un gráfico vacío o inventar una tendencia.
+ * Dos barras enfrentadas por hábito: la semana anterior detrás, estática; la
+ * actual delante, creciendo al montar. Solo entran los hábitos con las dos
+ * semanas completas para comparar; si ninguno califica, se explica en vez de
+ * dibujar un gráfico vacío o inventar una tendencia.
  */
 function ComparisonChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
+  const mounted = useMounted()
   const comparable = habitos.filter(
     (h): h is HabitWeeklyBreakdown & { semanaAnterior: NonNullable<HabitWeeklyBreakdown['semanaAnterior']> } =>
       h.semanaAnterior !== null,
@@ -183,6 +216,8 @@ function ComparisonChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
   const valueWidth = 34
   const trackWidth = CHART_WIDTH - LABEL_WIDTH - valueWidth - 8
   const height = comparable.length * ROW_HEIGHT
+  const barH = 8
+  const gap = 3
 
   return (
     <div>
@@ -193,17 +228,21 @@ function ComparisonChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
         aria-label="Comparación con la semana anterior"
       >
         {comparable.map((h, i) => {
-          const y = i * ROW_HEIGHT + ROW_HEIGHT / 2
+          const rowY = i * ROW_HEIGHT + (ROW_HEIGHT - (barH * 2 + gap)) / 2
+          const prevY = rowY
+          const curY = rowY + barH + gap
           const prevPct = pct(h.semanaAnterior)
           const curPct = pct(h.estaSemana)
-          const x1 = LABEL_WIDTH + (prevPct / 100) * trackWidth
-          const x2 = LABEL_WIDTH + (curPct / 100) * trackWidth
+          const prevWidth = (prevPct / 100) * trackWidth
+          const curWidth = (curPct / 100) * trackWidth
+          const improved = curPct > prevPct
+          const delayMs = i * 60
 
           return (
             <g key={h.habit.id}>
               <text
                 x={LABEL_WIDTH - 6}
-                y={y}
+                y={rowY + barH + gap / 2}
                 textAnchor="end"
                 dominantBaseline="middle"
                 fontSize="10"
@@ -212,28 +251,48 @@ function ComparisonChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
                 {truncate(h.habit.name)}
                 <title>{h.habit.name}</title>
               </text>
-              <line
-                x1={LABEL_WIDTH}
-                y1={y}
-                x2={LABEL_WIDTH + trackWidth}
-                y2={y}
-                stroke={COLOR_UNANSWERED}
-                strokeWidth={1}
-              />
-              <line x1={x1} y1={y} x2={x2} y2={y} stroke={INK_MUTED} strokeWidth={2} strokeLinecap="round" />
-              <circle cx={x1} cy={y} r={5} fill={COLOR_LAST_WEEK} stroke={RING} strokeWidth={2}>
+              {/* Semana anterior: detrás, estática, sin animar. */}
+              <rect x={LABEL_WIDTH} y={prevY} width={prevWidth} height={barH} rx={2} fill={COLOR_LAST_WEEK}>
                 <title>{`${h.habit.name} — semana anterior: ${prevPct}%`}</title>
-              </circle>
-              <circle cx={x2} cy={y} r={5} fill={COLOR_THIS_WEEK} stroke={RING} strokeWidth={2}>
-                <title>{`${h.habit.name} — esta semana (hasta hoy): ${curPct}%`}</title>
-              </circle>
+              </rect>
+              {/* Esta semana: delante, crece al montar. */}
+              <g
+                style={{
+                  transform: mounted ? 'scaleX(1)' : 'scaleX(0)',
+                  transformOrigin: `${LABEL_WIDTH}px ${curY + barH / 2}px`,
+                  transitionProperty: 'transform',
+                  transitionDuration: 'var(--dur-entrada)',
+                  transitionTimingFunction: 'var(--ease-salida)',
+                  transitionDelay: `${delayMs}ms`,
+                }}
+              >
+                <rect x={LABEL_WIDTH} y={curY} width={curWidth} height={barH} rx={2} fill={COLOR_THIS_WEEK}>
+                  <title>{`${h.habit.name} — esta semana (hasta hoy): ${curPct}%`}</title>
+                </rect>
+              </g>
+              {improved && (
+                <g
+                  style={{
+                    transform: mounted ? 'scale(1)' : 'scale(0.6)',
+                    transformOrigin: `${LABEL_WIDTH + curWidth + 10}px ${curY + barH / 2}px`,
+                    opacity: mounted ? 1 : 0,
+                    transitionProperty: 'transform, opacity',
+                    transitionDuration: 'var(--dur-entrada)',
+                    transitionTimingFunction: 'var(--ease-rebote)',
+                    // Aparece cuando su propia barra ya terminó de crecer.
+                    transitionDelay: `${delayMs + 320}ms`,
+                  }}
+                >
+                  <ImproveArrow x={LABEL_WIDTH + curWidth + 6} y={curY + barH / 2} />
+                </g>
+              )}
               <text
                 x={LABEL_WIDTH + trackWidth + 8}
-                y={y}
+                y={rowY + barH + gap / 2}
                 dominantBaseline="middle"
                 fontSize="10"
                 fontWeight="600"
-                fill={curPct >= prevPct ? COLOR_DONE : INK_PRIMARY}
+                fill={improved ? COLOR_DONE : INK_PRIMARY}
                 className="tabular-nums"
               >
                 {curPct}%
@@ -287,8 +346,21 @@ export default function WeekDashboard() {
   if (error && !data) return <LoadError onRetry={reload} />
   if (!data || data.habitos.length === 0) return null // WeekView ya cubre el caso sin hábitos
 
+  // No hay un % global ya calculado: se agrega aquí a partir de `estaSemana`
+  // de cada hábito (mismos números que ya dibuja BreakdownChart, sumados).
+  const totalHecho = data.habitos.reduce((sum, h) => sum + h.estaSemana.hecho, 0)
+  const totalDias = data.habitos.reduce((sum, h) => sum + h.estaSemana.diasTranscurridos, 0)
+  const weekPct = totalDias > 0 ? Math.round((totalHecho / totalDias) * 100) : 0
+
   return (
     <section className="mt-8 flex flex-col gap-6">
+      <WeekProgressRing
+        weekKey={data.semanaActual.inicio}
+        weekPct={weekPct}
+        totalHecho={totalHecho}
+        totalDias={totalDias}
+      />
+
       <div>
         <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Cumplimiento por hábito</h2>
         <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">

@@ -152,6 +152,14 @@ body {
 
   --ease-salida: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-toque: cubic-bezier(0.4, 0, 0.2, 1);
+  /*
+   * Con leve rebote: pasa de largo del valor final y vuelve, en vez de
+   * solo desacelerar. Para elementos que "llegan con energía" (la flecha
+   * de mejora en WeekDashboard, el indicador de estado de HabitRow), no
+   * para transiciones de estado normales — de ahí que sea un token propio
+   * y no una variación de --ease-salida.
+   */
+  --ease-rebote: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --sombra-tarjeta:
     0 1px 2px rgba(20, 22, 31, 0.06),

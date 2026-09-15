@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useMemo } from 'react'
+import { Fragment, useCallback, useMemo, type CSSProperties } from 'react'
 import {
   addDays,
   entryStatus,
@@ -11,9 +11,25 @@ import {
 } from '../data'
 import { useAsyncData } from '../useAsyncData'
 import { useMediaQuery } from '../useMediaQuery'
+import { useMounted } from '../useMounted'
 import { LoadError, Loading } from './ViewState'
 import WeekDashboard from './WeekDashboard'
 import WeeklyGoalsSection from './WeeklyGoalsSection'
+
+/** Cuánto se retrasa la entrada de cada columna de día (0 = lunes). */
+const CASCADE_DELAY_MS = 40
+
+/** Estilo de entrada de una celda de un día concreto: opacidad + un leve desplazamiento vertical, en cascada por `dayIndex`. Solo transform/opacity: nada de layout. */
+function enterStyle(mounted: boolean, dayIndex: number): CSSProperties {
+  return {
+    opacity: mounted ? 1 : 0,
+    transform: mounted ? 'translateY(0)' : 'translateY(4px)',
+    transitionProperty: 'opacity, transform',
+    transitionDuration: 'var(--dur-entrada)',
+    transitionTimingFunction: 'var(--ease-salida)',
+    transitionDelay: `${dayIndex * CASCADE_DELAY_MS}ms`,
+  }
+}
 
 /** Iniciales de lunes a domingo. X para miércoles, para no chocar con martes. */
 const DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
@@ -47,11 +63,27 @@ function formatRange(start: string, end: string): string {
   return `${startText} – ${endText}`
 }
 
-/** Cabecera de un día: inicial + número; resaltada si es hoy. */
-function DayHead({ iso, letter, isToday }: { iso: string; letter: string; isToday: boolean }) {
+/**
+ * Cabecera de un día: inicial + número; resaltada si es hoy. `dayIndex`
+ * (0 = lunes) fija el desfase de su entrada en cascada; ver `enterStyle`.
+ */
+function DayHead({
+  iso,
+  letter,
+  isToday,
+  mounted,
+  dayIndex,
+}: {
+  iso: string
+  letter: string
+  isToday: boolean
+  mounted: boolean
+  dayIndex: number
+}) {
   return (
     <div
       className={`pb-2 pt-1 text-sm ${isToday ? 'font-bold text-texto' : 'text-texto-tenue'}`}
+      style={enterStyle(mounted, dayIndex)}
     >
       <div>{letter}</div>
       <div
@@ -67,14 +99,25 @@ function DayHead({ iso, letter, isToday }: { iso: string; letter: string; isToda
   )
 }
 
-/** Una casilla de estado. Los bordes los pone cada disposición con `className`. */
+/**
+ * Una casilla de estado. Los bordes los pone cada disposición con
+ * `className`. `dayIndex` (0 = lunes) fija el desfase de su entrada en
+ * cascada, igual que en `DayHead`: todas las celdas de un mismo día entran
+ * a la vez, formando la columna, sin necesitar agruparlas en un elemento
+ * propio que rompería la maquetación de la cuadrícula (grid con
+ * auto-colocación).
+ */
 function StatusCell({
   status,
   isToday,
+  mounted,
+  dayIndex,
   className = '',
 }: {
   status: EntryStatus
   isToday: boolean
+  mounted: boolean
+  dayIndex: number
   className?: string
 }) {
   const cell = CELL[status]
@@ -83,9 +126,103 @@ function StatusCell({
       className={`flex items-center justify-center py-2 ${cell.className} ${
         isToday ? 'ring-1 ring-inset ring-borde' : ''
       } ${className}`}
+      style={enterStyle(mounted, dayIndex)}
     >
       <span aria-hidden="true">{cell.glyph}</span>
       <span className="sr-only">{cell.label}</span>
+    </div>
+  )
+}
+
+/**
+ * La cuadrícula en sí (las dos disposiciones), separada de `WeekView` por
+ * una sola razón: para que la cascada de entrada se dispare cuando la
+ * cuadrícula misma aparece por primera vez —al montar este componente—, y
+ * no cuando `WeekView` monta, que ocurre antes, mientras `data` todavía
+ * está cargando (`WeekView` devuelve `<Loading />` hasta entonces, así que
+ * este componente ni existe todavía).
+ */
+function WeekGrid({
+  wide,
+  days,
+  today,
+  habits,
+  statusAt,
+}: {
+  wide: boolean
+  days: string[]
+  today: string
+  habits: Habit[]
+  statusAt: (habitId: string, date: string) => EntryStatus
+}) {
+  const mounted = useMounted()
+
+  return (
+    <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta p-3 shadow-[var(--sombra-tarjeta)]">
+      {wide ? (
+        <div className="grid grid-cols-[minmax(0,13rem)_repeat(7,minmax(2rem,1fr))] text-center text-base">
+          <div />
+          {days.map((iso, i) => (
+            <DayHead key={iso} iso={iso} letter={DAY_LETTERS[i]} isToday={iso === today} mounted={mounted} dayIndex={i} />
+          ))}
+
+          {habits.map((h) => (
+            <Fragment key={h.id}>
+              <div
+                title={h.name}
+                className="self-center break-words border-t-[0.5px] border-separador px-2 py-2 text-right text-sm font-medium text-texto-cuerpo"
+              >
+                {h.name}
+              </div>
+              {days.map((iso, i) => (
+                <StatusCell
+                  key={iso}
+                  status={statusAt(h.id, iso)}
+                  isToday={iso === today}
+                  mounted={mounted}
+                  dayIndex={i}
+                  className="border-l-[0.5px] border-t-[0.5px] border-separador"
+                />
+              ))}
+            </Fragment>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-base">
+          <div className="grid grid-cols-7">
+            {days.map((iso, i) => (
+              <DayHead
+                key={iso}
+                iso={iso}
+                letter={DAY_LETTERS[i]}
+                isToday={iso === today}
+                mounted={mounted}
+                dayIndex={i}
+              />
+            ))}
+          </div>
+
+          {habits.map((h) => (
+            <div key={h.id} className="mt-3 border-t-[0.5px] border-separador pt-3">
+              <p className="mb-1 break-words text-left text-sm font-medium text-texto-cuerpo">
+                {h.name}
+              </p>
+              <div className="grid grid-cols-7 overflow-hidden rounded-campo">
+                {days.map((iso, i) => (
+                  <StatusCell
+                    key={iso}
+                    status={statusAt(h.id, iso)}
+                    isToday={iso === today}
+                    mounted={mounted}
+                    dayIndex={i}
+                    className="border-l-[0.5px] border-separador first:border-l-0"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -145,66 +282,7 @@ export default function WeekView() {
           </p>
         ) : (
           <>
-            <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta p-3 shadow-[var(--sombra-tarjeta)]">
-              {wide ? (
-                <div className="grid grid-cols-[minmax(0,13rem)_repeat(7,minmax(2rem,1fr))] text-center text-base">
-                  <div />
-                  {days.map((iso, i) => (
-                    <DayHead key={iso} iso={iso} letter={DAY_LETTERS[i]} isToday={iso === today} />
-                  ))}
-
-                  {habits.map((h) => (
-                    <Fragment key={h.id}>
-                      <div
-                        title={h.name}
-                        className="self-center break-words border-t-[0.5px] border-separador px-2 py-2 text-right text-sm font-medium text-texto-cuerpo"
-                      >
-                        {h.name}
-                      </div>
-                      {days.map((iso) => (
-                        <StatusCell
-                          key={iso}
-                          status={statusAt(h.id, iso)}
-                          isToday={iso === today}
-                          className="border-l-[0.5px] border-t-[0.5px] border-separador"
-                        />
-                      ))}
-                    </Fragment>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-base">
-                  <div className="grid grid-cols-7">
-                    {days.map((iso, i) => (
-                      <DayHead
-                        key={iso}
-                        iso={iso}
-                        letter={DAY_LETTERS[i]}
-                        isToday={iso === today}
-                      />
-                    ))}
-                  </div>
-
-                  {habits.map((h) => (
-                    <div key={h.id} className="mt-3 border-t-[0.5px] border-separador pt-3">
-                      <p className="mb-1 break-words text-left text-sm font-medium text-texto-cuerpo">
-                        {h.name}
-                      </p>
-                      <div className="grid grid-cols-7 overflow-hidden rounded-campo">
-                        {days.map((iso) => (
-                          <StatusCell
-                            key={iso}
-                            status={statusAt(h.id, iso)}
-                            isToday={iso === today}
-                            className="border-l-[0.5px] border-separador first:border-l-0"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <WeekGrid wide={wide} days={days} today={today} habits={habits} statusAt={statusAt} />
 
             <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-texto-apagado">
               <span>
