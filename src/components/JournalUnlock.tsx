@@ -15,6 +15,46 @@ interface JournalUnlockProps {
 }
 
 /**
+ * El monograma de Eos: los dos arcos del icono de la app (sin el fondo de
+ * degradado), en `currentColor`. Puramente decorativo — cierre de
+ * composición de la pantalla de desbloqueo, nunca portador de significado.
+ */
+function EosMonogram() {
+  return (
+    <svg viewBox="0 0 100 100" className="h-32 w-32" fill="none" stroke="currentColor" aria-hidden="true">
+      <g transform="translate(7,0) skewX(-8)">
+        <path d="M 41.91 26.88 A 23.12 23.12 0 0 0 41.91 73.12" strokeWidth={11.56} strokeLinecap="round" />
+        <path d="M 58.09 26.88 A 23.12 23.12 0 0 1 58.09 73.12" strokeWidth={11.56} strokeLinecap="round" />
+      </g>
+    </svg>
+  )
+}
+
+/**
+ * Aviso de error. La regla de "un solo color, el violeta" es para estados de
+ * cumplimiento (el Journal no tiene); un error sigue en --color-fallado,
+ * sobre todo aquí, donde es la única señal de que la contraseña no fue
+ * aceptada.
+ */
+function FieldError({ children }: { children: string }) {
+  return (
+    <p className="rounded-tarjeta border border-fallado/30 bg-fallado-suave px-4 py-3 text-sm text-fallado">
+      {children}
+    </p>
+  )
+}
+
+const campoClase =
+  'w-full rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-4 py-4 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento'
+
+const botonAcentoClase =
+  'rounded-campo bg-acento px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-acento-toque)] active:shadow-[var(--sombra-acento-toque)] disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none'
+
+/** Botón principal sobrio: para las pantallas de recuperación, no invita a pulsarlo. */
+const botonSobrioClase =
+  'rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue'
+
+/**
  * El Journal ya tiene clave configurada: pide la contraseña para desenvolver
  * la DEK. Incluye el rescate por código de recuperación, que obliga a fijar
  * una contraseña nueva antes de continuar.
@@ -90,12 +130,12 @@ export default function JournalUnlock({ keyRecord, onUnlocked, onPasswordChanged
 
   if (screen === 'recovery') {
     return (
-      <main className="px-4 pb-6 pt-4 text-gray-900">
-        <button type="button" onClick={() => goTo('password')} className="mb-3 text-sm text-gray-600">
+      <main className="px-4 pb-6 pt-4 text-texto">
+        <button type="button" onClick={() => goTo('password')} className="mb-3 text-sm text-texto-apagado">
           ‹ Volver
         </button>
-        <h1 className="text-xl font-semibold">Desbloquear con el código de recuperación</h1>
-        <p className="mt-2 text-sm text-gray-700">
+        <h1 className="text-titulo">Desbloquear con el código de recuperación</h1>
+        <p className="mt-2 text-contenido text-texto-cuerpo">
           Pega el código que guardaste al configurar el cifrado. Después tendrás que fijar
           una contraseña nueva.
         </p>
@@ -108,21 +148,17 @@ export default function JournalUnlock({ keyRecord, onUnlocked, onPasswordChanged
             autoFocus
             placeholder="XXXX-XXXX-XXXX-…"
             aria-label="Código de recuperación"
-            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-3 font-mono text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
+            className={`${campoClase} resize-none font-mono`}
           />
-          <button
-            type="submit"
-            disabled={!recoveryCode || busy}
-            className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
-          >
+          <button type="submit" disabled={!recoveryCode || busy} className={botonSobrioClase}>
             {busy ? 'Comprobando…' : 'Continuar'}
           </button>
         </form>
 
         {error && (
-          <p className="mt-4 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </p>
+          <div className="mt-4">
+            <FieldError>{error}</FieldError>
+          </div>
         )}
       </main>
     )
@@ -134,16 +170,16 @@ export default function JournalUnlock({ keyRecord, onUnlocked, onPasswordChanged
     const canSubmit = newPassword.length >= MIN_LENGTH && newPassword === newPasswordConfirm && !busy
 
     return (
-      <main className="px-4 pb-6 pt-4 text-gray-900">
-        <h1 className="text-xl font-semibold">Fija una contraseña nueva</h1>
-        <p className="mt-2 text-sm text-gray-700">
+      <main className="px-4 pb-6 pt-4 text-texto">
+        <h1 className="text-titulo">Fija una contraseña nueva</h1>
+        <p className="mt-2 text-contenido text-texto-cuerpo">
           El código de recuperación funcionó. Antes de continuar, elige una contraseña nueva
           para el Journal.
         </p>
 
         <form onSubmit={(e) => void submitNewPassword(e)} className="mt-4 flex flex-col gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="journal-new-pw">
+            <label className="mb-1 block text-sm font-medium text-texto-cuerpo" htmlFor="journal-new-pw">
               Contraseña nueva
             </label>
             <input
@@ -153,12 +189,12 @@ export default function JournalUnlock({ keyRecord, onUnlocked, onPasswordChanged
               autoFocus
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
+              className={campoClase}
             />
-            {tooShort && <p className="mt-1 text-xs text-rose-600">Mínimo {MIN_LENGTH} caracteres.</p>}
+            {tooShort && <p className="mt-1 text-xs text-fallado">Mínimo {MIN_LENGTH} caracteres.</p>}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="journal-new-pw2">
+            <label className="mb-1 block text-sm font-medium text-texto-cuerpo" htmlFor="journal-new-pw2">
               Confirma la contraseña nueva
             </label>
             <input
@@ -167,32 +203,28 @@ export default function JournalUnlock({ keyRecord, onUnlocked, onPasswordChanged
               autoComplete="new-password"
               value={newPasswordConfirm}
               onChange={(e) => setNewPasswordConfirm(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
+              className={campoClase}
             />
-            {mismatched && <p className="mt-1 text-xs text-rose-600">No coincide.</p>}
+            {mismatched && <p className="mt-1 text-xs text-fallado">No coincide.</p>}
           </div>
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
-          >
+          <button type="submit" disabled={!canSubmit} className={botonSobrioClase}>
             {busy ? 'Guardando…' : 'Guardar y continuar'}
           </button>
         </form>
 
         {error && (
-          <p className="mt-4 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </p>
+          <div className="mt-4">
+            <FieldError>{error}</FieldError>
+          </div>
         )}
       </main>
     )
   }
 
   return (
-    <main className="px-4 pb-6 pt-4 text-gray-900">
-      <h1 className="text-xl font-semibold">Desbloquear el Journal</h1>
-      <p className="mt-2 text-sm text-gray-700">Tus notas están cifradas. Escribe tu contraseña.</p>
+    <main className="flex min-h-[75vh] flex-col px-4 pb-6 pt-4 text-texto">
+      <h1 className="text-titulo">Desbloquear el Journal</h1>
+      <p className="mt-2 text-contenido text-texto-cuerpo">Lo que escribas aquí es solo tuyo.</p>
 
       <form onSubmit={(e) => void submitPassword(e)} className="mt-4 flex flex-col gap-3">
         <input
@@ -202,30 +234,30 @@ export default function JournalUnlock({ keyRecord, onUnlocked, onPasswordChanged
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           aria-label="Contraseña del Journal"
-          className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
+          className={campoClase}
         />
-        <button
-          type="submit"
-          disabled={!password || busy}
-          className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
-        >
+        <button type="submit" disabled={!password || busy} className={botonAcentoClase}>
           {busy ? 'Comprobando…' : 'Desbloquear'}
         </button>
       </form>
 
       {error && (
-        <p className="mt-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </p>
+        <div className="mt-3">
+          <FieldError>{error}</FieldError>
+        </div>
       )}
 
       <button
         type="button"
         onClick={() => goTo('recovery')}
-        className="mt-4 text-sm text-gray-500 underline decoration-dotted"
+        className="mt-4 text-sm text-texto-apagado underline decoration-dotted"
       >
         Olvidé mi contraseña
       </button>
+
+      <div className="mt-auto flex justify-center pt-10 text-texto-tenue opacity-30">
+        <EosMonogram />
+      </div>
     </main>
   )
 }

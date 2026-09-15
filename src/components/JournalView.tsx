@@ -13,6 +13,7 @@ import {
 } from '../data'
 import { useJournalLock } from '../journalLock'
 import { decryptNote, encryptNote } from '../lib/journalCrypto'
+import { useMounted } from '../useMounted'
 import { useAsyncData } from '../useAsyncData'
 import JournalSetup from './JournalSetup'
 import JournalUnlock from './JournalUnlock'
@@ -37,6 +38,16 @@ function PrivateIcon() {
   )
 }
 
+/** El aviso de privacidad: se queda en gris siempre. Ese color significa "sale hacia la IA" en el resto de la app; aquí es justo lo contrario. */
+function PrivateNotice() {
+  return (
+    <p className="flex items-center gap-1.5 border-b-[0.5px] border-separador bg-[var(--color-menu-fondo)] px-3 py-2 text-xs font-medium text-texto-apagado">
+      <PrivateIcon />
+      Privado. Nunca se envía a ninguna IA.
+    </p>
+  )
+}
+
 /** `2026-09-08` → `Lunes, 8 de septiembre`. Solo para mostrar. */
 function formatLongDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
@@ -48,8 +59,8 @@ function formatLongDate(iso: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-/** Navegación interna: lista, escribir una nota nueva, o editar una de hoy. */
-type Screen = { name: 'list' } | { name: 'compose' } | { name: 'edit'; note: JournalNote }
+/** Navegación interna: lista, o editar una nota de hoy. Escribir una nota nueva ya no navega: es la tarjeta fija de "Hoy". */
+type Screen = { name: 'list' } | { name: 'edit'; note: JournalNote }
 
 interface JournalData {
   today: JournalNote[]
@@ -75,78 +86,165 @@ async function decodeNoteText(note: JournalNote, dek: Uint8Array): Promise<Decod
   return plain === null ? { text: '', failed: true } : { text: plain, failed: false }
 }
 
-/** Una nota de un día anterior: solo lectura, con archivar en dos toques. */
+/** Un texto de nota tal como se lee, o el aviso de que no se pudo descifrar. */
+function NoteBody({ decoded, className = '' }: { decoded: DecodedText | undefined; className?: string }) {
+  if (decoded?.failed) {
+    return <p className={`text-meta italic text-fallado ${className}`}>No se pudo descifrar esta nota.</p>
+  }
+  return (
+    <p className={`whitespace-pre-wrap break-words text-lectura text-texto-cuerpo ${className}`}>
+      {decoded?.text ?? '…'}
+    </p>
+  )
+}
+
+/**
+ * Una nota de hoy ya guardada: solo su texto, tocar para editarla. Sin
+ * numeración ni etiqueta — si hay varias, la línea divisoria entre `<li>` la
+ * separa (ver el `<ul>` que las contiene).
+ */
+function TodayNoteRow({ decoded, onEdit }: { decoded: DecodedText | undefined; onEdit: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="w-full py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+    >
+      <NoteBody decoded={decoded} />
+    </button>
+  )
+}
+
+/** Una nota de un día anterior: solo lectura, con archivar detrás del menú "⋯". */
 function PastNote({
-  label,
   decoded,
   onArchive,
 }: {
-  label: string
   decoded: DecodedText | undefined
   onArchive: () => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
 
-  return (
-    <li>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</p>
-        {!confirming && (
-          <button
-            type="button"
-            onClick={() => setConfirming(true)}
-            className="shrink-0 text-sm font-medium text-gray-500"
-          >
-            Archivar
-          </button>
-        )}
-      </div>
-      {decoded?.failed ? (
-        <p className="mt-1 text-sm italic text-rose-600">No se pudo descifrar esta nota.</p>
-      ) : (
-        <p className="mt-1 whitespace-pre-wrap break-words text-gray-800">{decoded?.text ?? '…'}</p>
-      )}
-
-      {confirming && (
-        <div className="mt-2 rounded-lg border border-rose-300 bg-rose-50 p-3">
-          <p className="text-sm text-gray-700">
-            Se archivará: sale de la lista, el texto se conserva.
-          </p>
+  if (confirming) {
+    return (
+      <div className="py-3">
+        <NoteBody decoded={decoded} className="mb-2" />
+        <div className="rounded-campo border border-borde bg-[var(--color-menu-fondo)] p-3">
+          <p className="text-sm text-texto-cuerpo">Se archivará: sale de la lista, el texto se conserva.</p>
           <div className="mt-2 flex gap-2">
             <button
               type="button"
               onClick={onArchive}
-              className="rounded-lg bg-rose-600 px-4 py-3 text-sm font-medium text-white"
+              className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)]"
             >
               Archivar
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+              className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
             >
               Cancelar
             </button>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="py-3">
+      <div className="flex items-start justify-between gap-3">
+        <NoteBody decoded={decoded} className="flex-1" />
+        <button
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-expanded={menuOpen}
+          aria-label="Más acciones para esta nota"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-campo text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+        >
+          ⋯
+        </button>
+      </div>
+      {menuOpen && (
+        <div className="flex gap-4 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false)
+              setConfirming(true)
+            }}
+            className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+          >
+            Archivar
+          </button>
+        </div>
       )}
-    </li>
+    </div>
+  )
+}
+
+/** La tarjeta fija de "Hoy": el campo de escritura, siempre listo. */
+function TodayComposer({
+  prompt,
+  busy,
+  onSave,
+}: {
+  prompt: string | null
+  busy: boolean
+  onSave: (text: string) => void
+}) {
+  const [text, setText] = useState('')
+
+  function save() {
+    const clean = text.trim()
+    if (!clean || busy) return
+    onSave(clean)
+    setText('')
+  }
+
+  return (
+    <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
+      <PrivateNotice />
+      <div className="p-3">
+        {prompt && <p className="mb-2 text-sm italic text-texto-apagado">{prompt}</p>}
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={5}
+          placeholder="Escribe tu nota…"
+          aria-label="Texto de la nota"
+          disabled={busy}
+          className="w-full resize-y rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-3 text-lectura shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:opacity-60"
+        />
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={save}
+            disabled={!text.trim() || busy}
+            className="rounded-campo bg-acento px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-acento-toque)] active:shadow-[var(--sombra-acento-toque)] disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
+          >
+            {busy ? 'Guardando…' : 'Guardar nota'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
 /**
- * El editor: pantalla propia para escribir una nota nueva o cambiar el texto
- * de una de hoy. La pregunta sugerida solo aparece al crear, no al editar.
+ * El editor de una nota de hoy ya existente: pantalla propia. El botón de
+ * guardar aquí es sobrio a propósito — el violeta con relieve se reserva
+ * para Desbloquear y Guardar nota, no para cada acción del Journal.
  */
 function NoteEditor({
   initialText,
-  prompt,
   busy,
   onSave,
   onCancel,
 }: {
   initialText: string
-  prompt: string | null
   busy: boolean
   onSave: (text: string) => void
   onCancel: () => void
@@ -160,53 +258,51 @@ function NoteEditor({
   }
 
   return (
-    <main className="px-4 pb-6 pt-4 text-gray-900">
-      <button type="button" onClick={onCancel} className="mb-3 text-sm text-gray-600">
+    <main className="px-4 pb-6 pt-4 text-texto">
+      <button type="button" onClick={onCancel} className="mb-3 text-sm text-texto-apagado">
         ‹ Volver
       </button>
 
-      {prompt && <p className="mb-2 text-sm italic text-gray-500">{prompt}</p>}
-
-      <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500">
-        <PrivateIcon />
-        Privado. Nunca se envía a ninguna IA.
-      </p>
-
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={8}
-        autoFocus
-        placeholder="Escribe tu nota…"
-        aria-label="Texto de la nota"
-        className="w-full resize-y rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
-      />
-      <div className="mt-2 flex gap-2">
-        <button
-          type="button"
-          onClick={save}
-          disabled={!text.trim() || busy}
-          className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
-        >
-          {busy ? 'Guardando…' : 'Guardar'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 disabled:opacity-40"
-        >
-          Cancelar
-        </button>
+      <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
+        <PrivateNotice />
+        <div className="p-3">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={8}
+            autoFocus
+            placeholder="Escribe tu nota…"
+            aria-label="Texto de la nota"
+            className="w-full resize-y rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-3 text-lectura shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={!text.trim() || busy}
+              className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+            >
+              {busy ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={busy}
+              className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador disabled:opacity-40"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       </div>
     </main>
   )
 }
 
 /**
- * La lista de notas de hoy (numeradas, tocar una para editarla) con un botón
- * para añadir, y debajo las de días anteriores, de solo lectura, agrupadas
- * por día y también numeradas.
+ * La lista de notas: la tarjeta fija de hoy arriba (con lo ya escrito hoy
+ * debajo, tocar una para editarla), y debajo las de días anteriores, de solo
+ * lectura, agrupadas por día.
  *
  * Solo se monta con la DEK ya desenvuelta (ver `JournalView` más abajo): toda
  * nota que se guarde aquí se guarda cifrada, cree una nueva o edite una vieja
@@ -280,12 +376,11 @@ function JournalNotes({ dek }: { dek: Uint8Array }) {
     else await createNote(today, content)
   }
 
-  if (screen.name === 'compose' || screen.name === 'edit') {
-    const editing = screen.name === 'edit' ? screen.note : null
+  if (screen.name === 'edit') {
+    const editing = screen.note
     return (
       <NoteEditor
-        initialText={editing ? (decoded[editing.id]?.text ?? '') : ''}
-        prompt={editing ? null : promptForDate(today)}
+        initialText={decoded[editing.id]?.text ?? ''}
         busy={busy}
         onCancel={() => setScreen({ name: 'list' })}
         onSave={(text) => void run(() => save(text, editing), 'No se pudo guardar.', true)}
@@ -300,69 +395,50 @@ function JournalNotes({ dek }: { dek: Uint8Array }) {
   const pastDays = groupNotesByDate(data?.past ?? [])
 
   return (
-    <main className="px-4 pb-6 pt-4 text-gray-900">
+    <main className="px-4 pb-6 pt-4 text-texto">
       {actionError && (
-        <ActionError message={actionError} onDismiss={() => setActionError(null)} />
+        <div className="mb-4">
+          <ActionError message={actionError} onDismiss={() => setActionError(null)} />
+        </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setScreen({ name: 'compose' })}
-        className="mb-6 w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white"
-      >
-        + Nueva nota
-      </button>
-
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Hoy</h2>
-        {todayNotes.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">
-            Aún no has anotado nada hoy.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {todayNotes.map((note, i) => {
-              const d = decoded[note.id]
-              return (
-                <li key={note.id}>
-                  <button
-                    type="button"
-                    onClick={() => setScreen({ name: 'edit', note })}
-                    className="w-full rounded-xl border border-gray-200 bg-white p-3 text-left"
-                  >
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      Nota {i + 1}
-                    </p>
-                    {d?.failed ? (
-                      <p className="text-sm italic text-rose-600">No se pudo descifrar esta nota.</p>
-                    ) : (
-                      <p className="whitespace-pre-wrap break-words text-gray-900">{d?.text ?? '…'}</p>
-                    )}
-                  </button>
-                </li>
-              )
-            })}
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Hoy · {formatLongDate(today)}</h2>
+        <TodayComposer
+          prompt={promptForDate(today)}
+          busy={busy}
+          onSave={(text) => void run(() => save(text, null), 'No se pudo guardar.')}
+        />
+
+        {todayNotes.length > 0 && (
+          <ul className="mt-3 flex flex-col divide-y divide-separador rounded-tarjeta border border-borde bg-tarjeta px-3 shadow-[var(--sombra-tarjeta)]">
+            {todayNotes.map((note) => (
+              <li key={note.id}>
+                <TodayNoteRow decoded={decoded[note.id]} onEdit={() => setScreen({ name: 'edit', note })} />
+              </li>
+            ))}
           </ul>
         )}
       </section>
 
       {pastDays.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">Entradas anteriores</h2>
+          <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Entradas anteriores</h2>
           <ul className="flex flex-col gap-4">
             {pastDays.map((day) => (
-              <li key={day.date} className="rounded-xl border border-gray-200 bg-white p-3">
-                <p className="mb-2 text-sm font-medium text-gray-700">
-                  {formatLongDate(day.date)}
-                </p>
-                <ul className="flex flex-col gap-3">
-                  {day.notes.map((note, i) => (
-                    <PastNote
-                      key={note.id}
-                      label={`Nota ${i + 1}`}
-                      decoded={decoded[note.id]}
-                      onArchive={() => void run(() => archiveNote(note.id), 'No se pudo archivar.')}
-                    />
+              <li
+                key={day.date}
+                className="rounded-tarjeta border border-borde bg-tarjeta px-3 pt-3 shadow-[var(--sombra-tarjeta)]"
+              >
+                <p className="text-meta text-texto-apagado">{formatLongDate(day.date)}</p>
+                <ul className="flex flex-col divide-y divide-separador">
+                  {day.notes.map((note) => (
+                    <li key={note.id}>
+                      <PastNote
+                        decoded={decoded[note.id]}
+                        onArchive={() => void run(() => archiveNote(note.id), 'No se pudo archivar.')}
+                      />
+                    </li>
                   ))}
                 </ul>
               </li>
@@ -371,6 +447,25 @@ function JournalNotes({ dek }: { dek: Uint8Array }) {
         </section>
       )}
     </main>
+  )
+}
+
+/**
+ * Transición de entrada tras un desbloqueo correcto: se desvanece desde 8px
+ * más abajo. Solo se monta cuando `JournalUnlock` ya llamó a `onUnlocked` —
+ * si la contraseña falla, este componente nunca existe, así que no hay nada
+ * que animar.
+ */
+function JournalRevealed({ dek }: { dek: Uint8Array }) {
+  const mounted = useMounted()
+  return (
+    <div
+      className={`transition-[opacity,transform] duration-[var(--dur-entrada)] ease-salida ${
+        mounted ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+      }`}
+    >
+      <JournalNotes dek={dek} />
+    </div>
   )
 }
 
@@ -406,5 +501,5 @@ export default function JournalView() {
     )
   }
 
-  return <JournalNotes dek={lock.dek} />
+  return <JournalRevealed dek={lock.dek} />
 }

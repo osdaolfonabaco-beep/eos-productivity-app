@@ -111,6 +111,11 @@ body {
   --text-contenido--line-height: 1.45;
   --text-contenido--font-weight: 400;
 
+  /* Cuerpo de una nota del Journal: se lee, no se escanea. Más grande y más aireado que --text-contenido. */
+  --text-lectura: 15.5px;
+  --text-lectura--line-height: 1.62;
+  --text-lectura--font-weight: 400;
+
   --text-meta: 13px;
   --text-meta--font-weight: 400;
 
