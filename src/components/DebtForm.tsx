@@ -10,7 +10,7 @@ interface DebtFormProps {
 }
 
 const inputClass =
-  'rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800'
+  'rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-3 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento'
 
 function StatusButton({
   current,
@@ -29,8 +29,10 @@ function StatusButton({
       type="button"
       onClick={() => onSelect(value)}
       aria-pressed={active}
-      className={`flex-1 rounded-lg border px-4 py-3 text-sm font-medium ${
-        active ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 text-gray-700'
+      className={`flex-1 rounded-campo px-4 py-3 text-sm font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] ${
+        active
+          ? 'bg-acento text-white shadow-[var(--sombra-acento)] active:bg-[var(--color-acento-toque)]'
+          : 'border border-borde text-texto-apagado active:bg-separador'
       }`}
     >
       {label}
@@ -71,7 +73,7 @@ export default function DebtForm({ initial, onSubmit, onCancel }: DebtFormProps)
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-gray-700">Nombre</span>
+        <span className="text-sm font-medium text-texto-cuerpo">Nombre</span>
         <input
           type="text"
           value={name}
@@ -82,7 +84,7 @@ export default function DebtForm({ initial, onSubmit, onCancel }: DebtFormProps)
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-texto-cuerpo">
           {initial ? 'Saldo actual (corrección)' : 'Saldo actual'}
         </span>
         <input
@@ -94,12 +96,12 @@ export default function DebtForm({ initial, onSubmit, onCancel }: DebtFormProps)
           className={inputClass}
         />
         {openingBalance !== null && (
-          <span className="text-xs text-gray-500">{formatCOP(openingBalance)}</span>
+          <span className="text-xs tabular-nums text-texto-apagado">{formatCOP(openingBalance)}</span>
         )}
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-gray-700">Cuota mensual</span>
+        <span className="text-sm font-medium text-texto-cuerpo">Cuota mensual</span>
         <input
           type="text"
           inputMode="numeric"
@@ -111,7 +113,7 @@ export default function DebtForm({ initial, onSubmit, onCancel }: DebtFormProps)
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-gray-700">Tasa anual (opcional)</span>
+        <span className="text-sm font-medium text-texto-cuerpo">Tasa anual (opcional)</span>
         <span className="flex items-center gap-2">
           <input
             type="text"
@@ -121,12 +123,12 @@ export default function DebtForm({ initial, onSubmit, onCancel }: DebtFormProps)
             placeholder="0"
             className={`${inputClass} flex-1`}
           />
-          <span className="text-sm text-gray-500">% E.A.</span>
+          <span className="text-sm text-texto-apagado">% E.A.</span>
         </span>
       </label>
 
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-gray-700">Estado</span>
+        <span className="text-sm font-medium text-texto-cuerpo">Estado</span>
         <div className="flex gap-2">
           <StatusButton current={status} value="al-dia" label="Al día" onSelect={setStatus} />
           <StatusButton current={status} value="en-mora" label="En mora" onSelect={setStatus} />
@@ -137,14 +139,14 @@ export default function DebtForm({ initial, onSubmit, onCancel }: DebtFormProps)
         <button
           type="submit"
           disabled={!canSave}
-          className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
         >
           Guardar
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+          className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
         >
           Cancelar
         </button>

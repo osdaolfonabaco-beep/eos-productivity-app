@@ -9,6 +9,7 @@ import {
   type SavingsGoalInput,
 } from '../data'
 import { formatCOP, parsePesos } from '../money'
+import { useMounted } from '../useMounted'
 
 interface SavingsGoalSectionProps {
   /** `undefined` si no hay ninguna meta activa. */
@@ -28,8 +29,8 @@ function formatShortDate(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 }
 
-const fieldClass =
-  'rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800 disabled:opacity-60'
+const campoClass =
+  'rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-3 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:opacity-60'
 
 /** El formulario de la meta: nombre, monto objetivo y fecha opcional. Sirve para crear y para editar. */
 function GoalForm({
@@ -66,7 +67,7 @@ function GoalForm({
         aria-label="Nombre de la meta"
         autoFocus
         disabled={busy}
-        className={fieldClass}
+        className={campoClass}
       />
       <input
         type="text"
@@ -76,23 +77,23 @@ function GoalForm({
         placeholder="Monto objetivo"
         aria-label="Monto objetivo"
         disabled={busy}
-        className={fieldClass}
+        className={campoClass}
       />
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-gray-500">Fecha objetivo (opcional)</span>
+        <span className="text-xs text-texto-apagado">Fecha objetivo (opcional)</span>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           disabled={busy}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-base disabled:opacity-60"
+          className={`${campoClass} py-2`}
         />
       </label>
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={!canSave || busy}
-          className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
         >
           Guardar
         </button>
@@ -100,13 +101,36 @@ function GoalForm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+            className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
           >
             Cancelar
           </button>
         )}
       </div>
     </form>
+  )
+}
+
+/**
+ * Barra de progreso de la meta: crece desde cero hasta su valor al montar
+ * (técnica compartida con las barras de Deudas — ver `DebtsView`).
+ * `transform: scaleX`, no `width`: es una operación de compositor.
+ */
+function GoalProgressBar({ percent }: { percent: number }) {
+  const mounted = useMounted()
+  return (
+    <div className="mt-2 h-2 overflow-hidden rounded-full bg-separador">
+      <div
+        className="h-full origin-left rounded-full bg-acento"
+        style={{
+          transform: mounted ? 'scaleX(1)' : 'scaleX(0)',
+          width: `${percent}%`,
+          transitionProperty: 'transform',
+          transitionDuration: 'var(--dur-entrada)',
+          transitionTimingFunction: 'var(--ease-salida)',
+        }}
+      />
+    </div>
   )
 }
 
@@ -133,9 +157,9 @@ export default function SavingsGoalSection({
   if (!goal) {
     return (
       <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Meta de ahorro</h2>
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-4">
-          <p className="mb-3 text-sm text-gray-500">Todavía no tienes una meta de ahorro.</p>
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Meta de ahorro</h2>
+        <div className="rounded-tarjeta border border-dashed border-borde bg-tarjeta p-4">
+          <p className="mb-3 text-sm text-texto-apagado">Todavía no tienes una meta de ahorro.</p>
           <GoalForm busy={busy} onSubmit={onCreate} />
         </div>
       </section>
@@ -145,8 +169,8 @@ export default function SavingsGoalSection({
   if (mode === 'edit') {
     return (
       <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Meta de ahorro</h2>
-        <div className="rounded-xl border border-gray-300 bg-white p-4">
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Meta de ahorro</h2>
+        <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
           <GoalForm
             initial={goal}
             busy={busy}
@@ -179,11 +203,11 @@ export default function SavingsGoalSection({
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">Meta de ahorro</h2>
+      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Meta de ahorro</h2>
 
       {mode === 'confirm-archive' ? (
-        <div className="rounded-xl border border-rose-300 bg-rose-50 p-4">
-          <p className="text-sm text-gray-700">
+        <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
+          <p className="text-sm text-texto-apagado">
             Se archivará: la meta y sus aportes se conservan. Podrás crear una meta nueva.
           </p>
           <div className="mt-2 flex gap-2">
@@ -191,50 +215,46 @@ export default function SavingsGoalSection({
               type="button"
               onClick={() => onArchive(goal.id)}
               disabled={busy}
-              className="rounded-lg bg-rose-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+              className="rounded-campo bg-fallado px-4 py-3 text-sm font-medium text-white transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-40"
             >
               Archivar meta
             </button>
             <button
               type="button"
               onClick={() => setMode('view')}
-              className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+              className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
             >
               Cancelar
             </button>
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="break-words text-lg font-medium text-gray-900">{goal.name}</span>
-            <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">
-              {percent}%
-            </span>
+            <span className="break-words text-contenido font-medium text-texto">{goal.name}</span>
+            <span className="shrink-0 text-sm font-semibold tabular-nums text-texto">{percent}%</span>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
-            <div className="h-full rounded-full bg-gray-900" style={{ width: `${percent}%` }} />
-          </div>
-          <p className="mt-2 text-sm text-gray-600">
+          <GoalProgressBar percent={percent} />
+          <p className="mt-2 text-sm tabular-nums text-texto-apagado">
             {formatCOP(saved)} de {formatCOP(goal.targetAmount)}
             {remaining > 0 && ` · faltan ${formatCOP(remaining)}`}
           </p>
           {goal.targetDate && (
-            <p className="mt-0.5 text-xs text-gray-500">Meta: {formatShortDate(goal.targetDate)}</p>
+            <p className="mt-0.5 text-xs text-texto-tenue">Meta: {formatShortDate(goal.targetDate)}</p>
           )}
 
-          <div className="mt-3 flex gap-3">
+          <div className="mt-3 flex gap-4">
             <button
               type="button"
               onClick={() => setMode('edit')}
-              className="text-sm font-medium text-gray-500"
+              className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
             >
               Editar
             </button>
             <button
               type="button"
               onClick={() => setMode('confirm-archive')}
-              className="text-sm font-medium text-gray-500"
+              className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
             >
               Archivar
             </button>
@@ -242,22 +262,22 @@ export default function SavingsGoalSection({
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-white p-3">
-        <h3 className="mb-2 text-sm font-medium text-gray-700">Anotar un aporte</h3>
+      <div className="mt-4 rounded-tarjeta border border-borde bg-tarjeta p-3 shadow-[var(--sombra-tarjeta)]">
+        <h3 className="mb-2 text-sm font-medium text-texto-cuerpo">Anotar un aporte</h3>
         <form onSubmit={submitContribution} className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500">Fecha</span>
+            <span className="text-xs text-texto-apagado">Fecha</span>
             <input
               type="date"
               value={contribDate}
               max={todayISO()}
               onChange={(e) => setContribDate(e.target.value)}
               disabled={busy}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-base disabled:opacity-60"
+              className={`${campoClass} py-2`}
             />
           </label>
           <label className="flex flex-1 flex-col gap-1">
-            <span className="text-xs text-gray-500">Monto</span>
+            <span className="text-xs text-texto-apagado">Monto</span>
             <input
               type="text"
               inputMode="numeric"
@@ -265,13 +285,13 @@ export default function SavingsGoalSection({
               onChange={(e) => setContribAmount(e.target.value)}
               placeholder="$ 0"
               disabled={busy}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base disabled:opacity-60"
+              className={`w-full ${campoClass} py-2`}
             />
           </label>
           <button
             type="submit"
             disabled={!canAddContrib}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+            className="rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
           >
             Anotar
           </button>
@@ -279,54 +299,59 @@ export default function SavingsGoalSection({
       </div>
 
       {contributions.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-2">
-          {contributions.slice(0, 5).map((c) => (
-            <li key={c.id} className="rounded-xl border border-gray-200 bg-white p-3">
-              {confirmingContribId === c.id ? (
-                <div>
-                  <p className="text-sm text-gray-700">
-                    ¿Archivar el aporte de {formatCOP(c.amount)} del {formatShortDate(c.date)}?
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => {
-                        onArchiveContribution(c.id)
-                        setConfirmingContribId(null)
-                      }}
-                      className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-                    >
-                      Archivar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingContribId(null)}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700"
-                    >
-                      Cancelar
-                    </button>
+        <div className="mt-3 overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
+          <ul>
+            {contributions.slice(0, 5).map((c, i) => (
+              <li
+                key={c.id}
+                className={i < Math.min(5, contributions.length) - 1 ? 'border-b-[0.5px] border-separador' : ''}
+              >
+                {confirmingContribId === c.id ? (
+                  <div className="px-3 py-3">
+                    <p className="text-sm text-texto-cuerpo">
+                      ¿Archivar el aporte de {formatCOP(c.amount)} del {formatShortDate(c.date)}?
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          onArchiveContribution(c.id)
+                          setConfirmingContribId(null)
+                        }}
+                        className="rounded-campo bg-fallado px-4 py-2 text-sm font-medium text-white transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-40"
+                      >
+                        Archivar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingContribId(null)}
+                        className="rounded-campo border border-borde px-4 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-gray-600">{formatShortDate(c.date)}</span>
-                  <span className="flex items-center gap-3">
-                    <span className="font-medium tabular-nums">{formatCOP(c.amount)}</span>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingContribId(c.id)}
-                      className="text-sm font-medium text-gray-500"
-                      aria-label={`Archivar el aporte de ${formatCOP(c.amount)} del ${formatShortDate(c.date)}`}
-                    >
-                      Archivar
-                    </button>
-                  </span>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+                ) : (
+                  <div className="flex min-h-11 items-center justify-between gap-3 px-3 py-2">
+                    <span className="text-sm text-texto-apagado">{formatShortDate(c.date)}</span>
+                    <span className="flex items-center gap-3">
+                      <span className="font-medium tabular-nums text-texto">{formatCOP(c.amount)}</span>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingContribId(c.id)}
+                        className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                        aria-label={`Archivar el aporte de ${formatCOP(c.amount)} del ${formatShortDate(c.date)}`}
+                      >
+                        Archivar
+                      </button>
+                    </span>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   )

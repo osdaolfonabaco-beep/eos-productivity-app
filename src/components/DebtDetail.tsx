@@ -23,6 +23,9 @@ interface DebtDetailProps {
   onEdit: () => void
 }
 
+const campoClass =
+  'rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-2 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento'
+
 /** `2026-09-09` → `09 sept 2026`. Solo para mostrar. */
 function formatDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
@@ -76,11 +79,15 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
 
   if (!debt) {
     return (
-      <main className="px-4 py-6 text-gray-900">
-        <button type="button" onClick={onBack} className="text-sm text-gray-600">
+      <main className="px-4 py-6 text-texto">
+        <button
+          type="button"
+          onClick={onBack}
+          className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+        >
           ‹ Deudas
         </button>
-        <p className="mt-6 text-gray-500">Esta deuda ya no está disponible.</p>
+        <p className="mt-6 text-texto-apagado">Esta deuda ya no está disponible.</p>
       </main>
     )
   }
@@ -90,9 +97,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
   const settled = rawBalance <= 0
   const balance = Math.max(0, rawBalance)
   const progress =
-    debt.openingBalance > 0
-      ? Math.min(100, Math.round((paid / debt.openingBalance) * 100))
-      : 0
+    debt.openingBalance > 0 ? Math.min(100, Math.round((paid / debt.openingBalance) * 100)) : 0
 
   const amountValue = parsePesos(amount)
   const canRegister = amountValue !== null && amountValue > 0 && isISODate(date) && !busy
@@ -108,21 +113,25 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
   }
 
   return (
-    <main className="px-4 py-6 text-gray-900">
+    <main className="px-4 py-6 text-texto">
       <div className="flex items-center justify-between">
-        <button type="button" onClick={onBack} className="text-sm text-gray-600">
+        <button
+          type="button"
+          onClick={onBack}
+          className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+        >
           ‹ Deudas
         </button>
         <button
           type="button"
           onClick={onEdit}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
+          className="rounded-campo border border-borde px-3 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
         >
           Editar
         </button>
       </div>
 
-      <h1 className="mt-3 text-2xl font-semibold">{debt.name}</h1>
+      <h1 className="mt-3 text-titulo">{debt.name}</h1>
 
       {actionError && (
         <div className="mt-4">
@@ -130,57 +139,57 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mt-4 rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-2xl font-semibold tabular-nums">{formatCOP(balance)}</span>
+          <span className="text-2xl font-semibold tabular-nums text-texto">{formatCOP(balance)}</span>
           {settled ? (
-            <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+            <span className="shrink-0 rounded-pastilla bg-hecho-suave px-2 py-0.5 text-xs font-medium text-hecho">
               ✓ Saldada
             </span>
           ) : (
             <DebtStatusChip status={debt.status} />
           )}
         </div>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm tabular-nums text-texto-apagado">
           Abonado {formatCOP(paid)} de {formatCOP(debt.openingBalance)}
         </p>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
-          <div className="h-full rounded-full bg-gray-900" style={{ width: `${progress}%` }} />
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-separador">
+          <div className="h-full rounded-full bg-acento" style={{ width: `${progress}%` }} />
         </div>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm tabular-nums text-texto-apagado">
           Cuota mensual {formatCOP(debt.monthlyPayment)}
           {debt.annualRate != null && ` · ${formatRate(debt.annualRate)} % E.A.`}
         </p>
       </div>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Registrar pago</h2>
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Registrar pago</h2>
         <form onSubmit={submitPayment} className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500">Fecha</span>
+            <span className="text-xs text-texto-apagado">Fecha</span>
             <input
               type="date"
               value={date}
               max={todayISO()}
               onChange={(e) => setDate(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-base"
+              className={campoClass}
             />
           </label>
           <label className="flex flex-1 flex-col gap-1">
-            <span className="text-xs text-gray-500">Monto</span>
+            <span className="text-xs text-texto-apagado">Monto</span>
             <input
               type="text"
               inputMode="numeric"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="$ 0"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base"
+              className={`w-full ${campoClass}`}
             />
           </label>
           <button
             type="submit"
             disabled={!canRegister}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+            className="rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
           >
             {busy ? 'Guardando…' : 'Registrar'}
           </button>
@@ -188,72 +197,72 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Pagos</h2>
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Pagos</h2>
         {payments.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500">
+          <p className="rounded-tarjeta border border-dashed border-borde px-4 py-6 text-center text-sm text-texto-apagado">
             Aún no has registrado pagos.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {payments.map((p) => (
-              <li key={p.id} className="rounded-xl border border-gray-200 bg-white p-3">
-                {confirmingPaymentId === p.id ? (
-                  <div>
-                    <p className="text-sm text-gray-700">
-                      ¿Borrar el pago de {formatCOP(p.amount)} del {formatDate(p.date)}?
-                    </p>
-                    <div className="mt-2 flex gap-2">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(
-                            () => deletePayment(p.id),
-                            'No se pudo borrar el pago.',
-                            () => setConfirmingPaymentId(null),
-                          )
-                        }
-                        className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-                      >
-                        Borrar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingPaymentId(null)}
-                        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700"
-                      >
-                        Cancelar
-                      </button>
+          <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
+            <ul>
+              {payments.map((p, i) => (
+                <li key={p.id} className={i < payments.length - 1 ? 'border-b-[0.5px] border-separador' : ''}>
+                  {confirmingPaymentId === p.id ? (
+                    <div className="px-3 py-3">
+                      <p className="text-sm text-texto-cuerpo">
+                        ¿Borrar el pago de {formatCOP(p.amount)} del {formatDate(p.date)}?
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(
+                              () => deletePayment(p.id),
+                              'No se pudo borrar el pago.',
+                              () => setConfirmingPaymentId(null),
+                            )
+                          }
+                          className="rounded-campo bg-fallado px-4 py-2 text-sm font-medium text-white transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-40"
+                        >
+                          Borrar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingPaymentId(null)}
+                          className="rounded-campo border border-borde px-4 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-gray-600">{formatDate(p.date)}</span>
-                    <span className="flex items-center gap-3">
-                      <span className="font-medium tabular-nums">{formatCOP(p.amount)}</span>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingPaymentId(p.id)}
-                        className="text-sm font-medium text-gray-500"
-                        aria-label={`Borrar el pago de ${formatCOP(p.amount)} del ${formatDate(p.date)}`}
-                      >
-                        Borrar
-                      </button>
-                    </span>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+                  ) : (
+                    <div className="flex min-h-11 items-center justify-between gap-3 px-3 py-2">
+                      <span className="text-sm text-texto-apagado">{formatDate(p.date)}</span>
+                      <span className="flex items-center gap-3">
+                        <span className="font-medium tabular-nums text-texto">{formatCOP(p.amount)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingPaymentId(p.id)}
+                          className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                          aria-label={`Borrar el pago de ${formatCOP(p.amount)} del ${formatDate(p.date)}`}
+                        >
+                          Borrar
+                        </button>
+                      </span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
 
       <section className="mt-8">
         {confirmingArchive ? (
-          <div className="rounded-xl border border-rose-300 bg-rose-50 p-3">
-            <p className="text-sm text-gray-700">
-              Se archivará. El historial de pagos se conserva.
-            </p>
+          <div className="rounded-tarjeta border border-borde bg-tarjeta p-3 shadow-[var(--sombra-tarjeta)]">
+            <p className="text-sm text-texto-apagado">Se archivará. El historial de pagos se conserva.</p>
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
@@ -261,14 +270,14 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
                 onClick={() =>
                   void run(() => archiveDebt(debtId), 'No se pudo archivar.', onBack)
                 }
-                className="rounded-lg bg-rose-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+                className="rounded-campo bg-fallado px-4 py-3 text-sm font-medium text-white transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-40"
               >
                 Archivar deuda
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmingArchive(false)}
-                className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+                className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
               >
                 Cancelar
               </button>
@@ -278,7 +287,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
           <button
             type="button"
             onClick={() => setConfirmingArchive(true)}
-            className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+            className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
           >
             Archivar deuda
           </button>

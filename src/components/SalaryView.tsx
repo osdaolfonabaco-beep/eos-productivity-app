@@ -91,7 +91,7 @@ export default function SalaryView() {
   const periodLabel = quincenaLabel(periodStart)
 
   return (
-    <main className="px-4 pb-6 pt-4 text-gray-900">
+    <main className="px-4 pb-6 pt-4 text-texto">
       {actionError && <ActionError message={actionError} onDismiss={() => setActionError(null)} />}
 
       <PeriodSection

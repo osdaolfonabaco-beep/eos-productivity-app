@@ -17,9 +17,14 @@ interface FixedExpensesSectionProps {
   onArchive: (id: string) => void
 }
 
+const campoClass =
+  'rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-3 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:opacity-60'
+
 /**
- * Bloque 2 de la vista Sueldo: alta rápida de gastos fijos y la lista, con
- * edición en línea y archivar de dos toques por fila (`FixedExpenseRow`).
+ * Bloque 2 de la vista Sueldo: la lista de gastos fijos, con edición en línea
+ * y archivar de dos toques por fila (`FixedExpenseRow`). El alta no está
+ * siempre abierta: se repliega en una fila "+ Añadir gasto fijo" que
+ * despliega el formulario, mismo patrón que "+ Añadir hábito" en Hábitos.
  */
 export default function FixedExpensesSection({
   expenses,
@@ -29,6 +34,7 @@ export default function FixedExpensesSection({
   onUpdate,
   onArchive,
 }: FixedExpensesSectionProps) {
+  const [formOpen, setFormOpen] = useState(false)
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [quincena, setQuincena] = useState<Quincena>('ambas')
@@ -40,67 +46,97 @@ export default function FixedExpensesSection({
     e.preventDefault()
     if (!canAdd || amountValue === null) return
     onCreate({ name: name.trim(), amount: amountValue, quincena })
+    cancelForm()
+  }
+
+  function cancelForm() {
     setName('')
     setAmount('')
     setQuincena('ambas')
+    setFormOpen(false)
   }
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">Gastos fijos</h2>
+      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Gastos fijos</h2>
 
-      <form
-        onSubmit={submit}
-        className="mb-4 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3"
-      >
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Nombre del gasto…"
-          aria-label="Nombre del gasto fijo"
-          disabled={busy}
-          className="rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800 disabled:opacity-60"
-        />
-        <input
-          type="text"
-          inputMode="numeric"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="$ 0"
-          aria-label="Monto del gasto fijo"
-          disabled={busy}
-          className="rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800 disabled:opacity-60"
-        />
-        <QuincenaPicker value={quincena} onChange={setQuincena} disabled={busy} />
-        <button
-          type="submit"
-          disabled={!canAdd}
-          className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
-        >
-          Añadir
-        </button>
-      </form>
+      <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
+        {expenses.length === 0 && (
+          <p className="flex min-h-11 items-center border-b-[0.5px] border-separador px-3 text-texto-tenue">
+            No tienes gastos fijos. Añade el primero abajo.
+          </p>
+        )}
 
-      {expenses.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">
-          No tienes gastos fijos. Añade el primero arriba.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {expenses.map((expense) => (
-            <li key={expense.id}>
-              <FixedExpenseRow
-                expense={expense}
-                periodLabel={periodLabel}
-                busy={busy}
-                onUpdate={(input) => onUpdate(expense.id, input)}
-                onArchive={() => onArchive(expense.id)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+        {expenses.length > 0 && (
+          <ul>
+            {expenses.map((expense, i) => (
+              <li
+                key={expense.id}
+                className={i < expenses.length - 1 ? 'border-b-[0.5px] border-separador' : ''}
+              >
+                <FixedExpenseRow
+                  expense={expense}
+                  periodLabel={periodLabel}
+                  busy={busy}
+                  onUpdate={(input) => onUpdate(expense.id, input)}
+                  onArchive={() => onArchive(expense.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {formOpen ? (
+          <form onSubmit={submit} className="flex flex-col gap-2 px-3 py-3">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nombre del gasto…"
+              aria-label="Nombre del gasto fijo"
+              autoFocus
+              disabled={busy}
+              className={campoClass}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="$ 0"
+              aria-label="Monto del gasto fijo"
+              disabled={busy}
+              className={campoClass}
+            />
+            <QuincenaPicker value={quincena} onChange={setQuincena} disabled={busy} />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={!canAdd}
+                className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+              >
+                Guardar
+              </button>
+              <button
+                type="button"
+                onClick={cancelForm}
+                className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setFormOpen(true)}
+            className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador"
+          >
+            <span aria-hidden="true">+</span>
+            <span>Añadir gasto fijo</span>
+          </button>
+        )}
+      </div>
     </section>
   )
 }
