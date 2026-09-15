@@ -14,22 +14,28 @@ import { ActionError, LoadError, Loading } from './ViewState'
  * mínimos, construidos a mano en SVG, igual que el resto de glifos de la app.
  *
  * Hecho / no hecho son un estado bueno/malo, así que les toca la paleta de
- * ESTADO del skill (verde/rojo reservados), no un tono categórico cualquiera —
- * y de paso es el mismo lenguaje que ya usa toda la app. "Sin responder" es el
- * gris neutro de chrome del propio skill (gridline/axis), no un tercer estado
- * con significado. La comparación semana-a-semana usa un solo tono (azul, el
- * slot categórico 1) en dos intensidades: "antes/después por elemento" pide
- * exactamente eso, no dos colores de identidad.
+ * ESTADO del skill — y aquí, además, los tokens de la app (--color-hecho /
+ * --color-fallado), los mismos que usa el resto de las pantallas: un solo
+ * verde y un solo rojo en toda la app, no uno por pantalla. "Sin responder"
+ * usa --color-separador, el gris neutro de chrome que ya usa la app para
+ * líneas y fondos discretos. Los textos del gráfico (INK_*) usan los tokens
+ * de texto de la app por la misma razón.
+ *
+ * La comparación semana-a-semana usa un solo tono (azul, el slot categórico 1
+ * del skill) en dos intensidades: "antes/después por elemento" pide
+ * exactamente eso, no dos colores de identidad. Es el único color de la app
+ * sin token ni oficio asignado todavía — decisión pendiente, fuera de esta
+ * migración — así que se deja como literal.
  */
-const COLOR_DONE = '#0ca30c'
-const COLOR_NOT_DONE = '#d03b3b'
-const COLOR_UNANSWERED = '#e1e0d9'
+const COLOR_DONE = 'var(--color-hecho)'
+const COLOR_NOT_DONE = 'var(--color-fallado)'
+const COLOR_UNANSWERED = 'var(--color-separador)'
 const COLOR_LAST_WEEK = '#86b6ef'
 const COLOR_THIS_WEEK = '#2a78d6'
-const INK_PRIMARY = '#0b0b0b'
-const INK_SECONDARY = '#52514e'
-const INK_MUTED = '#898781'
-const RING = '#ffffff' // el fondo real de la tarjeta que envuelve cada gráfico
+const INK_PRIMARY = 'var(--color-texto)'
+const INK_SECONDARY = 'var(--color-texto-cuerpo)'
+const INK_MUTED = 'var(--color-texto-tenue)'
+const RING = 'var(--color-tarjeta)' // el fondo real de la tarjeta que envuelve cada gráfico
 
 const CHART_WIDTH = 300
 const LABEL_WIDTH = 80
@@ -47,7 +53,7 @@ function pct(stats: { hecho: number; diasTranscurridos: number }): number {
 
 function Legend({ items }: { items: { color: string; label: string }[] }) {
   return (
-    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-texto-apagado">
       {items.map((it) => (
         <span key={it.label} className="inline-flex items-center gap-1.5">
           <span
@@ -134,6 +140,7 @@ function BreakdownChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
                 fontSize="10"
                 fontWeight="600"
                 fill={INK_PRIMARY}
+                className="tabular-nums"
               >
                 {hecho}/{diasTranscurridos}
               </text>
@@ -166,7 +173,7 @@ function ComparisonChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
 
   if (comparable.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500">
+      <p className="rounded-tarjeta border border-dashed border-borde px-4 py-6 text-center text-sm text-texto-apagado">
         Todavía no llevas una semana completa antes de esta. La comparación aparece la
         semana que viene.
       </p>
@@ -210,7 +217,7 @@ function ComparisonChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
                 y1={y}
                 x2={LABEL_WIDTH + trackWidth}
                 y2={y}
-                stroke="#e1e0d9"
+                stroke={COLOR_UNANSWERED}
                 strokeWidth={1}
               />
               <line x1={x1} y1={y} x2={x2} y2={y} stroke={INK_MUTED} strokeWidth={2} strokeLinecap="round" />
@@ -226,7 +233,8 @@ function ComparisonChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
                 dominantBaseline="middle"
                 fontSize="10"
                 fontWeight="600"
-                fill={curPct >= prevPct ? '#006300' : INK_PRIMARY}
+                fill={curPct >= prevPct ? COLOR_DONE : INK_PRIMARY}
+                className="tabular-nums"
               >
                 {curPct}%
               </text>
@@ -241,7 +249,7 @@ function ComparisonChart({ habitos }: { habitos: HabitWeeklyBreakdown[] }) {
         ]}
       />
       {notComparable.length > 0 && (
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-texto-apagado">
           Muy recientes, sin comparar todavía: {notComparable.map((h) => h.habit.name).join(', ')}.
         </p>
       )}
@@ -282,32 +290,38 @@ export default function WeekDashboard() {
   return (
     <section className="mt-8 flex flex-col gap-6">
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Cumplimiento por hábito</h2>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Cumplimiento por hábito</h2>
+        <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
           <BreakdownChart habitos={data.habitos} />
         </div>
       </div>
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Esta semana vs. la anterior</h2>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Esta semana vs. la anterior</h2>
+        <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
           <ComparisonChart habitos={data.habitos} />
         </div>
       </div>
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Explicación</h2>
+        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Explicación</h2>
         {aiError && <ActionError message={aiError} onDismiss={() => setAiError(null)} />}
+        {/*
+         * Aguamarina, no neutro: esta acción llama a la IA, y en esta app
+         * ese color se reserva para lo que la toca (ver --color-ia en
+         * index.css). El mismo criterio que ya usa el aviso de
+         * DayCommentSection.
+         */}
         <button
           type="button"
           onClick={() => void explain()}
           disabled={busy}
-          className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 disabled:opacity-40"
+          className="rounded-campo bg-ia px-4 py-3 text-sm font-medium text-white transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-ia-texto)] disabled:bg-transparent disabled:text-texto-tenue"
         >
           {busy ? 'Analizando…' : 'Explicar mi semana'}
         </button>
         {explanation && (
-          <p className="mt-3 whitespace-pre-wrap rounded-xl border border-gray-200 bg-white p-3 text-gray-800">
+          <p className="mt-3 whitespace-pre-wrap rounded-tarjeta border border-borde bg-tarjeta p-3 text-texto-cuerpo">
             {explanation}
           </p>
         )}
