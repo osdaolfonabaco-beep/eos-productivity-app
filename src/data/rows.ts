@@ -19,6 +19,7 @@ import type {
   HabitEntry,
   Idea,
   IdeaStatus,
+  Income,
   JournalKey,
   JournalNote,
   Payment,
@@ -46,6 +47,7 @@ export const SALARY_PERIOD_COLS = 'id,period_start,period_end,amount,archived,cr
 export const FIXED_EXPENSE_COLS = 'id,name,amount,quincena,archived,created_at'
 export const SAVINGS_GOAL_COLS = 'id,name,target_amount,target_date,archived,created_at'
 export const SAVINGS_CONTRIBUTION_COLS = 'id,goal_id,date,amount,archived,created_at'
+export const INCOME_COLS = 'id,date,amount,category,note,archived,created_at'
 export const JOURNAL_KEY_COLS =
   'id,wrapped_dek_password,salt_password,iv_password,wrapped_dek_recovery,salt_recovery,iv_recovery,created_at,updated_at'
 
@@ -447,6 +449,40 @@ export function savingsContributionToRow(c: SavingsContribution) {
     amount: c.amount,
     archived: c.archived,
     created_at: c.createdAt,
+  }
+}
+
+interface IncomeRow {
+  id: string
+  date: string
+  amount: number | string
+  category: string | null
+  note: string | null
+  archived: boolean
+  created_at: string
+}
+
+export function rowToIncome(r: IncomeRow): Income {
+  return {
+    id: r.id,
+    date: r.date,
+    amount: Number(r.amount),
+    category: r.category,
+    note: r.note,
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function incomeToRow(i: Income) {
+  return {
+    id: i.id,
+    date: i.date,
+    amount: i.amount,
+    category: i.category,
+    note: i.note,
+    archived: i.archived,
+    created_at: i.createdAt,
   }
 }
 

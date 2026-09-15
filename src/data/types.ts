@@ -290,6 +290,29 @@ export interface SavingsContribution {
   archived: boolean
 }
 
+/**
+ * Un ingreso suelto, aparte del sueldo de la quincena (que vive en
+ * `SalaryPeriod`, no aquí — ver el comentario en `getPeriodBreakdown`).
+ * Un ingreso mal registrado se archiva, como `SavingsContribution`.
+ */
+export interface Income {
+  id: string
+  /** Fecha local en formato `YYYY-MM-DD`. */
+  date: string
+  /** Pesos colombianos, entero > 0 y <= 100.000.000.000 (mismo tope que la base). */
+  amount: number
+  /**
+   * Texto libre, no lista cerrada: es personal y abierta (a diferencia de
+   * `Debt.status` o `FixedExpense.quincena`). `null` si no se indicó o si
+   * quedó vacía tras recortar espacios.
+   */
+  category: string | null
+  /** Nota opcional. `null` si no se indicó o si quedó vacía tras recortar. */
+  note: string | null
+  createdAt: string
+  archived: boolean
+}
+
 // --- Cifrado del diario -----------------------------------------------
 
 /**

@@ -73,6 +73,16 @@ body {
   /* Superficie de marca, solo para fondos, nunca para estados */
   --color-rosa-suave: #FBD3E6;
 
+  /*
+   * Paleta de categorías de Ingresos (los tonos de las letras del
+   * logotipo, ver src/assets/eos-logotipo.svg). Un color más de marca,
+   * nunca de estado: por eso no se llaman "verde"/"rojo" aunque el matiz
+   * se le acerque — --color-hecho ya es el verde de "cumplido", y una
+   * categoría de ingreso no es un estado.
+   */
+  --color-marca-cian: #5EC8E5;
+  --color-marca-menta: #4FD1B5;
+
   /* Neutros */
   --color-texto: #14161F;
   --color-texto-cuerpo: #3A3F4E;

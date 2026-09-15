@@ -163,6 +163,12 @@ export default function PeriodSection({
                 </button>
               </dd>
             </div>
+            {breakdown.incomesTotal > 0 && (
+              <div className="flex justify-between gap-2 border-b-[0.5px] border-separador py-2 text-texto-cuerpo">
+                <dt>Ingresos extra de esta quincena</dt>
+                <dd className="tabular-nums">+ {formatCOP(breakdown.incomesTotal)}</dd>
+              </div>
+            )}
             <div className="flex justify-between gap-2 border-b-[0.5px] border-separador py-2 text-texto-cuerpo">
               <dt>Gastos fijos de esta quincena</dt>
               <dd className="tabular-nums">− {formatCOP(breakdown.fixedExpensesTotal)}</dd>

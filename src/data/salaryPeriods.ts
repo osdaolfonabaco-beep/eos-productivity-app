@@ -10,6 +10,7 @@
 
 import { isISODate, quincenaLabel } from './dates'
 import { fixedExpensesForQuincena, listFixedExpenses, sumFixedExpenses } from './fixedExpenses'
+import { listIncomes, sumIncomes } from './incomes'
 import {
   PAYMENT_COLS,
   rowToPayment,
@@ -18,7 +19,7 @@ import {
   salaryPeriodToRow,
 } from './rows'
 import { supabase, unwrap } from './supabase'
-import type { FixedExpense, Payment, SalaryPeriod } from './types'
+import type { FixedExpense, Income, Payment, SalaryPeriod } from './types'
 
 /** El sueldo registrado para la quincena que empieza en `periodStart`, o `undefined`. */
 export async function getSalaryPeriod(periodStart: string): Promise<SalaryPeriod | undefined> {
@@ -99,18 +100,20 @@ async function getPaymentsInRange(start: string, end: string): Promise<Payment[]
 export interface PeriodBreakdown {
   /** `undefined` si aún no se ha registrado el sueldo de esta quincena. */
   salary: SalaryPeriod | undefined
+  incomes: Income[]
+  incomesTotal: number
   fixedExpenses: FixedExpense[]
   fixedExpensesTotal: number
   debtPayments: Payment[]
   debtPaymentsTotal: number
-  /** Sueldo − gastos fijos aplicables − pagos a deudas. 0 si no hay sueldo registrado. */
+  /** Sueldo (0 si no hay) + ingresos extra − gastos fijos aplicables − pagos a deudas. Puede dar negativo. */
   available: number
 }
 
 /**
- * El desglose completo de una quincena: sueldo, gastos fijos que le aplican y
- * pagos a deudas hechos dentro de ese rango. Todo se calcula aquí; nada de
- * esto se guarda.
+ * El desglose completo de una quincena: sueldo, ingresos extra, gastos fijos
+ * que le aplican y pagos a deudas hechos dentro de ese rango. Todo se calcula
+ * aquí; nada de esto se guarda.
  */
 export async function getPeriodBreakdown(
   periodStart: string,
@@ -118,22 +121,36 @@ export async function getPeriodBreakdown(
 ): Promise<PeriodBreakdown> {
   const label = quincenaLabel(periodStart)
 
-  const [salary, allFixedExpenses, debtPayments] = await Promise.all([
+  const [salary, incomes, allFixedExpenses, debtPayments] = await Promise.all([
     getSalaryPeriod(periodStart),
+    listIncomes(periodStart, periodEnd),
     listFixedExpenses(),
     getPaymentsInRange(periodStart, periodEnd),
   ])
 
+  const incomesTotal = sumIncomes(incomes)
   const fixedExpenses = fixedExpensesForQuincena(allFixedExpenses, label)
   const fixedExpensesTotal = sumFixedExpenses(fixedExpenses)
   const debtPaymentsTotal = debtPayments.reduce((total, p) => total + p.amount, 0)
 
   return {
     salary,
+    incomes,
+    incomesTotal,
     fixedExpenses,
     fixedExpensesTotal,
     debtPayments,
     debtPaymentsTotal,
-    available: salary ? salary.amount - fixedExpensesTotal - debtPaymentsTotal : 0,
+    // OJO al volver a este archivo dentro de un año: el sueldo vive en
+    // `salary_periods`, nunca en `incomes` (ver el comentario en la cabecera
+    // de incomes.ts). `salary?.amount ?? 0` es la ÚNICA vez que el sueldo
+    // entra en esta cuenta — si `incomes` alguna vez empezara a incluir el
+    // sueldo, hay que QUITARLO de aquí, no sumarlo también: sumar las dos
+    // fuentes duplicaría el sueldo y el disponible saldría inflado.
+    // Sin sueldo registrado, cuenta como 0 (no como "disponible = 0"): con
+    // ingresos extra y sin sueldo el resultado puede ser positivo, y con
+    // gastos/pagos que superan lo que sí entró puede dar negativo — los dos
+    // casos son correctos y PeriodSection ya pinta el negativo en rojo.
+    available: (salary?.amount ?? 0) + incomesTotal - fixedExpensesTotal - debtPaymentsTotal,
   }
 }

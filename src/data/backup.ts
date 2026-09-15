@@ -3,6 +3,11 @@
  *
  * "Exportar" y "reemplazar" trabajan contra Supabase (`async`). "Copia local"
  * lee lo que quedó en `localStorage` de antes de la migración (síncrono).
+ *
+ * TODO: no cubre ninguna tabla de Dinero — faltan `salary_periods`,
+ * `fixed_expenses`, `debts`, `payments`, `savings_goal`,
+ * `savings_contributions` e `incomes`. Es un hueco anterior a `incomes`, no
+ * algo que este archivo haya roto; queda anotado para no perderlo.
  */
 
 import {

@@ -30,6 +30,7 @@ export type {
   FixedExpense,
   SavingsGoal,
   SavingsContribution,
+  Income,
 } from './types'
 
 export {
@@ -197,3 +198,7 @@ export {
   sumContributions,
   savingsProgress,
 } from './savingsContributions'
+
+export type { IncomeInput } from './incomes'
+
+export { listIncomes, createIncome, updateIncome, archiveIncome, sumIncomes } from './incomes'
