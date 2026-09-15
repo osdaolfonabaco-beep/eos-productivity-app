@@ -98,15 +98,29 @@ export default function HabitRow({ name, status, onCycle }: HabitRowProps) {
       type="button"
       onClick={onCycle}
       aria-label={`${name}, ${meta.label.toLowerCase()}. Tocar para cambiar a ${meta.nextLabel}.`}
-      className={`flex min-h-11 w-full items-center gap-3 border-l-[3px] py-3 pl-4 pr-4 text-left transition-opacity active:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${meta.stripe}`}
+      className={`flex min-h-11 w-full items-center gap-3 border-l-[3px] py-3 pl-4 pr-4 text-left active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${meta.stripe}`}
+      style={{
+        // Dos duraciones en la misma fila: el hundimiento al tocar (transform,
+        // background-color) responde casi al instante; el color de la franja
+        // izquierda, que refleja el estado, usa la transición más pausada.
+        transition:
+          'transform var(--dur-toque) var(--ease-toque), ' +
+          'background-color var(--dur-toque) var(--ease-toque), ' +
+          'border-color var(--dur-estado) var(--ease-salida)',
+      }}
     >
       <span
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${meta.badge}`}
+        key={status}
+        className={`flex h-6 w-6 shrink-0 animate-entrada-indicador items-center justify-center rounded-full border-2 ${meta.badge}`}
         aria-hidden="true"
       >
         <Glyph status={status} />
       </span>
-      <span className={`min-w-0 flex-1 break-words text-contenido ${meta.name}`}>{name}</span>
+      <span
+        className={`min-w-0 flex-1 break-words text-contenido transition-colors duration-[var(--dur-estado)] ease-salida ${meta.name}`}
+      >
+        {name}
+      </span>
     </button>
   )
 }

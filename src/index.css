@@ -101,6 +101,35 @@ body {
   --radius-pastilla: 999px;
 
   /*
+   * Movimiento y profundidad.
+   *
+   * Duraciones y sombras (--dur-*, --sombra-*) no caen en ningún namespace
+   * de utilidades de Tailwind: son variables CSS de consulta, para usar con
+   * `var()` en valores arbitrarios (ej. `duration-[var(--dur-toque)]`,
+   * `shadow-[var(--sombra-tarjeta)]`), igual que --fondo-app más abajo.
+   *
+   * --ease-* sí cae en el namespace de Tailwind para `ease-*`, así que
+   * además de quedar como variable también genera las utilidades
+   * `ease-salida` y `ease-toque` directamente.
+   */
+  --dur-toque: 120ms;
+  --dur-estado: 260ms;
+  --dur-entrada: 320ms;
+
+  --ease-salida: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-toque: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --sombra-tarjeta:
+    0 1px 2px rgba(20, 22, 31, 0.04),
+    0 8px 24px -8px rgba(20, 22, 31, 0.06);
+  --sombra-principal:
+    0 2px 4px rgba(123, 90, 240, 0.12),
+    0 12px 28px -8px rgba(123, 90, 240, 0.22);
+
+  /* Animación de entrada del indicador de estado del hábito (ver HabitRow). */
+  --animate-entrada-indicador: entrada-indicador var(--dur-estado) var(--ease-salida);
+
+  /*
    * Fondo de la app: pila de degradados radiales sobre un color de
    * respaldo. No se usa el namespace --background-image-* de Tailwind
    * porque ese namespace solo admite imágenes, no un color sólido al
@@ -115,4 +144,39 @@ body {
   		radial-gradient(67% 59% at 96% 4%, #F4F0FE 0%, transparent 89%),
   		radial-gradient(67% 59% at 4% 96%, #EFFAF4 0%, transparent 89%),
   		#FBFEFE;
+}
+
+/*
+ * Entrada del indicador de estado (el disco con el check/la equis) en
+ * HabitRow: arranca pequeño y algo transparente, se pasa de tamaño y se
+ * asienta. Se dispara remontando el elemento (key={status}) cada vez que
+ * cambia el estado del hábito, ver HabitRow.tsx.
+ */
+@keyframes entrada-indicador {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/*
+ * Respeta la preferencia del sistema de reducir el movimiento: todas las
+ * animaciones y transiciones (de este cambio y de cualquiera futura) pasan
+ * a ser prácticamente instantáneas. No es opcional.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

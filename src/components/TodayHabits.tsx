@@ -97,7 +97,7 @@ export default function TodayHabits() {
           <p className="mb-2 text-etiqueta uppercase text-texto-tenue">
             Hábitos · {hechos} de {habits.length}
           </p>
-          <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta">
+          <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
             <ul>
               {habits.map((h, i) => (
                 <li
