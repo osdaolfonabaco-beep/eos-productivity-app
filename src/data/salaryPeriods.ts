@@ -39,6 +39,21 @@ export async function getSalaryPeriod(periodStart: string): Promise<SalaryPeriod
 /**
  * Registra el sueldo de una quincena, o lo corrige si ya había uno (una fila
  * por `periodStart`).
+ *
+ * EXCEPCIÓN DELIBERADA al patrón de archivado del resto de la app: esta
+ * función SÍ reactiva una fila archivada (le pone `archived: false`), algo
+ * que ninguna otra función de este proyecto hace. Por qué: `salary_periods`
+ * tiene `unique (user_id, period_start)` SIN filtrar por `archived` — a
+ * diferencia de `savings_goal`, que sí usa un índice único parcial
+ * (`where not archived`). Eso significa que si se quita el sueldo de una
+ * quincena (`archiveSalaryPeriod`), la fila archivada sigue ocupando esa
+ * `period_start` para siempre. Si esta función buscara solo entre las no
+ * archivadas (como `getSalaryPeriod`), no encontraría esa fila y trataría de
+ * INSERTAR una nueva con la misma `period_start` — y esa restricción única
+ * la rechazaría. Por eso busca CUALQUIER fila con ese `period_start`, sin
+ * filtrar por `archived`, y si la encuentra la reactiva y corrige en vez de
+ * insertar. NO "corrijas" esto volviendo a filtrar por `archived: false`:
+ * eso reintroduce el fallo de no poder volver a poner un sueldo que se quitó.
  */
 export async function setSalaryAmount(
   periodStart: string,
@@ -53,12 +68,21 @@ export async function setSalaryAmount(
   }
   const roundedAmount = Math.round(amount)
 
-  const existing = await getSalaryPeriod(periodStart)
+  const existingRows = unwrap(
+    await supabase
+      .from('salary_periods')
+      .select(SALARY_PERIOD_COLS)
+      .eq('period_start', periodStart)
+      .limit(1),
+    'setSalaryAmount (buscar)',
+  )
+  const existing = existingRows[0]
+
   if (existing) {
     const rows = unwrap(
       await supabase
         .from('salary_periods')
-        .update({ amount: roundedAmount })
+        .update({ period_end: periodEnd, amount: roundedAmount, archived: false })
         .eq('id', existing.id)
         .select(SALARY_PERIOD_COLS),
       'setSalaryAmount (editar)',
@@ -79,6 +103,17 @@ export async function setSalaryAmount(
     'setSalaryAmount (crear)',
   )
   return rowToSalaryPeriod(rows[0])
+}
+
+/**
+ * Quita el sueldo de una quincena (el botón dice "Quitar sueldo"; por dentro
+ * archiva, no borra — mismo patrón que el resto de la app). Afecta solo a
+ * esta fila, o sea solo a esa quincena. Idempotente. Ver el comentario de
+ * `setSalaryAmount` para cómo se vuelve a poner después.
+ */
+export async function archiveSalaryPeriod(id: string): Promise<void> {
+  const res = await supabase.from('salary_periods').update({ archived: true }).eq('id', id)
+  if (res.error) throw new Error(`archiveSalaryPeriod: ${res.error.message}`)
 }
 
 // --- Disponible del período (derivado) --------------------------------

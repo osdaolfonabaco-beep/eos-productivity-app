@@ -168,7 +168,12 @@ export { readLocalCounts, uploadLocalData } from './migrate'
 
 export type { PeriodBreakdown } from './salaryPeriods'
 
-export { getSalaryPeriod, setSalaryAmount, getPeriodBreakdown } from './salaryPeriods'
+export {
+  getSalaryPeriod,
+  setSalaryAmount,
+  archiveSalaryPeriod,
+  getPeriodBreakdown,
+} from './salaryPeriods'
 
 export type { FixedExpenseInput } from './fixedExpenses'
 

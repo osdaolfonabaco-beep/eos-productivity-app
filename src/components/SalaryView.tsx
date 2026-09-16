@@ -4,6 +4,7 @@ import {
   addDays,
   archiveContribution,
   archiveFixedExpense,
+  archiveSalaryPeriod,
   archiveSavingsGoal,
   createFixedExpense,
   createSavingsGoal,
@@ -112,6 +113,13 @@ export default function SalaryView() {
             'No se pudo guardar el sueldo.',
           )
         }
+        onRemoveSalary={() => {
+          if (!breakdown.salary) return
+          void run(
+            () => archiveSalaryPeriod(breakdown.salary!.id),
+            'No se pudo quitar el sueldo.',
+          )
+        }}
       />
 
       <FixedExpensesSection

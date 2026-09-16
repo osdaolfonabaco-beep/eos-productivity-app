@@ -14,6 +14,8 @@ interface PeriodSectionProps {
   onNext: () => void
   onGoToToday: () => void
   onSetSalary: (amount: number) => void
+  /** Solo se llama cuando ya hay un sueldo registrado (el menú "⋯" no aparece si no). */
+  onRemoveSalary: () => void
 }
 
 const QUINCENA_TITLE: Record<'primera' | 'segunda', string> = {
@@ -52,9 +54,12 @@ export default function PeriodSection({
   onNext,
   onGoToToday,
   onSetSalary,
+  onRemoveSalary,
 }: PeriodSectionProps) {
   const salary = breakdown.salary
   const [editing, setEditing] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [draft, setDraft] = useState(salary ? String(salary.amount) : '')
 
   const draftAmount = parsePesos(draft)
@@ -65,6 +70,12 @@ export default function PeriodSection({
     if (!canSave || draftAmount === null) return
     onSetSalary(draftAmount)
     setEditing(false)
+  }
+
+  function startEdit() {
+    if (!salary) return
+    setDraft(String(salary.amount))
+    setEditing(true)
   }
 
   const negative = salary !== undefined && breakdown.available < 0
@@ -145,6 +156,33 @@ export default function PeriodSection({
               )}
             </div>
           </form>
+        ) : confirmingRemove ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-texto-apagado">
+              Se quitará el sueldo de esta quincena. Solo afecta a esta quincena y se puede volver
+              a poner.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onRemoveSalary()
+                  setConfirmingRemove(false)
+                }}
+                disabled={busy}
+                className="rounded-campo bg-acento px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-acento-toque)] active:shadow-[var(--sombra-acento-toque)] disabled:opacity-40"
+              >
+                Quitar sueldo
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingRemove(false)}
+                className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         ) : (
           <dl className="flex flex-col text-sm">
             <div className="flex items-baseline justify-between gap-2 border-b-[0.5px] border-separador pb-2">
@@ -153,16 +191,39 @@ export default function PeriodSection({
                 {formatCOP(salary.amount)}
                 <button
                   type="button"
-                  onClick={() => {
-                    setDraft(String(salary.amount))
-                    setEditing(true)
-                  }}
-                  className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-xs font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                  onClick={() => setMenuOpen((open) => !open)}
+                  aria-expanded={menuOpen}
+                  aria-label="Más acciones para el sueldo"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-campo text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
                 >
-                  Editar
+                  ⋯
                 </button>
               </dd>
             </div>
+            {menuOpen && (
+              <div className="flex gap-4 border-b-[0.5px] border-separador pb-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    startEdit()
+                  }}
+                  className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setConfirmingRemove(true)
+                  }}
+                  className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                >
+                  Quitar sueldo
+                </button>
+              </div>
+            )}
             {breakdown.incomesTotal > 0 && (
               <div className="flex justify-between gap-2 border-b-[0.5px] border-separador py-2 text-texto-cuerpo">
                 <dt>Ingresos extra de esta quincena</dt>
