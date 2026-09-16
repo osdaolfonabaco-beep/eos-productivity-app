@@ -213,6 +213,68 @@ body {
   --sombra-pastilla: 0 1px 2px rgba(20, 22, 31, 0.10);
   --sombra-pastilla-toque: 0 1px 1px rgba(20, 22, 31, 0.06);
 
+  /*
+   * Degradados, siempre de abajo hacia arriba: el tono más oscuro se
+   * asienta abajo, el más claro "sale a la luz" arriba. Ningún botón ni
+   * indicador de estado se queda plano ni negro (ver README de este paso).
+   *
+   * --grad-calido: la acción principal de la pantalla en la que estás
+   * (como mucho una por pantalla) y la pastilla seleccionada de SectionNav.
+   * --grad-secundario: Guardar de formularios y demás acciones que hoy son
+   * bg-texto/bg-gray-900/bg-acento pero no son la acción principal.
+   * --grad-hecho / --grad-fallado: botones y pastillas CON TEXTO que
+   * signifiquen esos estados (ej. "Cumplida"/"No cumplida").
+   * --grad-neutro: Cancelar y demás botones neutros que ya llevan borde.
+   */
+  --grad-calido: linear-gradient(to top, #DD5A1C, #CE2F7C);
+  --grad-secundario: linear-gradient(to top, #4C33BE, #1C9BD6);
+  --grad-hecho: linear-gradient(to top, #04704F, #0FBE7E);
+  --grad-fallado: linear-gradient(to top, #A81B1F, #DE6321);
+  --grad-neutro: linear-gradient(to top, #EDEFF3, #FFFFFF);
+
+  /*
+   * Degradados de INDICADOR: el neón completo, solo para círculos, celdas
+   * y pastillas de estado pequeñas sin texto largo (el disco de hábito, la
+   * casilla de tarea, el círculo de "hoy" en Semana). Nunca detrás de
+   * texto, y nunca en la cuadrícula de Semana entera: decenas de celdas en
+   * neón serían ruido, así que esa cuadrícula se queda con sus lavados
+   * pálidos de siempre.
+   */
+  --grad-ind-hecho: linear-gradient(to top, #047857, #35EFA3);
+  --grad-ind-fallado: linear-gradient(to top, #B4231F, #FF9340);
+  --grad-ind-acento: linear-gradient(to top, #5B3FD1, #28D9FF);
+
+  /*
+   * Sombras de color a juego con cada degradado cálido/indicador: van con
+   * el tono BRILLANTE (el de arriba), no con el oscuro — es lo que hace
+   * que el botón parezca encendido en vez de solo teñido. Cada una lleva
+   * su versión encogida para :active, mismo criterio que --sombra-hecho
+   * -toque y las demás de arriba: se cae la capa más lejana y la que
+   * queda pierde intensidad.
+   */
+  --sombra-calido:
+    0 2px 5px rgba(206, 47, 124, 0.34),
+    0 10px 20px -6px rgba(221, 90, 28, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --sombra-calido-toque:
+    0 1px 3px rgba(206, 47, 124, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+
+  --sombra-ind-hecho:
+    0 1px 3px rgba(4, 120, 87, 0.40),
+    0 6px 13px -4px rgba(53, 239, 163, 0.55);
+  --sombra-ind-hecho-toque: 0 1px 3px rgba(4, 120, 87, 0.30);
+
+  --sombra-ind-fallado:
+    0 1px 3px rgba(180, 35, 31, 0.40),
+    0 6px 13px -4px rgba(255, 147, 64, 0.55);
+  --sombra-ind-fallado-toque: 0 1px 3px rgba(180, 35, 31, 0.30);
+
+  --sombra-ind-acento:
+    0 1px 3px rgba(91, 63, 209, 0.40),
+    0 6px 13px -4px rgba(40, 217, 255, 0.55);
+  --sombra-ind-acento-toque: 0 1px 3px rgba(91, 63, 209, 0.30);
+
   --sombra-principal:
     0 2px 6px rgba(123, 90, 240, 0.18),
     0 10px 20px -4px rgba(123, 90, 240, 0.22),
