@@ -1,4 +1,3 @@
-import { useId } from 'react'
 import { formatCOP } from '../money'
 import { useMounted } from '../useMounted'
 
@@ -11,11 +10,12 @@ export interface QuincenaTotal {
 }
 
 const CHART_HEIGHT = 72
-const BAR_WIDTH = 28
-const GAP = 14
-// Línea mínima en la base cuando una quincena no tiene datos: nunca un hueco,
-// mismo criterio que el anillo de progreso en 0% (ver ProgressRing).
-const MIN_BAR_HEIGHT = 3
+// Gris azulado neutro para las quincenas pasadas con datos: no hay token de
+// este tono en el sistema (los --color-marca-* son para categorías, no para
+// esto), así que va puntual — mismo criterio que ya usa ProgressRing para su
+// filtro con un color fuera de @theme.
+const NEUTRAL_GRADIENT = 'linear-gradient(to bottom, #94A3B8, #64748B)'
+const CURRENT_GRADIENT = 'linear-gradient(to bottom, var(--color-acento), var(--color-acento-toque))'
 
 /** `2026-09-16` → `16 sept`. Solo para el tooltip de cada barra. */
 function formatShortDate(iso: string): string {
@@ -25,66 +25,48 @@ function formatShortDate(iso: string): string {
 
 /**
  * Barras verticales de las últimas 6 quincenas (la más antigua a la
- * izquierda, la actual a la derecha). Cada barra crece desde la base al
- * montar, con 60ms de desfase respecto a la anterior — misma técnica que las
- * barras horizontales de `WeekDashboard`, pero animando `scaleY` con origen
- * abajo en vez de `scaleX` con origen a la izquierda.
+ * izquierda, la actual a la derecha). Cada quincena tiene un carril de fondo
+ * permanente (hundido, altura completa) para que una quincena sin datos se
+ * lea como un hueco vacío y no como un error; la barra de datos crece dentro
+ * del carril, apoyada abajo, desde cero al montar — 60ms de desfase respecto
+ * a la anterior, mismo criterio que las barras horizontales de
+ * `WeekDashboard`.
  */
 export default function IncomeQuincenaChart({ history }: { history: QuincenaTotal[] }) {
   const mounted = useMounted()
-  const filterId = useId()
   const max = Math.max(1, ...history.map((h) => h.total))
-  const width = history.length * BAR_WIDTH + (history.length - 1) * GAP
 
   return (
-    <svg
-      viewBox={`0 0 ${width} ${CHART_HEIGHT}`}
-      width="100%"
-      height={CHART_HEIGHT}
+    <div
       role="img"
       aria-label="Entradas de las últimas 6 quincenas, la actual a la derecha"
-      className="mt-4"
+      className="mt-4 flex items-end gap-3"
+      style={{ height: CHART_HEIGHT }}
     >
-      <defs>
-        {/*
-          Aproximación de --sombra-acento como filtro SVG (box-shadow no
-          aplica a formas SVG). El color se repite en hex a propósito, como ya
-          hace ProgressRing con su resplandor: un filtro SVG no resuelve
-          var(--color-acento) de forma fiable en flood-color.
-        */}
-        <filter id={filterId} x="-60%" y="-60%" width="220%" height="220%">
-          <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#7B5AF0" floodOpacity="0.4" />
-        </filter>
-      </defs>
-      {history.map((h, i) => {
-        const x = i * (BAR_WIDTH + GAP)
-        const targetHeight = Math.max(MIN_BAR_HEIGHT, (h.total / max) * (CHART_HEIGHT - 4))
-        return (
-          <g
-            key={h.start}
-            style={{
-              transform: mounted ? 'scaleY(1)' : 'scaleY(0)',
-              transformOrigin: `${x + BAR_WIDTH / 2}px ${CHART_HEIGHT}px`,
-              transitionProperty: 'transform',
-              transitionDuration: 'var(--dur-entrada)',
-              transitionTimingFunction: 'var(--ease-salida)',
-              transitionDelay: `${i * 60}ms`,
-            }}
-          >
-            <rect
-              x={x}
-              y={CHART_HEIGHT - targetHeight}
-              width={BAR_WIDTH}
-              height={targetHeight}
-              rx={4}
-              fill={h.isCurrent ? 'var(--color-acento)' : 'var(--color-separador)'}
-              filter={h.isCurrent ? `url(#${filterId})` : undefined}
-            >
-              <title>{`${formatShortDate(h.start)}: ${formatCOP(h.total)}`}</title>
-            </rect>
-          </g>
-        )
-      })}
-    </svg>
+      {history.map((h, i) => (
+        <div
+          key={h.start}
+          className="relative h-full flex-1 overflow-hidden rounded-[6px] shadow-[var(--sombra-hundida)]"
+          style={{ backgroundColor: 'var(--color-separador)' }}
+        >
+          {h.total > 0 && (
+            <div
+              title={`${formatShortDate(h.start)}: ${formatCOP(h.total)}`}
+              className="absolute inset-x-0 bottom-0 origin-bottom rounded-[6px]"
+              style={{
+                height: `${(h.total / max) * 100}%`,
+                background: h.isCurrent ? CURRENT_GRADIENT : NEUTRAL_GRADIENT,
+                boxShadow: h.isCurrent ? 'var(--sombra-acento)' : undefined,
+                transform: mounted ? 'scaleY(1)' : 'scaleY(0)',
+                transitionProperty: 'transform',
+                transitionDuration: 'var(--dur-entrada)',
+                transitionTimingFunction: 'var(--ease-salida)',
+                transitionDelay: `${i * 60}ms`,
+              }}
+            />
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
