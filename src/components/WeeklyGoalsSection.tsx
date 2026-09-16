@@ -184,10 +184,10 @@ function GoalRow({ goal, updates, busy, onSaveText, onSetResult, onArchive, onAd
               onClick={() => onSetResult(goal.resultado === 'cumplida' ? null : 'cumplida')}
               aria-pressed={goal.resultado === 'cumplida'}
               disabled={busy}
-              className={`rounded-pastilla px-3 py-1 text-xs font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-60 ${
+              className={`rounded-pastilla px-3 py-1 text-xs font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] ${
                 goal.resultado === 'cumplida'
-                  ? 'bg-[image:var(--grad-hecho)] text-white shadow-[var(--sombra-hecho)] active:shadow-[var(--sombra-hecho-toque)]'
-                  : 'border border-borde text-texto-apagado active:bg-separador'
+                  ? 'bg-[image:var(--grad-hecho)] text-white shadow-[var(--sombra-hecho)] active:shadow-[var(--sombra-hecho-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none'
+                  : 'border border-borde text-texto-apagado active:bg-separador disabled:opacity-60'
               }`}
             >
               Cumplida
@@ -197,10 +197,10 @@ function GoalRow({ goal, updates, busy, onSaveText, onSetResult, onArchive, onAd
               onClick={() => onSetResult(goal.resultado === 'no-cumplida' ? null : 'no-cumplida')}
               aria-pressed={goal.resultado === 'no-cumplida'}
               disabled={busy}
-              className={`rounded-pastilla px-3 py-1 text-xs font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-60 ${
+              className={`rounded-pastilla px-3 py-1 text-xs font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] ${
                 goal.resultado === 'no-cumplida'
-                  ? 'bg-[image:var(--grad-fallado)] text-white shadow-[var(--sombra-fallado)] active:shadow-[var(--sombra-fallado-toque)]'
-                  : 'border border-borde text-texto-apagado active:bg-separador'
+                  ? 'bg-[image:var(--grad-fallado)] text-white shadow-[var(--sombra-fallado)] active:shadow-[var(--sombra-fallado-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none'
+                  : 'border border-borde text-texto-apagado active:bg-separador disabled:opacity-60'
               }`}
             >
               No cumplida

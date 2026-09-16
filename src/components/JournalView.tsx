@@ -143,7 +143,7 @@ function PastNote({
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+              className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
             >
               Cancelar
             </button>
@@ -288,7 +288,7 @@ function NoteEditor({
               type="button"
               onClick={onCancel}
               disabled={busy}
-              className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador disabled:opacity-40"
+              className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:border-transparent disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue"
             >
               Cancelar
             </button>

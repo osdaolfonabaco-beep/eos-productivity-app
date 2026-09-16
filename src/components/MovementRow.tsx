@@ -179,7 +179,7 @@ export default function MovementRow({
           <button
             type="button"
             onClick={() => setMode('view')}
-            className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+            className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
           >
             Cancelar
           </button>
@@ -204,7 +204,7 @@ export default function MovementRow({
           <button
             type="button"
             onClick={() => setMode('view')}
-            className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+            className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
           >
             Cancelar
           </button>

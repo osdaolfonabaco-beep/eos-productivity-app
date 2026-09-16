@@ -125,7 +125,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
         <button
           type="button"
           onClick={onEdit}
-          className="rounded-campo border border-borde px-3 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+          className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-3 py-2 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
         >
           Editar
         </button>
@@ -233,7 +233,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
                         <button
                           type="button"
                           onClick={() => setConfirmingPaymentId(null)}
-                          className="rounded-campo border border-borde px-4 py-2 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                          className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-2 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
                         >
                           Cancelar
                         </button>
@@ -280,7 +280,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
               <button
                 type="button"
                 onClick={() => setConfirmingArchive(false)}
-                className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+                className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
               >
                 Cancelar
               </button>
@@ -290,7 +290,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
           <button
             type="button"
             onClick={() => setConfirmingArchive(true)}
-            className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+            className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
           >
             Archivar deuda
           </button>

@@ -499,7 +499,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+            className="w-full rounded-lg border border-gray-300 bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-gray-700 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
           >
             Importar datos
           </button>
@@ -585,7 +585,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
                     type="button"
                     onClick={resetImport}
                     disabled={replaceBusy}
-                    className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 disabled:opacity-40"
+                    className="rounded-lg border border-gray-300 bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-gray-700 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:border-transparent disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue"
                   >
                     Cancelar
                   </button>
@@ -627,7 +627,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
               onClick={() =>
                 downloadJSON(`productividad-local-${todayISO()}.json`, exportLocal())
               }
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+              className="w-full rounded-lg border border-gray-300 bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-gray-700 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
             >
               Descargar copia local
             </button>
@@ -668,7 +668,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
                   <button
                     type="button"
                     onClick={() => setConfirmingClear(false)}
-                    className="rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+                    className="rounded-lg border border-gray-300 bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-gray-700 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
                   >
                     Cancelar
                   </button>
@@ -710,10 +710,10 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
                 onClick={() => void chooseTone(opt.value)}
                 disabled={tone === null || toneBusy}
                 aria-pressed={active}
-                className={`rounded-lg border px-4 py-3 text-left transition-[background-color,box-shadow] duration-[var(--dur-toque)] ease-toque disabled:opacity-60 ${
+                className={`rounded-lg border px-4 py-3 text-left transition-[background-color,box-shadow] duration-[var(--dur-toque)] ease-toque ${
                   active
-                    ? 'border-transparent bg-[image:var(--grad-secundario)] text-white shadow-[var(--sombra-acento)]'
-                    : 'border-gray-300 text-gray-700'
+                    ? 'border-transparent bg-[image:var(--grad-secundario)] text-white shadow-[var(--sombra-acento)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none'
+                    : 'border-gray-300 text-gray-700 disabled:opacity-60'
                 }`}
               >
                 <span className="block text-sm font-medium">{opt.label}</span>
@@ -796,7 +796,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
                   type="button"
                   onClick={() => void testPush()}
                   disabled={pushBusy}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 disabled:opacity-40"
+                  className="w-full rounded-lg border border-gray-300 bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-gray-700 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:border-transparent disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue"
                 >
                   {pushBusy ? 'Enviando…' : 'Enviar aviso de prueba'}
                 </button>
@@ -825,7 +825,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
         <button
           type="button"
           onClick={() => void signOut()}
-          className="mt-3 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700"
+          className="mt-3 rounded-lg border border-gray-300 bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-gray-700 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
         >
           Cerrar sesión
         </button>

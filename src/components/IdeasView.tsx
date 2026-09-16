@@ -55,14 +55,14 @@ function ArchivedIdeaRow({
             <button
               type="button"
               onClick={() => onReopen('pendiente')}
-              className="rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600"
+              className="rounded-full border border-gray-300 bg-[image:var(--grad-neutro)] px-3 py-1 text-xs font-medium text-gray-600 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
             >
               Pendiente
             </button>
             <button
               type="button"
               onClick={() => onReopen('en-marcha')}
-              className="rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600"
+              className="rounded-full border border-gray-300 bg-[image:var(--grad-neutro)] px-3 py-1 text-xs font-medium text-gray-600 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
             >
               En marcha
             </button>

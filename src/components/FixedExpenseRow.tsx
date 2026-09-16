@@ -44,10 +44,10 @@ export function QuincenaPicker({
             onClick={() => onChange(opt.value)}
             disabled={disabled}
             aria-pressed={active}
-            className={`flex-1 rounded-campo px-2 py-2 text-xs font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-60 ${
+            className={`flex-1 rounded-campo px-2 py-2 text-xs font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] ${
               active
-                ? 'bg-[image:var(--grad-secundario)] text-white shadow-[var(--sombra-acento)] active:shadow-[var(--sombra-acento-toque)]'
-                : 'border border-borde text-texto-apagado active:bg-separador'
+                ? 'bg-[image:var(--grad-secundario)] text-white shadow-[var(--sombra-acento)] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none'
+                : 'border border-borde text-texto-apagado active:bg-separador disabled:opacity-60'
             }`}
           >
             {opt.label}
@@ -142,7 +142,7 @@ export default function FixedExpenseRow({
           <button
             type="button"
             onClick={() => setMode('view')}
-            className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+            className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
           >
             Cancelar
           </button>
@@ -168,7 +168,7 @@ export default function FixedExpenseRow({
           <button
             type="button"
             onClick={() => setMode('view')}
-            className="rounded-campo border border-borde px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+            className="rounded-campo border border-borde bg-[image:var(--grad-neutro)] px-4 py-3 text-sm font-medium text-texto-apagado transition-[transform] duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
           >
             Cancelar
           </button>

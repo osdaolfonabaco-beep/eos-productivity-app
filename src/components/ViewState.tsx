@@ -13,7 +13,7 @@ export function LoadError({ onRetry }: { onRetry: () => void }) {
       <button
         type="button"
         onClick={onRetry}
-        className="mt-3 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700"
+        className="mt-3 rounded-lg border border-gray-300 bg-[image:var(--grad-neutro)] px-4 py-2 text-sm font-medium text-gray-700 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
       >
         Reintentar
       </button>
