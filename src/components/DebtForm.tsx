@@ -31,7 +31,7 @@ function StatusButton({
       aria-pressed={active}
       className={`flex-1 rounded-campo px-4 py-3 text-sm font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] ${
         active
-          ? 'bg-acento text-white shadow-[var(--sombra-acento)] active:bg-[var(--color-acento-toque)]'
+          ? 'bg-[image:var(--grad-secundario)] text-white shadow-[var(--sombra-acento)] active:shadow-[var(--sombra-acento-toque)]'
           : 'border border-borde text-texto-apagado active:bg-separador'
       }`}
     >
@@ -139,7 +139,7 @@ export default function DebtForm({ initial, onSubmit, onCancel }: DebtFormProps)
         <button
           type="submit"
           disabled={!canSave}
-          className="rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+          className="rounded-campo bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
         >
           Guardar
         </button>

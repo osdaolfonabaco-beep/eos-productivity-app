@@ -102,7 +102,7 @@ function GoalRow({ goal, updates, busy, onSaveText, onSetResult, onArchive, onAd
             type="button"
             onClick={save}
             disabled={!draft.trim()}
-            className="rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+            className="rounded-campo bg-[image:var(--grad-secundario)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
           >
             Guardar
           </button>
@@ -129,7 +129,7 @@ function GoalRow({ goal, updates, busy, onSaveText, onSetResult, onArchive, onAd
           <button
             type="button"
             onClick={onArchive}
-            className="rounded-campo bg-acento px-4 py-2 text-sm font-medium text-white transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-acento-toque)]"
+            className="rounded-campo bg-[image:var(--grad-secundario)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)]"
           >
             Archivar
           </button>
@@ -184,9 +184,9 @@ function GoalRow({ goal, updates, busy, onSaveText, onSetResult, onArchive, onAd
               onClick={() => onSetResult(goal.resultado === 'cumplida' ? null : 'cumplida')}
               aria-pressed={goal.resultado === 'cumplida'}
               disabled={busy}
-              className={`rounded-pastilla px-3 py-1 text-xs font-medium transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-60 ${
+              className={`rounded-pastilla px-3 py-1 text-xs font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-60 ${
                 goal.resultado === 'cumplida'
-                  ? 'bg-hecho text-white'
+                  ? 'bg-[image:var(--grad-hecho)] text-white shadow-[var(--sombra-hecho)] active:shadow-[var(--sombra-hecho-toque)]'
                   : 'border border-borde text-texto-apagado active:bg-separador'
               }`}
             >
@@ -197,9 +197,9 @@ function GoalRow({ goal, updates, busy, onSaveText, onSetResult, onArchive, onAd
               onClick={() => onSetResult(goal.resultado === 'no-cumplida' ? null : 'no-cumplida')}
               aria-pressed={goal.resultado === 'no-cumplida'}
               disabled={busy}
-              className={`rounded-pastilla px-3 py-1 text-xs font-medium transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-60 ${
+              className={`rounded-pastilla px-3 py-1 text-xs font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] disabled:opacity-60 ${
                 goal.resultado === 'no-cumplida'
-                  ? 'bg-fallado text-white'
+                  ? 'bg-[image:var(--grad-fallado)] text-white shadow-[var(--sombra-fallado)] active:shadow-[var(--sombra-fallado-toque)]'
                   : 'border border-borde text-texto-apagado active:bg-separador'
               }`}
             >
@@ -405,7 +405,7 @@ export default function WeeklyGoalsSection() {
                 type="button"
                 onClick={submitNewGoal}
                 disabled={!newGoalText.trim() || busy}
-                className="shrink-0 rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+                className="shrink-0 rounded-campo bg-[image:var(--grad-secundario)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
               >
                 Guardar
               </button>

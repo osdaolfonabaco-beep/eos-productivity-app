@@ -75,7 +75,7 @@ export default function LoginScreen() {
             <button
               type="submit"
               disabled={!looksLikeEmail(email) || status === 'sending'}
-              className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+              className="rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
             >
               {status === 'sending' ? 'Enviando…' : 'Enviar enlace'}
             </button>

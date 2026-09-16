@@ -15,8 +15,10 @@ export const STATUSES: { value: IdeaStatus; label: string }[] = [
  * neutro de siempre.
  */
 export const STATUS_ACTIVE_CLASS: Record<IdeaStatus, string> = {
-  pendiente: 'bg-gray-900 text-white',
-  'en-marcha': 'bg-gray-900 text-white',
+  pendiente: 'bg-[image:var(--grad-secundario)] text-white shadow-[var(--sombra-acento)]',
+  'en-marcha': 'bg-[image:var(--grad-secundario)] text-white shadow-[var(--sombra-acento)]',
+  // 'descartada' y 'hecha' se quedan planas a propósito: los cuatro estados
+  // de una idea tendrán su propia paleta cuando se migre esta pantalla.
   descartada: 'bg-rose-600 text-white',
   hecha: 'bg-emerald-600 text-white',
 }
@@ -84,7 +86,7 @@ export default function IdeaCard({
             type="button"
             onClick={save}
             disabled={!draft.trim()}
-            className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+            className="rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
           >
             Guardar
           </button>

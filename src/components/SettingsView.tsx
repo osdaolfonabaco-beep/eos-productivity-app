@@ -248,7 +248,7 @@ function JournalPasswordSection() {
       <button
         type="submit"
         disabled={!canSubmit}
-        className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+        className="w-full rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
       >
         {busy ? 'Cambiando…' : 'Cambiar contraseña'}
       </button>
@@ -491,7 +491,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
             type="button"
             onClick={() => void handleExport()}
             disabled={exportBusy}
-            className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+            className="w-full rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
           >
             {exportBusy ? 'Exportando…' : 'Exportar datos'}
           </button>
@@ -577,7 +577,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
                     type="button"
                     onClick={() => void replaceNow()}
                     disabled={!safetyDownloaded || !safetyKept || replaceBusy}
-                    className="rounded-lg bg-rose-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+                    className="rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
                   >
                     {replaceBusy ? 'Reemplazando…' : 'Reemplazar'}
                   </button>
@@ -614,7 +614,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
               type="button"
               onClick={() => void upload()}
               disabled={uploadBusy}
-              className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+              className="w-full rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
             >
               {uploadBusy ? 'Subiendo…' : 'Subir a la nube'}
             </button>
@@ -661,7 +661,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
                   <button
                     type="button"
                     onClick={clearLocal}
-                    className="rounded-lg bg-rose-600 px-4 py-3 text-sm font-medium text-white"
+                    className="rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)]"
                   >
                     Borrar copia local
                   </button>
@@ -710,8 +710,10 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
                 onClick={() => void chooseTone(opt.value)}
                 disabled={tone === null || toneBusy}
                 aria-pressed={active}
-                className={`rounded-lg border px-4 py-3 text-left disabled:opacity-60 ${
-                  active ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 text-gray-700'
+                className={`rounded-lg border px-4 py-3 text-left transition-[background-color,box-shadow] duration-[var(--dur-toque)] ease-toque disabled:opacity-60 ${
+                  active
+                    ? 'border-transparent bg-[image:var(--grad-secundario)] text-white shadow-[var(--sombra-acento)]'
+                    : 'border-gray-300 text-gray-700'
                 }`}
               >
                 <span className="block text-sm font-medium">{opt.label}</span>
@@ -783,7 +785,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
                 type="button"
                 onClick={() => void activatePush()}
                 disabled={pushBusy}
-                className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+                className="w-full rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
               >
                 {pushBusy ? 'Activando…' : 'Activar notificaciones'}
               </button>

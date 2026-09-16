@@ -106,7 +106,7 @@ export default function JournalSetup({ onCreated }: JournalSetupProps) {
           type="button"
           onClick={() => onCreated(created.key, created.dek)}
           disabled={!savedConfirmed}
-          className="mt-4 w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+          className="mt-4 w-full rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
         >
           Continuar
         </button>
@@ -160,7 +160,7 @@ export default function JournalSetup({ onCreated }: JournalSetupProps) {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-lg bg-[image:var(--grad-secundario)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-acento-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
         >
           {busy ? 'Creando…' : 'Crear clave del Journal'}
         </button>
