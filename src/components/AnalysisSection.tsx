@@ -34,7 +34,7 @@ export default function AnalysisSection() {
           type="button"
           onClick={() => void run()}
           disabled={busy}
-          className="w-full rounded-campo bg-acento px-4 py-3 text-sm font-semibold text-white shadow-[var(--sombra-principal)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-[var(--color-acento-toque)] active:shadow-[var(--sombra-principal-toque)] disabled:opacity-40"
+          className="w-full rounded-campo bg-[image:var(--grad-calido)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--sombra-calido)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:shadow-[var(--sombra-calido-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
         >
           {busy ? 'Analizando…' : 'Pedir análisis'}
         </button>

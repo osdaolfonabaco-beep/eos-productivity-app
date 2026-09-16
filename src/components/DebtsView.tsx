@@ -278,7 +278,7 @@ export default function DebtsView() {
       <button
         type="button"
         onClick={() => setScreen({ name: 'new' })}
-        className="mt-6 w-full rounded-campo bg-texto px-4 py-3 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-[var(--color-texto-toque)]"
+        className="mt-6 w-full rounded-campo bg-[image:var(--grad-calido)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-calido)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:shadow-[var(--sombra-calido-toque)]"
       >
         + Nueva deuda
       </button>

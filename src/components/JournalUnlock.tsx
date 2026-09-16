@@ -47,8 +47,9 @@ function FieldError({ children }: { children: string }) {
 const campoClase =
   'w-full rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-4 py-4 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento'
 
-const botonAcentoClase =
-  'rounded-campo bg-acento px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-acento)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-acento-toque)] active:shadow-[var(--sombra-acento-toque)] disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none'
+/** Botón cálido: la acción principal de esta pantalla es desbloquear. */
+const botonCalidoClase =
+  'rounded-campo bg-[image:var(--grad-calido)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-calido)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-calido-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none'
 
 /** Botón principal sobrio: para las pantallas de recuperación, no invita a pulsarlo. */
 const botonSobrioClase =
@@ -236,7 +237,7 @@ export default function JournalUnlock({ keyRecord, onUnlocked, onPasswordChanged
           aria-label="Contraseña del Journal"
           className={campoClase}
         />
-        <button type="submit" disabled={!password || busy} className={botonAcentoClase}>
+        <button type="submit" disabled={!password || busy} className={botonCalidoClase}>
           {busy ? 'Comprobando…' : 'Desbloquear'}
         </button>
       </form>

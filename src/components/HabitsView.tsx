@@ -106,7 +106,7 @@ export default function HabitsView() {
               type="button"
               onClick={submit}
               disabled={!name.trim() || busy}
-              className="shrink-0 rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+              className="shrink-0 rounded-campo bg-[image:var(--grad-calido)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sombra-calido)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-calido-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
             >
               Guardar
             </button>
