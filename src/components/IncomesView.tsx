@@ -181,17 +181,24 @@ export default function IncomesView() {
           </button>
         </div>
 
-        <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
-          <h3 className="text-etiqueta uppercase text-texto-tenue">Entró esta quincena</h3>
-          <p className="mt-1 text-destacado tabular-nums text-hecho">{formatCOP(total)}</p>
-          <p className="mt-1 text-meta text-texto-apagado">
-            Sueldo {formatCOP(currentSalary?.amount ?? 0)} · Extras {formatCOP(extrasTotal)}
-          </p>
-          <IncomeQuincenaChart key={periodStart} history={history} />
+        <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
+          <div
+            className="p-4"
+            style={{ background: 'linear-gradient(to bottom, var(--color-hecho-lavado), white)' }}
+          >
+            <h3 className="text-etiqueta uppercase text-texto-tenue">Entró esta quincena</h3>
+            <p className="mt-1 text-destacado tabular-nums text-hecho">{formatCOP(total)}</p>
+            <p className="mt-1 text-meta text-texto-apagado">
+              Sueldo {formatCOP(currentSalary?.amount ?? 0)} · Extras {formatCOP(extrasTotal)}
+            </p>
+          </div>
+          <div className="border-t-[0.5px] border-separador p-4">
+            <IncomeQuincenaChart key={periodStart} history={history} />
+          </div>
         </div>
       </section>
 
-      <IncomeCategoryBreakdown incomes={currentIncomes} />
+      <IncomeCategoryBreakdown incomes={currentIncomes} salaryAmount={currentSalary?.amount ?? 0} />
 
       <IncomeListSection
         key={periodStart}
