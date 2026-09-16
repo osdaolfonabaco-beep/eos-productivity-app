@@ -29,7 +29,7 @@ export default function MovementSummaryCard({ entrada, salida, history }: Moveme
         className="p-4"
         style={{ background: 'linear-gradient(to bottom, var(--color-separador), var(--color-tarjeta))' }}
       >
-        <h3 className="text-etiqueta uppercase text-texto-tenue">Diferencia</h3>
+        <h3 className="text-etiqueta uppercase etiqueta-calido">Diferencia</h3>
         <p
           className={`mt-1 text-titulo tabular-nums ${negativa ? 'text-fallado' : 'text-texto'}`}
         >
@@ -38,11 +38,11 @@ export default function MovementSummaryCard({ entrada, salida, history }: Moveme
 
         <div className="mt-4 flex items-baseline justify-between gap-3">
           <div>
-            <h3 className="text-etiqueta uppercase text-texto-tenue">Entró</h3>
+            <h3 className="text-etiqueta uppercase etiqueta-calido">Entró</h3>
             <p className="mt-1 text-destacado tabular-nums text-hecho">{formatCOP(entrada)}</p>
           </div>
           <div className="text-right">
-            <h3 className="text-etiqueta uppercase text-texto-tenue">Salió</h3>
+            <h3 className="text-etiqueta uppercase etiqueta-calido">Salió</h3>
             <p className="mt-1 text-destacado tabular-nums text-fallado">{formatCOP(salida)}</p>
           </div>
         </div>

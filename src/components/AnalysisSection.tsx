@@ -25,7 +25,7 @@ export default function AnalysisSection() {
 
   return (
     <section className="px-4 pt-6 text-texto">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Análisis</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Mentor</h2>
 
       {error && <ActionError message={error} onDismiss={() => setError(null)} />}
 
@@ -36,7 +36,7 @@ export default function AnalysisSection() {
           disabled={busy}
           className="w-full rounded-campo bg-[image:var(--grad-calido)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--sombra-calido)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:shadow-[var(--sombra-calido-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
         >
-          {busy ? 'Analizando…' : 'Pedir análisis'}
+          {busy ? 'Analizando…' : 'Pedir al mentor'}
         </button>
 
         {text && (

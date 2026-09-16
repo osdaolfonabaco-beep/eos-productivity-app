@@ -274,7 +274,7 @@ export default function WeekView() {
       <WeeklyGoalsSection />
 
       <section className="mt-8">
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Cuadrícula</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Cuadrícula</h2>
 
         {habits.length === 0 ? (
           <p className="rounded-tarjeta border border-dashed border-borde px-4 py-8 text-center text-texto-apagado">

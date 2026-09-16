@@ -140,7 +140,7 @@ export default function PlanView() {
         <div className="flex flex-col gap-6">
           {days.map((day) => (
             <section key={day.date}>
-              <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">
+              <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">
                 {dayLabel(day.date, today)}
               </h2>
               <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">

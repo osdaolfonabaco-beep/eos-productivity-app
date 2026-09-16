@@ -186,7 +186,7 @@ export default function IncomesView() {
             className="p-4"
             style={{ background: 'linear-gradient(to bottom, var(--color-hecho-lavado), white)' }}
           >
-            <h3 className="text-etiqueta uppercase text-texto-tenue">Entró esta quincena</h3>
+            <h3 className="text-etiqueta uppercase etiqueta-calido">Entró esta quincena</h3>
             <p className="mt-1 text-destacado tabular-nums text-hecho">{formatCOP(total)}</p>
             <p className="mt-1 text-meta text-texto-apagado">
               Sueldo {formatCOP(currentSalary?.amount ?? 0)} · Extras {formatCOP(extrasTotal)}

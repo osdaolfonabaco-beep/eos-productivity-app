@@ -89,7 +89,7 @@ export default function IncomeListSection({
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Ingresos de la quincena</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Ingresos de la quincena</h2>
 
       <datalist id={CATEGORY_LIST_ID}>
         {categorySuggestions.map((c) => (

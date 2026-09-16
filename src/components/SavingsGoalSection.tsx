@@ -165,7 +165,7 @@ export default function SavingsGoalSection({
   if (!goal) {
     return (
       <section className="mb-8">
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Meta de ahorro</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Meta de ahorro</h2>
         <div className="rounded-tarjeta border border-dashed border-borde bg-tarjeta p-4">
           <p className="mb-3 text-sm text-texto-apagado">Todavía no tienes una meta de ahorro.</p>
           <GoalForm busy={busy} onSubmit={onCreate} />
@@ -177,7 +177,7 @@ export default function SavingsGoalSection({
   if (mode === 'edit') {
     return (
       <section className="mb-8">
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Meta de ahorro</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Meta de ahorro</h2>
         <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
           <GoalForm
             initial={goal}
@@ -212,7 +212,7 @@ export default function SavingsGoalSection({
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Meta de ahorro</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Meta de ahorro</h2>
 
       {mode === 'confirm-archive' ? (
         <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">

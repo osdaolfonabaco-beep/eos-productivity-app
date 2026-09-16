@@ -362,21 +362,21 @@ export default function WeekDashboard() {
       />
 
       <div>
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Cumplimiento por hábito</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Cumplimiento por hábito</h2>
         <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
           <BreakdownChart habitos={data.habitos} />
         </div>
       </div>
 
       <div>
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Esta semana vs. la anterior</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Esta semana vs. la anterior</h2>
         <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
           <ComparisonChart habitos={data.habitos} />
         </div>
       </div>
 
       <div>
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Explicación</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Explicación</h2>
         {aiError && <ActionError message={aiError} onDismiss={() => setAiError(null)} />}
         {/*
          * Aguamarina, no neutro: esta acción llama a la IA, y en esta app

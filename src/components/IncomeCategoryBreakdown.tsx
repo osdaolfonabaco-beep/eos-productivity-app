@@ -72,7 +72,7 @@ export default function IncomeCategoryBreakdown({
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">De dónde vino</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">De dónde vino</h2>
       <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
         <div
           className="flex h-3 overflow-hidden rounded-full shadow-[var(--sombra-hundida)]"

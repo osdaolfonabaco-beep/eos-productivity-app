@@ -166,7 +166,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
       </div>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Registrar pago</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Registrar pago</h2>
         <form onSubmit={submitPayment} className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1">
             <span className="text-xs text-texto-apagado">Fecha</span>
@@ -200,7 +200,7 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Pagos</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Pagos</h2>
         {payments.length === 0 ? (
           <p className="rounded-tarjeta border border-dashed border-borde px-4 py-6 text-center text-sm text-texto-apagado">
             Aún no has registrado pagos.

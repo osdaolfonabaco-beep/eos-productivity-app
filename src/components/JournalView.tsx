@@ -403,7 +403,7 @@ function JournalNotes({ dek }: { dek: Uint8Array }) {
       )}
 
       <section>
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Hoy · {formatLongDate(today)}</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Hoy · {formatLongDate(today)}</h2>
         <TodayComposer
           prompt={promptForDate(today)}
           busy={busy}
@@ -423,7 +423,7 @@ function JournalNotes({ dek }: { dek: Uint8Array }) {
 
       {pastDays.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Entradas anteriores</h2>
+          <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Entradas anteriores</h2>
           <ul className="flex flex-col gap-4">
             {pastDays.map((day) => (
               <li

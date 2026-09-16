@@ -132,9 +132,9 @@ body {
   --text-meta: 13px;
   --text-meta--font-weight: 400;
 
-  --text-etiqueta: 11px;
-  --text-etiqueta--font-weight: 600;
-  --text-etiqueta--letter-spacing: 0.08em;
+  --text-etiqueta: 13px;
+  --text-etiqueta--font-weight: 700;
+  --text-etiqueta--letter-spacing: 0.07em;
 
   /*
    * Espaciado: escala de 4 (4, 8, 12, 16, 24, 32, 48).
@@ -227,6 +227,15 @@ body {
    * --grad-neutro: Cancelar y demás botones neutros que ya llevan borde.
    */
   --grad-calido: linear-gradient(to top, #DD5A1C, #CE2F7C);
+  /*
+   * Versión sólida de --grad-calido, solo para texto (nunca fondo): el
+   * respaldo de .etiqueta-calido más abajo, para cuando el navegador no
+   * recorta el degradado al texto o en prefers-contrast: more. Magenta del
+   * extremo del degradado, no rojo -- el rojo ya significa "no hecho"/"en
+   * mora" en esta app, y un título de sección en ese tono se leería como
+   * alerta. ~5.9:1 de contraste sobre blanco.
+   */
+  --color-calido-texto: #B4306B;
   --grad-secundario: linear-gradient(to top, #4C33BE, #1C9BD6);
   --grad-hecho: linear-gradient(to top, #04704F, #0FBE7E);
   --grad-fallado: linear-gradient(to top, #A81B1F, #DE6321);
@@ -324,6 +333,38 @@ body {
   		radial-gradient(67% 59% at 96% 4%, #F4F0FE 0%, transparent 89%),
   		radial-gradient(67% 59% at 4% 96%, #EFFAF4 0%, transparent 89%),
   		#FBFEFE;
+}
+
+/*
+ * Degradado cálido recortado al texto, para los títulos de sección
+ * (--text-etiqueta): una sola clase reutilizable en vez de repetir el
+ * recorte en cada componente. NO usar en texto de contenido -- un
+ * degradado en texto dificulta la selección y copia, y en una etiqueta
+ * corta no se nota, pero en un párrafo sí.
+ *
+ * `color` es el respaldo sólido: si el navegador no soporta
+ * `background-clip: text`, el texto se queda en ese color en vez de
+ * transparente (que es lo que pasaría sin este respaldo, porque
+ * `-webkit-text-fill-color: transparent` no tiene alternativa propia).
+ *
+ * `prefers-contrast: more` apaga el degradado y deja el mismo sólido: es
+ * la señal de que el sistema pide más contraste, y un degradado -- por
+ * legible que sea aquí -- nunca es tan seguro como un color plano.
+ */
+.etiqueta-calido {
+  color: var(--color-calido-texto);
+  background-image: var(--grad-calido);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (prefers-contrast: more) {
+  .etiqueta-calido {
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--color-calido-texto);
+  }
 }
 
 /*

@@ -689,9 +689,9 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
 
       {/* -------- Tono del análisis -------- */}
       <section className="mt-8 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-700">Tono del análisis</h2>
+        <h2 className="text-sm font-semibold text-gray-700">Tono del mentor</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Cómo quieres que te hable el análisis de hábitos y tareas.
+          Cómo quieres que te hable el mentor sobre tus hábitos y tareas.
         </p>
 
         {toneError && (

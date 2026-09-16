@@ -75,7 +75,7 @@ export default function DayCommentSection() {
 
   return (
     <section className="px-4 pt-6 text-texto">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Comentario del día</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Comentario del día</h2>
 
       {actionError && (
         <div className="mb-2">
@@ -92,7 +92,7 @@ export default function DayCommentSection() {
           }}
         >
           <SentIcon />
-          Se envía a la IA en el análisis diario y semanal.
+          Este texto se envía a la IA: el mentor lo usa en su análisis diario y semanal.
         </p>
 
         <div className="p-3">

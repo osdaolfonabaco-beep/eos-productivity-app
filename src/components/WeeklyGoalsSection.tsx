@@ -340,7 +340,7 @@ export default function WeeklyGoalsSection() {
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Metas de la semana</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Metas de la semana</h2>
 
       {actionError && (
         <div className="mb-3">

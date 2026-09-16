@@ -112,7 +112,7 @@ function TasksToday() {
 
   return (
     <section className="px-4 pt-6 text-texto">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Tareas de hoy</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Tareas de hoy</h2>
 
       {actionError && (
         <ActionError message={actionError} onDismiss={() => setActionError(null)} />

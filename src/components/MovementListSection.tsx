@@ -279,7 +279,7 @@ export default function MovementListSection({
 
       {pendingFixedExpenses.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Gastos fijos pendientes</h2>
+          <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Gastos fijos pendientes</h2>
           <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
             <ul>
               {pendingFixedExpenses.map((expense, i) => (
@@ -303,7 +303,7 @@ export default function MovementListSection({
       )}
 
       <section className="mb-8">
-        <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Movimientos de la quincena</h2>
+        <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Movimientos de la quincena</h2>
 
         <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
           {!hasRows && (

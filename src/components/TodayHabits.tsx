@@ -94,7 +94,7 @@ export default function TodayHabits() {
         </p>
       ) : (
         <>
-          <p className="mb-2 text-etiqueta uppercase text-texto-tenue">
+          <p className="mb-2 text-etiqueta uppercase etiqueta-calido">
             Hábitos · {hechos} de {habits.length}
           </p>
           <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">

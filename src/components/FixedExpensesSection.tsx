@@ -58,7 +58,7 @@ export default function FixedExpensesSection({
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Gastos fijos</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Gastos fijos</h2>
 
       <div className="overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
         {expenses.length === 0 && (

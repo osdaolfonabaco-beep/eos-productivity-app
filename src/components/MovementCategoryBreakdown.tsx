@@ -135,7 +135,7 @@ export default function MovementCategoryBreakdown({
 
   return (
     <section className="mb-8">
-      <h2 className="mb-2 text-etiqueta uppercase text-texto-tenue">Reparto por categoría</h2>
+      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Reparto por categoría</h2>
       <div className="flex flex-col gap-4 rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
         <CategoryBar title="De dónde vino" slices={incomeSlices} />
         {hasIncome && hasExpense && <div className="border-t-[0.5px] border-separador" />}
