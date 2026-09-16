@@ -5,6 +5,7 @@ import { changePassword } from '../lib/journalCrypto'
 import {
   applyBackup,
   clearLocalData,
+  countAll,
   enablePushNotifications,
   exportAll,
   exportLocal,
@@ -22,6 +23,8 @@ import {
   todayISO,
   uploadLocalData,
   type BackupData,
+  type CloudCounts,
+  type ParsedBackup,
   type ReminderTimes,
   type TableReport,
   type Tone,
@@ -120,13 +123,76 @@ function n(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`
 }
 
-function summarizeData(data: BackupData): string {
-  return [
-    n(data.habits.length, 'hábito', 'hábitos'),
-    n(data.entries.length, 'registro', 'registros'),
-    n(data.debts.length, 'deuda', 'deudas'),
-    n(data.payments.length, 'pago', 'pagos'),
-  ].join(' · ')
+/** Las 16 colecciones del respaldo, en el mismo orden en que se muestran. */
+const BACKUP_KEYS: (keyof BackupData)[] = [
+  'habits',
+  'entries',
+  'debts',
+  'payments',
+  'ideas',
+  'tasks',
+  'journal',
+  'weeklyGoals',
+  'goalUpdates',
+  'dayComments',
+  'salaryPeriods',
+  'fixedExpenses',
+  'savingsGoals',
+  'savingsContributions',
+  'incomes',
+  'expenses',
+]
+
+const BACKUP_LABELS: Record<keyof BackupData, [one: string, many: string]> = {
+  habits: ['hábito', 'hábitos'],
+  entries: ['registro', 'registros'],
+  debts: ['deuda', 'deudas'],
+  payments: ['pago', 'pagos'],
+  ideas: ['idea', 'ideas'],
+  tasks: ['tarea', 'tareas'],
+  journal: ['nota del diario', 'notas del diario'],
+  weeklyGoals: ['meta semanal', 'metas semanales'],
+  goalUpdates: ['avance', 'avances'],
+  dayComments: ['comentario del día', 'comentarios del día'],
+  salaryPeriods: ['sueldo', 'sueldos'],
+  fixedExpenses: ['gasto fijo', 'gastos fijos'],
+  savingsGoals: ['meta de ahorro', 'metas de ahorro'],
+  savingsContributions: ['aporte', 'aportes'],
+  incomes: ['ingreso', 'ingresos'],
+  expenses: ['gasto', 'gastos'],
+}
+
+/**
+ * Una fila de la comparación "ahora vs. archivo" que se muestra antes de
+ * reemplazar. `replaced` es `false` cuando el archivo no trae esta colección
+ * (`present` no la incluye, ver el comentario grande en `parseBackup`): esa
+ * tabla se deja tal cual está en la nube, así que `afterCount` es el mismo
+ * `cloudCount`, no el (irrelevante) `data[key].length`, que sería 0.
+ */
+interface CompareRow {
+  key: keyof BackupData
+  /** Nombre en plural, para el encabezado de la fila (ej. "Ingresos"). */
+  many: string
+  cloudCount: number
+  fileCount: number
+  replaced: boolean
+  afterCount: number
+}
+
+function compareRows(parsed: ParsedBackup, cloud: CloudCounts): CompareRow[] {
+  return BACKUP_KEYS.map((key) => {
+    const cloudCount = cloud[key]
+    const replaced = parsed.present.has(key)
+    const fileCount = parsed.data[key].length
+    return {
+      key,
+      many: BACKUP_LABELS[key][1],
+      cloudCount,
+      fileCount,
+      replaced,
+      afterCount: replaced ? fileCount : cloudCount,
+    }
+  })
 }
 
 function summarizeCounts(c: ReturnType<typeof readLocalCounts>): string {
@@ -147,7 +213,9 @@ function reportLine(label: string, r: TableReport): string {
 
 interface Pending {
   fileName: string
-  data: BackupData
+  parsed: ParsedBackup
+  /** Lo que hay HOY en la nube, tabla por tabla, para comparar contra el archivo. */
+  cloudCounts: CloudCounts
 }
 
 const JOURNAL_PW_MIN_LENGTH = 8
@@ -274,6 +342,15 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
   const [safetyDownloaded, setSafetyDownloaded] = useState(false)
   const [safetyKept, setSafetyKept] = useState(false)
   const [replaceBusy, setReplaceBusy] = useState(false)
+
+  // La comparación "ahora vs. archivo" que se muestra antes de reemplazar.
+  const pendingRows = pending ? compareRows(pending.parsed, pending.cloudCounts) : null
+  const pendingTotals = pendingRows
+    ? {
+        before: pendingRows.reduce((sum, r) => sum + r.cloudCount, 0),
+        after: pendingRows.reduce((sum, r) => sum + r.afterCount, 0),
+      }
+    : null
 
   // --- Copia local de este dispositivo ---
   const [localCounts, setLocalCounts] = useState(readLocalCounts)
@@ -414,17 +491,29 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
     if (!file) return
     resetImport()
 
-    let parsed: unknown
+    let rawJson: unknown
     try {
-      parsed = JSON.parse(await file.text())
+      rawJson = JSON.parse(await file.text())
     } catch {
       setImportError('El archivo no es JSON válido.')
       return
     }
+    let parsed: ParsedBackup
     try {
-      setPending({ fileName: file.name, data: parseBackup(parsed) })
+      parsed = parseBackup(rawJson)
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Respaldo no válido.')
+      return
+    }
+    // Las cifras de la nube se piden aquí, no al abrir Ajustes: solo hacen
+    // falta si de verdad hay un archivo que comparar contra ellas.
+    try {
+      const cloudCounts = await countAll()
+      setPending({ fileName: file.name, parsed, cloudCounts })
+    } catch (err) {
+      setImportError(
+        err instanceof Error ? err.message : 'No se pudieron leer los datos actuales de la nube.',
+      )
     }
   }
 
@@ -441,7 +530,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
     if (!pending || !safetyDownloaded || !safetyKept) return
     setReplaceBusy(true)
     try {
-      await applyBackup(pending.data)
+      await applyBackup(pending.parsed)
       location.reload()
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'No se pudo reemplazar.')
@@ -523,13 +612,55 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
           </p>
         )}
 
-        {pending && (
+        {pending && pendingRows && pendingTotals && (
           <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-4">
             <p className="text-sm font-medium text-gray-900">{pending.fileName}</p>
-            <p className="mt-1 text-sm text-gray-600">{summarizeData(pending.data)}</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Respaldo versión {pending.parsed.version}
+              {pending.parsed.version < 2 && ' · de antes de que el respaldo cubriera Dinero'}
+            </p>
+
+            {/*
+              Fila por fila: lo que hay hoy en la nube vs. lo que trae el
+              archivo. Una fila sin "→" es una colección que el archivo no
+              trae -- se deja tal cual está en la nube, no se toca (ver el
+              comentario grande sobre `present` en parseBackup).
+            */}
+            <div className="mt-3 flex flex-col divide-y divide-rose-200 rounded-lg border border-rose-200 bg-white">
+              {pendingRows.map((row) => (
+                <div
+                  key={row.key}
+                  className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm"
+                >
+                  <span className="text-gray-700">{n(row.cloudCount, ...BACKUP_LABELS[row.key])}</span>
+                  {row.replaced ? (
+                    <span className="font-medium text-rose-700">
+                      → {n(row.fileCount, ...BACKUP_LABELS[row.key])} del archivo
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">se conservan, no está en el archivo</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
             <p className="mt-3 text-sm text-gray-700">
-              Importar <strong>reemplaza todos tus datos de la nube</strong> por los del
-              archivo. No se puede deshacer.
+              En total: <strong>{pendingTotals.before}</strong> registros ahora en la nube →{' '}
+              <strong>{pendingTotals.after}</strong> después de importar.
+              {pendingTotals.after < pendingTotals.before && (
+                <>
+                  {' '}
+                  <strong className="text-rose-700">
+                    Se perderán {n(pendingTotals.before - pendingTotals.after, 'registro', 'registros')}
+                  </strong>{' '}
+                  que no están en el archivo.
+                </>
+              )}
+            </p>
+
+            <p className="mt-3 text-sm text-gray-700">
+              Importar <strong>reemplaza en la nube las colecciones que trae este archivo</strong>.
+              Las que no trae (marcadas arriba) se conservan tal cual. No se puede deshacer.
             </p>
 
             {importError && (

@@ -74,7 +74,7 @@ export {
   debtBalance,
 } from './finance'
 
-export type { BackupFile, BackupData } from './backup'
+export type { BackupFile, BackupData, ParsedBackup, CloudCounts } from './backup'
 
 export {
   exportAll,
@@ -83,6 +83,7 @@ export {
   parseBackup,
   applyBackup,
   importAll,
+  countAll,
 } from './backup'
 
 export {
