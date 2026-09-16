@@ -23,7 +23,7 @@ export default function SectionNav<T extends string>({
 }: SectionNavProps<T>) {
   return (
     <div className="px-4 pt-3">
-      <div className="inline-flex gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
+      <div className="inline-flex gap-1 rounded-lg border border-[var(--color-campo-borde)] bg-[var(--color-campo)] p-0.5 shadow-[var(--sombra-hundida)]">
         {items.map((item) => {
           const isActive = item.value === active
           return (
@@ -32,8 +32,10 @@ export default function SectionNav<T extends string>({
               type="button"
               onClick={() => onChange(item.value)}
               aria-current={isActive ? 'page' : undefined}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800 ${
-                isActive ? 'bg-gray-900 text-white active:bg-[var(--color-texto-toque)]' : 'text-gray-600 active:bg-separador'
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800 ${
+                isActive
+                  ? 'bg-[image:var(--grad-calido)] text-white shadow-[var(--sombra-calido)] active:shadow-[var(--sombra-calido-toque)]'
+                  : 'text-gray-600 active:bg-separador'
               }`}
             >
               {item.label}

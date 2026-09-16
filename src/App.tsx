@@ -60,11 +60,25 @@ function BottomTab({
       type="button"
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`py-3 text-sm transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-gray-800 ${
-        active ? 'font-semibold text-gray-900' : 'font-normal text-gray-500'
+      className={`flex flex-col items-center gap-1 py-3 text-sm transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-gray-800 ${
+        active ? 'font-semibold text-[var(--color-acento-texto)]' : 'font-normal text-gray-500'
       }`}
     >
       {label}
+      {/*
+       * Indicador de la pestaña activa: un punto con el degradado de
+       * indicador (neón violeta-cian), no el cálido — ese ya lo lleva la
+       * pastilla de SectionNav, y dos barras cálidas a la vez competirían.
+       * Se reserva el espacio siempre (opacity, no display) para que las
+       * cuatro pestañas no salten de alto al cambiar cuál está activa.
+       */}
+      <span
+        aria-hidden="true"
+        className={`h-1 w-1 rounded-full transition-opacity duration-[var(--dur-estado)] ease-salida ${
+          active ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{ background: 'var(--grad-ind-acento)' }}
+      />
     </button>
   )
 }
