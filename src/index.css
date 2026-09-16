@@ -261,19 +261,31 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
 
   --sombra-ind-hecho:
-    0 1px 3px rgba(4, 120, 87, 0.40),
-    0 6px 13px -4px rgba(53, 239, 163, 0.55);
-  --sombra-ind-hecho-toque: 0 1px 3px rgba(4, 120, 87, 0.30);
+    0 0 14px rgba(53, 239, 163, 0.62),
+    0 1px 3px rgba(4, 120, 87, 0.38),
+    0 6px 13px -4px rgba(53, 239, 163, 0.50),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --sombra-ind-hecho-toque:
+    0 0 8px rgba(53, 239, 163, 0.45),
+    0 1px 3px rgba(4, 120, 87, 0.30);
 
   --sombra-ind-fallado:
-    0 1px 3px rgba(180, 35, 31, 0.40),
-    0 6px 13px -4px rgba(255, 147, 64, 0.55);
-  --sombra-ind-fallado-toque: 0 1px 3px rgba(180, 35, 31, 0.30);
+    0 0 14px rgba(255, 147, 64, 0.62),
+    0 1px 3px rgba(180, 35, 31, 0.38),
+    0 6px 13px -4px rgba(255, 147, 64, 0.50),
+    inset 0 1px 0 rgba(255, 255, 255, 0.50);
+  --sombra-ind-fallado-toque:
+    0 0 8px rgba(255, 147, 64, 0.45),
+    0 1px 3px rgba(180, 35, 31, 0.30);
 
   --sombra-ind-acento:
-    0 1px 3px rgba(91, 63, 209, 0.40),
-    0 6px 13px -4px rgba(40, 217, 255, 0.55);
-  --sombra-ind-acento-toque: 0 1px 3px rgba(91, 63, 209, 0.30);
+    0 0 14px rgba(40, 217, 255, 0.62),
+    0 1px 3px rgba(91, 63, 209, 0.38),
+    0 6px 13px -4px rgba(40, 217, 255, 0.50),
+    inset 0 1px 0 rgba(255, 255, 255, 0.50);
+  --sombra-ind-acento-toque:
+    0 0 8px rgba(40, 217, 255, 0.45),
+    0 1px 3px rgba(91, 63, 209, 0.30);
 
   --sombra-principal:
     0 2px 6px rgba(123, 90, 240, 0.18),

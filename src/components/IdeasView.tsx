@@ -38,16 +38,16 @@ function ArchivedIdeaRow({
 }) {
   const label = STATUSES.find((s) => s.value === idea.status)?.label ?? idea.status
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-3">
+    <div className="rounded-tarjeta border border-borde bg-tarjeta p-3 shadow-[var(--sombra-tarjeta)]">
       <p
-        className={`whitespace-pre-wrap break-words ${
-          idea.status === 'descartada' ? 'text-gray-400' : 'text-gray-900'
+        className={`whitespace-pre-wrap break-words text-lectura ${
+          idea.status === 'descartada' ? 'text-texto-tenue' : 'text-texto-cuerpo'
         }`}
       >
         {idea.text}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_ACTIVE_CLASS[idea.status]}`}>
+        <span className={`rounded-pastilla px-3 py-1 text-xs font-medium ${STATUS_ACTIVE_CLASS[idea.status]}`}>
           {label}
         </span>
         {idea.status === 'hecha' && (
@@ -55,14 +55,14 @@ function ArchivedIdeaRow({
             <button
               type="button"
               onClick={() => onReopen('pendiente')}
-              className="rounded-full border border-gray-300 bg-[image:var(--grad-neutro)] px-3 py-1 text-xs font-medium text-gray-600 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
+              className="rounded-pastilla border border-borde bg-[image:var(--grad-neutro)] px-3 py-1 text-xs font-medium text-texto-apagado transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
             >
               Pendiente
             </button>
             <button
               type="button"
               onClick={() => onReopen('en-marcha')}
-              className="rounded-full border border-gray-300 bg-[image:var(--grad-neutro)] px-3 py-1 text-xs font-medium text-gray-600 transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
+              className="rounded-pastilla border border-borde bg-[image:var(--grad-neutro)] px-3 py-1 text-xs font-medium text-texto-apagado transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
             >
               En marcha
             </button>
@@ -169,8 +169,8 @@ export default function IdeasView() {
   const ideas = data ?? []
 
   return (
-    <main className="px-4 py-6 text-gray-900">
-      <h1 className="mb-4 text-2xl font-semibold">Ideas</h1>
+    <main className="px-4 py-6 text-texto">
+      <h1 className="mb-4 text-titulo">Ideas</h1>
 
       {actionError && (
         <ActionError message={actionError} onDismiss={() => setActionError(null)} />
@@ -182,26 +182,26 @@ export default function IdeasView() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          rows={2}
+          rows={3}
           autoFocus
-          placeholder="Anota una idea…"
+          placeholder="¿Qué se te ocurrió?"
           aria-label="Anota una idea"
-          className="w-full resize-y rounded-lg border border-gray-300 px-3 py-3 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-800"
+          className="w-full resize-y rounded-campo border border-[var(--color-campo-borde)] bg-[var(--color-campo)] px-3 py-3 text-base shadow-[var(--sombra-hundida)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
         />
         <div className="mt-2 flex justify-end">
           <button
             type="button"
             onClick={submit}
             disabled={!text.trim() || busy}
-            className="rounded-lg bg-[image:var(--grad-calido)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-calido)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-calido-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
+            className="rounded-campo bg-[image:var(--grad-calido)] px-4 py-3 text-sm font-medium text-white shadow-[var(--sombra-calido)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-calido-toque)] disabled:bg-none disabled:bg-transparent disabled:text-texto-tenue disabled:shadow-none"
           >
-            Guardar
+            Guardar idea
           </button>
         </div>
       </div>
 
       {ideas.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-gray-500">
+        <p className="rounded-tarjeta border border-dashed border-borde px-4 py-8 text-center text-texto-apagado">
           Aún no has anotado ninguna idea.
         </p>
       ) : (
@@ -236,11 +236,11 @@ export default function IdeasView() {
         </ul>
       )}
 
-      <div className="mt-6 border-t border-gray-100 pt-4">
+      <div className="mt-6 border-t-[0.5px] border-separador pt-4">
         <button
           type="button"
           onClick={() => setShowArchived((v) => !v)}
-          className="text-sm font-medium text-gray-500 underline"
+          className="text-sm font-medium text-texto-apagado underline"
         >
           {showArchived ? 'Ocultar archivadas' : 'Ver archivadas'}
         </button>
@@ -252,7 +252,7 @@ export default function IdeasView() {
             ) : archivedError && !archivedData ? (
               <LoadError onRetry={reloadArchived} />
             ) : (archivedData ?? []).length === 0 ? (
-              <p className="text-sm text-gray-500">No hay ideas archivadas.</p>
+              <p className="text-sm text-texto-apagado">No hay ideas archivadas.</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {(archivedData ?? []).map((idea) => (
