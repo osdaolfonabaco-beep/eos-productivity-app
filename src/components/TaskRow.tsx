@@ -187,7 +187,7 @@ export default function TaskRow({
             aria-label={task.done ? 'Marcar como no hecha' : 'Marcar como hecha'}
             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[7px] border transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
               task.done
-                ? 'border-transparent bg-[var(--color-hecho)] text-tarjeta shadow-[var(--sombra-hecho)] active:shadow-[var(--sombra-hecho-toque)]'
+                ? 'border-transparent bg-[image:var(--grad-ind-hecho)] text-tarjeta shadow-[var(--sombra-ind-hecho)] active:shadow-[var(--sombra-ind-hecho-toque)]'
                 : 'border-[var(--color-campo-borde)] bg-[var(--color-campo)] shadow-[var(--sombra-hundida)] active:bg-separador'
             }`}
           >

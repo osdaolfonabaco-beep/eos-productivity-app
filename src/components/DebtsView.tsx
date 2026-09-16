@@ -122,7 +122,7 @@ function DebtCard({
         </p>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-separador">
           <div
-            className="h-full origin-left rounded-full bg-acento"
+            className="h-full origin-left rounded-full bg-[image:var(--grad-ind-acento)]"
             style={{
               transform: mounted ? 'scaleX(1)' : 'scaleX(0)',
               width: `${progressPct}%`,

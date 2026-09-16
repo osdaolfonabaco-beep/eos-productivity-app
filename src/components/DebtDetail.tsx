@@ -154,7 +154,10 @@ export default function DebtDetail({ debtId, onBack, onEdit }: DebtDetailProps) 
           Abonado {formatCOP(paid)} de {formatCOP(debt.openingBalance)}
         </p>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-separador">
-          <div className="h-full rounded-full bg-acento" style={{ width: `${progress}%` }} />
+          <div
+            className="h-full rounded-full bg-[image:var(--grad-ind-acento)]"
+            style={{ width: `${progress}%` }}
+          />
         </div>
         <p className="mt-2 text-sm tabular-nums text-texto-apagado">
           Cuota mensual {formatCOP(debt.monthlyPayment)}

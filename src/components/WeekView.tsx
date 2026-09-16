@@ -89,7 +89,7 @@ function DayHead({
       <div
         className={
           isToday
-            ? 'mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-acento text-white shadow-[var(--sombra-acento)]'
+            ? 'mx-auto mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-[image:var(--grad-ind-acento)] text-white shadow-[var(--sombra-ind-acento)]'
             : 'mt-0.5'
         }
       >

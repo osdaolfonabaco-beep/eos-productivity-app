@@ -53,7 +53,7 @@ const STATUS_META: Record<
     nextLabel: 'no hecho',
     stripe: 'border-l-hecho',
     badge:
-      'border-transparent bg-hecho text-white shadow-[var(--sombra-hecho)] group-active:shadow-[var(--sombra-hecho-toque)]',
+      'border-transparent bg-[image:var(--grad-ind-hecho)] text-white shadow-[var(--sombra-ind-hecho)] group-active:shadow-[var(--sombra-ind-hecho-toque)]',
     name: 'text-texto-apagado line-through',
     wash: 'linear-gradient(90deg, var(--color-hecho-lavado), transparent 42%)',
   },
@@ -62,7 +62,7 @@ const STATUS_META: Record<
     nextLabel: 'sin responder',
     stripe: 'border-l-fallado',
     badge:
-      'border-transparent bg-fallado text-white shadow-[var(--sombra-fallado)] group-active:shadow-[var(--sombra-fallado-toque)]',
+      'border-transparent bg-[image:var(--grad-ind-fallado)] text-white shadow-[var(--sombra-ind-fallado)] group-active:shadow-[var(--sombra-ind-fallado-toque)]',
     name: 'text-texto-cuerpo',
     wash: 'linear-gradient(90deg, var(--color-fallado-lavado), transparent 42%)',
   },
