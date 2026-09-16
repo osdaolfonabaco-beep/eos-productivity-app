@@ -3,9 +3,9 @@ import DebtsView from './components/DebtsView'
 import HabitsView from './components/HabitsView'
 import HomeView from './components/HomeView'
 import IdeasView from './components/IdeasView'
-import IncomesView from './components/IncomesView'
 import JournalView from './components/JournalView'
 import LoginScreen from './components/LoginScreen'
+import MovementsView from './components/MovementsView'
 import PlanView from './components/PlanView'
 import SalaryView from './components/SalaryView'
 import SectionNav from './components/SectionNav'
@@ -16,7 +16,7 @@ import { useSession } from './useSession'
 
 type Tab = 'hoy' | 'vida' | 'dinero' | 'ideas'
 type VidaSub = 'habitos' | 'semana' | 'journal' | 'plan'
-type DineroSub = 'deudas' | 'sueldo' | 'ingresos'
+type DineroSub = 'deudas' | 'sueldo' | 'movimientos'
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'hoy', label: 'Hoy' },
@@ -34,7 +34,7 @@ const VIDA_ITEMS: { value: VidaSub; label: string }[] = [
 
 const DINERO_ITEMS: { value: DineroSub; label: string }[] = [
   { value: 'sueldo', label: 'Sueldo' },
-  { value: 'ingresos', label: 'Ingresos' },
+  { value: 'movimientos', label: 'Movimientos' },
   { value: 'deudas', label: 'Deudas' },
 ]
 
@@ -109,8 +109,8 @@ export default function App() {
         <SectionNav items={DINERO_ITEMS} active={dineroSub} onChange={setDineroSub} />
         {dineroSub === 'sueldo' ? (
           <SalaryView />
-        ) : dineroSub === 'ingresos' ? (
-          <IncomesView />
+        ) : dineroSub === 'movimientos' ? (
+          <MovementsView />
         ) : (
           <DebtsView />
         )}

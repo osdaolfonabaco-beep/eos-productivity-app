@@ -170,6 +170,7 @@ export type { PeriodBreakdown } from './salaryPeriods'
 
 export {
   getSalaryPeriod,
+  listSalaryPeriods,
   setSalaryAmount,
   archiveSalaryPeriod,
   getPeriodBreakdown,

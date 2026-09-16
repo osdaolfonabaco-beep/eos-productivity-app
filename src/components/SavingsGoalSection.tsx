@@ -141,9 +141,9 @@ function GoalProgressBar({ percent }: { percent: number }) {
  * meta, muestra el estado vacío con el formulario para crearla.
  *
  * "Editar"/"Archivar" viven detrás del menú "⋯" (mismo patrón que
- * `IncomeRow`), y "Anotar un aporte" empieza replegado en una línea que
+ * `MovementRow`), y "Anotar un aporte" empieza replegado en una línea que
  * despliega el formulario (mismo patrón que "+ Anotar un ingreso…" en
- * `IncomeListSection`).
+ * `MovementListSection`).
  */
 export default function SavingsGoalSection({
   goal,

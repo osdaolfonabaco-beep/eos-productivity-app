@@ -37,6 +37,26 @@ export async function getSalaryPeriod(periodStart: string): Promise<SalaryPeriod
 }
 
 /**
+ * Los sueldos registrados con `periodStart` entre `start` y `end`, ambos
+ * incluidos, en una sola consulta — para cuando hace falta el sueldo de
+ * varias quincenas a la vez (el histórico de Movimientos) y pedirlo
+ * quincena por quincena sería una consulta de más por cada una.
+ */
+export async function listSalaryPeriods(start: string, end: string): Promise<SalaryPeriod[]> {
+  const rows = unwrap(
+    await supabase
+      .from('salary_periods')
+      .select(SALARY_PERIOD_COLS)
+      .gte('period_start', start)
+      .lte('period_start', end)
+      .eq('archived', false)
+      .order('period_start', { ascending: true }),
+    'listSalaryPeriods',
+  )
+  return rows.map(rowToSalaryPeriod)
+}
+
+/**
  * Registra el sueldo de una quincena, o lo corrige si ya había uno (una fila
  * por `periodStart`).
  *
