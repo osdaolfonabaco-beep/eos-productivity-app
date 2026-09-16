@@ -72,6 +72,13 @@ const STATUS_META: Record<
  * El glifo dentro del disco. La forma distingue los estados sin depender del
  * color: check para "hecho", cruz para "no hecho", nada (anillo vacío) para
  * "sin responder".
+ *
+ * Sobre el degradado de indicador (ver --grad-ind-hecho/fallado en
+ * index.css), el trazo blanco pierde contraste sin ayuda: un trazo más
+ * grueso y un contorno oscuro del mismo color de estado lo mantienen
+ * legible. `text-shadow` no pinta sobre un `<path>` de SVG -- el
+ * equivalente real es `filter: drop-shadow(...)`, con el mismo valor que
+ * los tokens --texto-glifo-*.
  */
 function Glyph({ status }: { status: EntryStatus }) {
   if (status === 'done') {
@@ -81,10 +88,11 @@ function Glyph({ status }: { status: EntryStatus }) {
         className="h-4 w-4"
         fill="none"
         stroke="currentColor"
-        strokeWidth={3}
+        strokeWidth={3.5}
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
+        style={{ filter: 'drop-shadow(var(--texto-glifo-hecho))' }}
       >
         <path d="M5 13l4 4L19 7" />
       </svg>
@@ -97,10 +105,11 @@ function Glyph({ status }: { status: EntryStatus }) {
         className="h-4 w-4"
         fill="none"
         stroke="currentColor"
-        strokeWidth={3}
+        strokeWidth={3.5}
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
+        style={{ filter: 'drop-shadow(var(--texto-glifo-fallado))' }}
       >
         <path d="M6 6l12 12M18 6L6 18" />
       </svg>

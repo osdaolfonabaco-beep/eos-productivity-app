@@ -240,9 +240,9 @@ body {
    * neón serían ruido, así que esa cuadrícula se queda con sus lavados
    * pálidos de siempre.
    */
-  --grad-ind-hecho: linear-gradient(to top, #047857, #35EFA3);
-  --grad-ind-fallado: linear-gradient(to top, #B4231F, #FF9340);
-  --grad-ind-acento: linear-gradient(to top, #5B3FD1, #28D9FF);
+  --grad-ind-hecho: linear-gradient(to top, #12D084, #5DF8BA);
+  --grad-ind-fallado: linear-gradient(to top, #FF5A46, #FFB35C);
+  --grad-ind-acento: linear-gradient(to top, #7B5AF0, #5BE7FF);
 
   /*
    * Sombras de color a juego con cada degradado cálido/indicador: van con
@@ -261,31 +261,37 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
 
   --sombra-ind-hecho:
-    0 0 14px rgba(53, 239, 163, 0.62),
-    0 1px 3px rgba(4, 120, 87, 0.38),
-    0 6px 13px -4px rgba(53, 239, 163, 0.50),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    0 0 16px rgba(53, 239, 163, 0.78),
+    0 0 4px rgba(53, 239, 163, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.60);
   --sombra-ind-hecho-toque:
-    0 0 8px rgba(53, 239, 163, 0.45),
-    0 1px 3px rgba(4, 120, 87, 0.30);
+    0 0 9px rgba(53, 239, 163, 0.58),
+    0 0 3px rgba(53, 239, 163, 0.40);
 
   --sombra-ind-fallado:
-    0 0 14px rgba(255, 147, 64, 0.62),
-    0 1px 3px rgba(180, 35, 31, 0.38),
-    0 6px 13px -4px rgba(255, 147, 64, 0.50),
-    inset 0 1px 0 rgba(255, 255, 255, 0.50);
+    0 0 16px rgba(255, 147, 64, 0.78),
+    0 0 4px rgba(255, 120, 80, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   --sombra-ind-fallado-toque:
-    0 0 8px rgba(255, 147, 64, 0.45),
-    0 1px 3px rgba(180, 35, 31, 0.30);
+    0 0 9px rgba(255, 147, 64, 0.58),
+    0 0 3px rgba(255, 120, 80, 0.40);
 
   --sombra-ind-acento:
-    0 0 14px rgba(40, 217, 255, 0.62),
-    0 1px 3px rgba(91, 63, 209, 0.38),
-    0 6px 13px -4px rgba(40, 217, 255, 0.50),
-    inset 0 1px 0 rgba(255, 255, 255, 0.50);
+    0 0 16px rgba(40, 217, 255, 0.78),
+    0 0 4px rgba(91, 63, 209, 0.50),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   --sombra-ind-acento-toque:
-    0 0 8px rgba(40, 217, 255, 0.45),
-    0 1px 3px rgba(91, 63, 209, 0.30);
+    0 0 9px rgba(40, 217, 255, 0.58),
+    0 0 3px rgba(91, 63, 209, 0.35);
+
+  /*
+   * Contorno del glifo blanco (check/equis) sobre el degradado de indicador
+   * correspondiente: sin él, el trazo blanco pierde contraste contra un
+   * neón tan claro. Un tono oscuro del mismo color de estado, no negro puro,
+   * para que se lea como sombra y no como borde.
+   */
+  --texto-glifo-hecho: 0 1px 2px rgba(3, 64, 44, 0.85);
+  --texto-glifo-fallado: 0 1px 2px rgba(74, 18, 6, 0.85);
 
   --sombra-principal:
     0 2px 6px rgba(123, 90, 240, 0.18),

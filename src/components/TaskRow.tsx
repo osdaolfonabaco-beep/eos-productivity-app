@@ -25,16 +25,20 @@ type Mode = 'view' | 'edit' | 'move' | 'confirm-archive'
 const CHECKBOX_BASE =
   'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border'
 
+// El trazo va más grueso y con un contorno oscuro (drop-shadow, el
+// equivalente real de text-shadow sobre un <path> de SVG) para que aguante
+// sobre el neón de --grad-ind-hecho -- ver el mismo criterio en HabitRow.
 const CHECK_GLYPH = (
   <svg
     viewBox="0 0 24 24"
     className="h-3.5 w-3.5"
     fill="none"
     stroke="currentColor"
-    strokeWidth={3}
+    strokeWidth={3.5}
     strokeLinecap="round"
     strokeLinejoin="round"
     aria-hidden="true"
+    style={{ filter: 'drop-shadow(var(--texto-glifo-hecho))' }}
   >
     <path d="M5 13l4 4L19 7" />
   </svg>
