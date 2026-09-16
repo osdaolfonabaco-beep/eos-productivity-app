@@ -31,6 +31,7 @@ export type {
   SavingsGoal,
   SavingsContribution,
   Income,
+  Expense,
 } from './types'
 
 export {
@@ -202,3 +203,14 @@ export {
 export type { IncomeInput } from './incomes'
 
 export { listIncomes, createIncome, updateIncome, archiveIncome, sumIncomes } from './incomes'
+
+export type { ExpenseInput } from './expenses'
+
+export {
+  listExpenses,
+  createExpense,
+  updateExpense,
+  archiveExpense,
+  sumExpenses,
+  fixedExpenseIdsWithExpenseInRange,
+} from './expenses'

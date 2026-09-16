@@ -170,8 +170,12 @@ export default function PeriodSection({
               </div>
             )}
             <div className="flex justify-between gap-2 border-b-[0.5px] border-separador py-2 text-texto-cuerpo">
-              <dt>Gastos fijos de esta quincena</dt>
-              <dd className="tabular-nums">− {formatCOP(breakdown.fixedExpensesTotal)}</dd>
+              <dt>Gastos reales de esta quincena</dt>
+              <dd className="tabular-nums">− {formatCOP(breakdown.expensesTotal)}</dd>
+            </div>
+            <div className="flex justify-between gap-2 border-b-[0.5px] border-separador py-2 text-texto-cuerpo">
+              <dt>Gastos fijos pendientes</dt>
+              <dd className="tabular-nums">− {formatCOP(breakdown.pendingFixedExpensesTotal)}</dd>
             </div>
             <div className="flex justify-between gap-2 border-b-[0.5px] border-separador py-2 text-texto-cuerpo">
               <dt>Pagos a deudas de este período</dt>
@@ -182,8 +186,12 @@ export default function PeriodSection({
                 negative ? 'text-fallado' : 'text-hecho'
               }`}
             >
-              <dt className="text-sm text-texto">Disponible</dt>
+              <dt className="text-sm text-texto">Disponible ahora</dt>
               <dd className="text-destacado tabular-nums">{formatCOP(breakdown.available)}</dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-2 pt-1 text-texto-apagado">
+              <dt className="text-xs">Queda si pagas lo pendiente</dt>
+              <dd className="text-sm tabular-nums">{formatCOP(breakdown.projected)}</dd>
             </div>
           </dl>
         )}

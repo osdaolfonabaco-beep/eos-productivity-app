@@ -313,6 +313,39 @@ export interface Income {
   archived: boolean
 }
 
+/**
+ * Un gasto real: lo que de verdad se gastó, con fecha y monto — a diferencia
+ * de `FixedExpense`, que es solo la plantilla de lo esperado. Ver el
+ * comentario largo en `getPeriodBreakdown` para el porqué de la distinción.
+ *
+ * Puede venir de una plantilla (`fixedExpenseId` apunta a un `FixedExpense`)
+ * o ser suelto (`fixedExpenseId` es `null`). El gasto siempre cuenta en la
+ * quincena de SU `date`, nunca en la de la plantilla que referencia — pagar
+ * con retraso un gasto de la plantilla de la primera quincena, ya en la
+ * segunda, es válido y no se corrige ni se avisa.
+ */
+export interface Expense {
+  id: string
+  /** Fecha local en formato `YYYY-MM-DD`. */
+  date: string
+  /** Pesos colombianos, entero > 0 y <= 100.000.000.000 (mismo tope que la base). */
+  amount: number
+  /** Obligatorio: qué fue el gasto. A diferencia de `category`/`note`, no puede quedar vacío. */
+  concept: string
+  /** Texto libre. `null` si no se indicó o si quedó vacía tras recortar espacios. */
+  category: string | null
+  /** Nota opcional. `null` si no se indicó o si quedó vacía tras recortar. */
+  note: string | null
+  /**
+   * La plantilla de gasto fijo de la que vino este gasto, o `null` si fue
+   * suelto. Si la plantilla se borra de verdad (no archivada), esto pasa a
+   * `null` solo: el gasto ya ocurrió y no desaparece con ella.
+   */
+  fixedExpenseId: string | null
+  createdAt: string
+  archived: boolean
+}
+
 // --- Cifrado del diario -----------------------------------------------
 
 /**

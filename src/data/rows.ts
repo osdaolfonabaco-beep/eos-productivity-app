@@ -11,6 +11,7 @@ import type {
   DayComment,
   Debt,
   DebtStatus,
+  Expense,
   FixedExpense,
   GoalDirection,
   GoalResult,
@@ -48,6 +49,8 @@ export const FIXED_EXPENSE_COLS = 'id,name,amount,quincena,archived,created_at'
 export const SAVINGS_GOAL_COLS = 'id,name,target_amount,target_date,archived,created_at'
 export const SAVINGS_CONTRIBUTION_COLS = 'id,goal_id,date,amount,archived,created_at'
 export const INCOME_COLS = 'id,date,amount,category,note,archived,created_at'
+export const EXPENSE_COLS =
+  'id,date,amount,concept,category,note,fixed_expense_id,archived,created_at'
 export const JOURNAL_KEY_COLS =
   'id,wrapped_dek_password,salt_password,iv_password,wrapped_dek_recovery,salt_recovery,iv_recovery,created_at,updated_at'
 
@@ -483,6 +486,46 @@ export function incomeToRow(i: Income) {
     note: i.note,
     archived: i.archived,
     created_at: i.createdAt,
+  }
+}
+
+interface ExpenseRow {
+  id: string
+  date: string
+  amount: number | string
+  concept: string
+  category: string | null
+  note: string | null
+  fixed_expense_id: string | null
+  archived: boolean
+  created_at: string
+}
+
+export function rowToExpense(r: ExpenseRow): Expense {
+  return {
+    id: r.id,
+    date: r.date,
+    amount: Number(r.amount),
+    concept: r.concept,
+    category: r.category,
+    note: r.note,
+    fixedExpenseId: r.fixed_expense_id,
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function expenseToRow(e: Expense) {
+  return {
+    id: e.id,
+    date: e.date,
+    amount: e.amount,
+    concept: e.concept,
+    category: e.category,
+    note: e.note,
+    fixed_expense_id: e.fixedExpenseId,
+    archived: e.archived,
+    created_at: e.createdAt,
   }
 }
 

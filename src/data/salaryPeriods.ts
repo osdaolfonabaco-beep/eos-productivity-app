@@ -9,6 +9,7 @@
  */
 
 import { isISODate, quincenaLabel } from './dates'
+import { fixedExpenseIdsWithExpenseInRange, listExpenses, sumExpenses } from './expenses'
 import { fixedExpensesForQuincena, listFixedExpenses, sumFixedExpenses } from './fixedExpenses'
 import { listIncomes, sumIncomes } from './incomes'
 import {
@@ -19,7 +20,7 @@ import {
   salaryPeriodToRow,
 } from './rows'
 import { supabase, unwrap } from './supabase'
-import type { FixedExpense, Income, Payment, SalaryPeriod } from './types'
+import type { Expense, FixedExpense, Income, Payment, SalaryPeriod } from './types'
 
 /** El sueldo registrado para la quincena que empieza en `periodStart`, o `undefined`. */
 export async function getSalaryPeriod(periodStart: string): Promise<SalaryPeriod | undefined> {
@@ -102,18 +103,66 @@ export interface PeriodBreakdown {
   salary: SalaryPeriod | undefined
   incomes: Income[]
   incomesTotal: number
-  fixedExpenses: FixedExpense[]
-  fixedExpensesTotal: number
+  /** Los gastos reales (tabla `expenses`) con fecha dentro de este período. */
+  expenses: Expense[]
+  expensesTotal: number
+  /**
+   * Las plantillas de gastos fijos que aplican a esta quincena y que
+   * TODAVÍA NO tienen un gasto real asociado en ella (ver el comentario de
+   * `getPeriodBreakdown` para el porqué de "pendiente").
+   */
+  pendingFixedExpenses: FixedExpense[]
+  pendingFixedExpensesTotal: number
   debtPayments: Payment[]
   debtPaymentsTotal: number
-  /** Sueldo (0 si no hay) + ingresos extra − gastos fijos aplicables − pagos a deudas. Puede dar negativo. */
+  /** Sueldo (0 si no hay) + ingresos extra − gastos reales − pagos a deudas. Puede dar negativo. */
   available: number
+  /** `available` menos lo que falta pagar de las plantillas de gastos fijos. Puede dar negativo. */
+  projected: number
 }
 
 /**
- * El desglose completo de una quincena: sueldo, ingresos extra, gastos fijos
- * que le aplican y pagos a deudas hechos dentro de ese rango. Todo se calcula
- * aquí; nada de esto se guarda.
+ * El desglose completo de una quincena: sueldo, ingresos extra, gastos
+ * reales y pagos a deudas hechos dentro de ese rango, más la proyección de
+ * gastos fijos pendientes. Todo se calcula aquí; nada de esto se guarda.
+ *
+ * ────────────────────────────────────────────────────────────────────────
+ * EL MODELO — léelo entero antes de tocar esta función.
+ *
+ * `fixed_expenses` es una PLANTILLA: lo que esperas gastar cada quincena
+ * (arriendo, streaming, etc.), no un hecho. Por eso ya NO se resta de
+ * `available` — hacerlo sumaría un gasto que quizás todavía no ocurrió, o
+ * que ya ocurrió pero con un monto distinto al de la plantilla.
+ *
+ * `expenses` es lo REAL: cada fila es un gasto que de verdad pasó, con su
+ * fecha y su monto exactos (algunos vienen de una plantilla vía
+ * `fixedExpenseId`, otros son sueltos). `available` resta esto, y solo
+ * esto — es la cifra "cuánta plata tengo de verdad ahora mismo", y
+ * cualquier cosa que no haya ocurrido todavía no puede restar de un hecho.
+ *
+ *   available = sueldo + ingresos extra − gastos reales − pagos a deudas
+ *
+ * El problema de quedarse solo con `available`: si todavía no has pagado el
+ * arriendo de esta quincena, `available` no lo sabe, y el número parece más
+ * alto de lo que en la práctica vas a poder gastar. Para eso existe
+ * `projected`: toma `available` y le resta el total de las plantillas que
+ * aplican a esta quincena (`fixedExpensesForQuincena`) y que TODAVÍA no
+ * tienen un gasto real que las cubra (`pendingFixedExpenses`, deducido con
+ * `fixedExpenseIdsWithExpenseInRange` — nunca guardado, siempre recalculado
+ * a partir de `expenses`).
+ *
+ *   projected = available − total de plantillas pendientes de esta quincena
+ *
+ * Si ya se pagaron todos los gastos fijos de la quincena, `pendingFixedExpenses`
+ * queda vacío y `projected === available`: las dos cifras coinciden porque ya
+ * no queda nada pendiente que proyectar.
+ *
+ * LA TRAMPA para dentro de un año: NUNCA restar `fixedExpensesTotal` (el
+ * total de la plantilla completa) de `available` — eso es volver al modelo
+ * viejo, donde un gasto fijo ya pagado se restaba dos veces (una como
+ * plantilla, otra como gasto real). Los gastos fijos SOLO entran en
+ * `projected`, y solo la parte pendiente.
+ * ────────────────────────────────────────────────────────────────────────
  */
 export async function getPeriodBreakdown(
   periodStart: string,
@@ -121,36 +170,49 @@ export async function getPeriodBreakdown(
 ): Promise<PeriodBreakdown> {
   const label = quincenaLabel(periodStart)
 
-  const [salary, incomes, allFixedExpenses, debtPayments] = await Promise.all([
-    getSalaryPeriod(periodStart),
-    listIncomes(periodStart, periodEnd),
-    listFixedExpenses(),
-    getPaymentsInRange(periodStart, periodEnd),
-  ])
+  const [salary, incomes, expenses, allFixedExpenses, paidFixedExpenseIds, debtPayments] =
+    await Promise.all([
+      getSalaryPeriod(periodStart),
+      listIncomes(periodStart, periodEnd),
+      listExpenses(periodStart, periodEnd),
+      listFixedExpenses(),
+      fixedExpenseIdsWithExpenseInRange(periodStart, periodEnd),
+      getPaymentsInRange(periodStart, periodEnd),
+    ])
 
   const incomesTotal = sumIncomes(incomes)
-  const fixedExpenses = fixedExpensesForQuincena(allFixedExpenses, label)
-  const fixedExpensesTotal = sumFixedExpenses(fixedExpenses)
+  const expensesTotal = sumExpenses(expenses)
+  const fixedExpensesForThisQuincena = fixedExpensesForQuincena(allFixedExpenses, label)
+  const pendingFixedExpenses = fixedExpensesForThisQuincena.filter(
+    (e) => !paidFixedExpenseIds.has(e.id),
+  )
+  const pendingFixedExpensesTotal = sumFixedExpenses(pendingFixedExpenses)
   const debtPaymentsTotal = debtPayments.reduce((total, p) => total + p.amount, 0)
+
+  // OJO al volver a este archivo dentro de un año: el sueldo vive en
+  // `salary_periods`, nunca en `incomes` (ver el comentario en la cabecera
+  // de incomes.ts). `salary?.amount ?? 0` es la ÚNICA vez que el sueldo
+  // entra en esta cuenta — si `incomes` alguna vez empezara a incluir el
+  // sueldo, hay que QUITARLO de aquí, no sumarlo también: sumar las dos
+  // fuentes duplicaría el sueldo y el disponible saldría inflado.
+  // Sin sueldo registrado, cuenta como 0 (no como "disponible = 0"): con
+  // ingresos extra y sin sueldo el resultado puede ser positivo, y con
+  // gastos/pagos que superan lo que sí entró puede dar negativo — los dos
+  // casos son correctos y PeriodSection ya pinta el negativo en rojo.
+  const available = (salary?.amount ?? 0) + incomesTotal - expensesTotal - debtPaymentsTotal
+  const projected = available - pendingFixedExpensesTotal
 
   return {
     salary,
     incomes,
     incomesTotal,
-    fixedExpenses,
-    fixedExpensesTotal,
+    expenses,
+    expensesTotal,
+    pendingFixedExpenses,
+    pendingFixedExpensesTotal,
     debtPayments,
     debtPaymentsTotal,
-    // OJO al volver a este archivo dentro de un año: el sueldo vive en
-    // `salary_periods`, nunca en `incomes` (ver el comentario en la cabecera
-    // de incomes.ts). `salary?.amount ?? 0` es la ÚNICA vez que el sueldo
-    // entra en esta cuenta — si `incomes` alguna vez empezara a incluir el
-    // sueldo, hay que QUITARLO de aquí, no sumarlo también: sumar las dos
-    // fuentes duplicaría el sueldo y el disponible saldría inflado.
-    // Sin sueldo registrado, cuenta como 0 (no como "disponible = 0"): con
-    // ingresos extra y sin sueldo el resultado puede ser positivo, y con
-    // gastos/pagos que superan lo que sí entró puede dar negativo — los dos
-    // casos son correctos y PeriodSection ya pinta el negativo en rojo.
-    available: (salary?.amount ?? 0) + incomesTotal - fixedExpensesTotal - debtPaymentsTotal,
+    available,
+    projected,
   }
 }
