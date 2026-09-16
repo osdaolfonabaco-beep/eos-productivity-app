@@ -119,10 +119,11 @@ function GoalForm({
 function GoalProgressBar({ percent }: { percent: number }) {
   const mounted = useMounted()
   return (
-    <div className="mt-2 h-2 overflow-hidden rounded-full bg-separador">
+    <div className="mt-2 h-2 overflow-hidden rounded-full bg-separador shadow-[var(--sombra-hundida)]">
       <div
-        className="h-full origin-left rounded-full bg-acento"
+        className="h-full origin-left rounded-full"
         style={{
+          background: 'linear-gradient(to bottom, var(--color-acento), var(--color-acento-toque))',
           transform: mounted ? 'scaleX(1)' : 'scaleX(0)',
           width: `${percent}%`,
           transitionProperty: 'transform',
@@ -138,6 +139,11 @@ function GoalProgressBar({ percent }: { percent: number }) {
  * Bloque 3 de la vista Sueldo: la meta de ahorro activa (una sola a la vez),
  * su progreso, el campo para anotar un aporte y los últimos aportes. Sin
  * meta, muestra el estado vacío con el formulario para crearla.
+ *
+ * "Editar"/"Archivar" viven detrás del menú "⋯" (mismo patrón que
+ * `IncomeRow`), y "Anotar un aporte" empieza replegado en una línea que
+ * despliega el formulario (mismo patrón que "+ Anotar un ingreso…" en
+ * `IncomeListSection`).
  */
 export default function SavingsGoalSection({
   goal,
@@ -150,6 +156,8 @@ export default function SavingsGoalSection({
   onArchiveContribution,
 }: SavingsGoalSectionProps) {
   const [mode, setMode] = useState<'view' | 'edit' | 'confirm-archive'>('view')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
   const [contribDate, setContribDate] = useState(todayISO())
   const [contribAmount, setContribAmount] = useState('')
   const [confirmingContribId, setConfirmingContribId] = useState<string | null>(null)
@@ -199,6 +207,7 @@ export default function SavingsGoalSection({
     onAddContribution(goal.id, contribDate, contribAmountValue)
     setContribAmount('')
     setContribDate(todayISO())
+    setFormOpen(false)
   }
 
   return (
@@ -230,9 +239,20 @@ export default function SavingsGoalSection({
         </div>
       ) : (
         <div className="rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="break-words text-contenido font-medium text-texto">{goal.name}</span>
-            <span className="shrink-0 text-sm font-semibold tabular-nums text-texto">{percent}%</span>
+          <div className="flex items-start justify-between gap-2">
+            <span className="min-w-0 break-words text-contenido font-medium text-texto">{goal.name}</span>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="text-sm font-semibold tabular-nums text-texto">{percent}%</span>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-expanded={menuOpen}
+                aria-label="Más acciones para la meta de ahorro"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-campo text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+              >
+                ⋯
+              </button>
+            </div>
           </div>
           <GoalProgressBar percent={percent} />
           <p className="mt-2 text-sm tabular-nums text-texto-apagado">
@@ -243,59 +263,80 @@ export default function SavingsGoalSection({
             <p className="mt-0.5 text-xs text-texto-tenue">Meta: {formatShortDate(goal.targetDate)}</p>
           )}
 
-          <div className="mt-3 flex gap-4">
-            <button
-              type="button"
-              onClick={() => setMode('edit')}
-              className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('confirm-archive')}
-              className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
-            >
-              Archivar
-            </button>
-          </div>
+          {menuOpen && (
+            <div className="mt-3 flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setMode('edit')
+                }}
+                className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setMode('confirm-archive')
+                }}
+                className="-mx-1 -my-0.5 rounded px-1 py-0.5 text-sm font-medium text-texto-apagado transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador"
+              >
+                Archivar
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="mt-4 rounded-tarjeta border border-borde bg-tarjeta p-3 shadow-[var(--sombra-tarjeta)]">
-        <h3 className="mb-2 text-sm font-medium text-texto-cuerpo">Anotar un aporte</h3>
-        <form onSubmit={submitContribution} className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-texto-apagado">Fecha</span>
-            <input
-              type="date"
-              value={contribDate}
-              max={todayISO()}
-              onChange={(e) => setContribDate(e.target.value)}
-              disabled={busy}
-              className={`${campoClass} py-2`}
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1">
-            <span className="text-xs text-texto-apagado">Monto</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={contribAmount}
-              onChange={(e) => setContribAmount(e.target.value)}
-              placeholder="$ 0"
-              disabled={busy}
-              className={`w-full ${campoClass} py-2`}
-            />
-          </label>
+      <div className="mt-4 overflow-hidden rounded-tarjeta border border-borde bg-tarjeta shadow-[var(--sombra-tarjeta)]">
+        {formOpen ? (
+          <div className="p-3">
+            <h3 className="mb-2 text-sm font-medium text-texto-cuerpo">Anotar un aporte</h3>
+            <form onSubmit={submitContribution} className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-texto-apagado">Fecha</span>
+                <input
+                  type="date"
+                  value={contribDate}
+                  max={todayISO()}
+                  onChange={(e) => setContribDate(e.target.value)}
+                  disabled={busy}
+                  className={`${campoClass} py-2`}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-xs text-texto-apagado">Monto</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={contribAmount}
+                  onChange={(e) => setContribAmount(e.target.value)}
+                  placeholder="$ 0"
+                  disabled={busy}
+                  className={`w-full ${campoClass} py-2`}
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={!canAddContrib}
+                className="rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+              >
+                Anotar
+              </button>
+            </form>
+          </div>
+        ) : (
           <button
-            type="submit"
-            disabled={!canAddContrib}
-            className="rounded-campo bg-texto px-4 py-2 text-sm font-medium text-tarjeta transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-[var(--color-texto-toque)] disabled:bg-transparent disabled:text-texto-tenue"
+            type="button"
+            onClick={() => setFormOpen(true)}
+            className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador"
           >
-            Anotar
+            <span aria-hidden="true">+</span>
+            <span>Anotar un aporte</span>
           </button>
-        </form>
+        )}
       </div>
 
       {contributions.length > 0 && (
