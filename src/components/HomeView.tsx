@@ -192,9 +192,10 @@ function TasksToday() {
 /**
  * La pantalla de inicio: el título del día, los hábitos de hoy, las tareas
  * de hoy y las atrasadas, el comentario del día, y el análisis a pedido.
- * Cada bloque carga por su cuenta.
+ * Cada bloque carga por su cuenta. `onOpenMentor` solo lo usa la sección
+ * Mentor, para su enlace "Ver todo el historial" — ver App.tsx.
  */
-export default function HomeView() {
+export default function HomeView({ onOpenMentor }: { onOpenMentor: () => void }) {
   return (
     <main className="pb-2 text-gray-900">
       <header className="px-4 pt-4">
@@ -204,7 +205,7 @@ export default function HomeView() {
       <TodayHabits />
       <TasksToday />
       <DayCommentSection />
-      <AnalysisSection />
+      <AnalysisSection onOpenMentor={onOpenMentor} />
     </main>
   )
 }

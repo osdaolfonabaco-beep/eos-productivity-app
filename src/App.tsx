@@ -5,6 +5,7 @@ import HomeView from './components/HomeView'
 import IdeasView from './components/IdeasView'
 import JournalView from './components/JournalView'
 import LoginScreen from './components/LoginScreen'
+import MentorView from './components/MentorView'
 import MovementsView from './components/MovementsView'
 import PlanView from './components/PlanView'
 import SalaryView from './components/SalaryView'
@@ -89,10 +90,16 @@ export default function App() {
   const [vidaSub, setVidaSub] = useState<VidaSub>('semana')
   const [dineroSub, setDineroSub] = useState<DineroSub>('sueldo')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Se abre desde el enlace "Ver todo el historial" de la sección Mentor en
+  // Hoy. Mismo patrón que `settingsOpen`: no hay una quinta casilla en la
+  // barra inferior ni una quinta pastilla en Vida, así que la pantalla
+  // reemplaza `content` entera, con su propio botón de volver.
+  const [mentorOpen, setMentorOpen] = useState(false)
 
   function go(next: Tab) {
     setTab(next)
     setSettingsOpen(false)
+    setMentorOpen(false)
   }
 
   let content: ReactNode
@@ -100,8 +107,10 @@ export default function App() {
     content = (
       <SettingsView onClose={() => setSettingsOpen(false)} email={session?.user.email} />
     )
+  } else if (mentorOpen) {
+    content = <MentorView onClose={() => setMentorOpen(false)} />
   } else if (tab === 'hoy') {
-    content = <HomeView />
+    content = <HomeView onOpenMentor={() => setMentorOpen(true)} />
   } else if (tab === 'vida') {
     content = (
       <>
@@ -150,7 +159,10 @@ export default function App() {
           <header className="flex h-11 items-center justify-end px-2">
             <button
               type="button"
-              onClick={() => setSettingsOpen((open) => !open)}
+              onClick={() => {
+                setSettingsOpen((open) => !open)
+                setMentorOpen(false)
+              }}
               aria-label="Ajustes"
               aria-pressed={settingsOpen}
               className={`rounded-lg p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-800 ${
@@ -169,7 +181,7 @@ export default function App() {
                 <BottomTab
                   key={t.value}
                   label={t.label}
-                  active={!settingsOpen && tab === t.value}
+                  active={!settingsOpen && !mentorOpen && tab === t.value}
                   onClick={() => go(t.value)}
                 />
               ))}

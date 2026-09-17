@@ -7,8 +7,8 @@
  * los mismos números, solo que uno los dibuja y el otro los describe.
  */
 
-import { addDays, startOfWeekISO, toISODate } from './dates'
-import { getEntriesInRange, listHabits } from './store'
+import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
+import { getEntriesInRange, listAllHabits, listHabits } from './store'
 import type { Habit } from './types'
 
 export interface WeekRange {
@@ -103,4 +103,98 @@ export async function getWeeklyHabitStats(today: string): Promise<WeeklyStats> {
     hayHistoriaSuficiente: habitos.some((h) => h.semanaAnterior !== null),
     habitos,
   }
+}
+
+/** El resultado de `getWeekCompletionPercentages` para una sola semana. */
+export interface WeekCompletion {
+  pct: number
+  /**
+   * Señal CONSERVADORA de que este número podría no ser exacto: ver el
+   * comentario grande de `getWeekCompletionPercentages`, justo abajo, antes
+   * de decidir qué hacer con esto en la interfaz.
+   */
+  quizasIncompleto: boolean
+}
+
+/**
+ * El % de cumplimiento (hecho / días transcurridos) de cada semana de
+ * `weekStarts`, todas de una vez -- pensado para pantallas que miran hacia
+ * atrás sobre MUCHAS semanas de golpe (el historial del Mentor), no para el
+ * dashboard en vivo de una semana sola. Un solo `listAllHabits()` y un solo
+ * `getEntriesInRange()` que cubre desde la primera semana pedida hasta la
+ * última, sin importar cuántas semanas se pidan.
+ *
+ * ============================================================================
+ * POR QUÉ NO REUTILIZA `getWeeklyHabitStats` -- LÉELO ANTES DE UNIFICARLAS
+ * ============================================================================
+ * `getWeeklyHabitStats` llama a `listHabits()`, que filtra `archived =
+ * false` -- correcto para el dashboard EN VIVO (Vida -> Semana), que solo
+ * quiere enseñar los hábitos que sigues llevando hoy. Pero para una semana
+ * PASADA eso falsea el resultado: si un hábito estuvo activo esa semana y
+ * DESPUÉS se archivó, sus `habit_entries` de esa semana siguen existiendo
+ * intactos -- pero `listHabits()` ya no lo trae, así que su aporte
+ * desaparece de la cuenta sin ningún aviso. El % de esa semana pasada
+ * quedaría calculado con menos datos de los que de verdad hubo.
+ *
+ * Esta función usa `listAllHabits()` (activos Y archivados) a propósito.
+ * No hay `archived_at` en el esquema, así que no se puede saber el día
+ * exacto en que un hábito se archivó: si fue a mitad de esa semana, sus
+ * días posteriores a ese momento cuentan aquí como "sin responder" en vez
+ * de "ya no aplica". Por eso cada resultado lleva `quizasIncompleto` -- una
+ * señal CONSERVADORA (se enciende si algún hábito que contó esa semana está
+ * archivado HOY, aunque se haya archivado mucho después y esa semana en
+ * concreto esté perfectamente completa) para que la interfaz pueda avisarlo
+ * en vez de fingir una precisión que el esquema no tiene.
+ *
+ * Si en el futuro "simplificas" esto reemplazándola por
+ * `getWeeklyHabitStats`, estás reintroduciendo el sesgo de arriba: las
+ * semanas pasadas con algún hábito ya archivado volverán a calcularse mal,
+ * en silencio.
+ * ============================================================================
+ */
+export async function getWeekCompletionPercentages(
+  weekStarts: string[],
+): Promise<Map<string, WeekCompletion>> {
+  const result = new Map<string, WeekCompletion>()
+  if (weekStarts.length === 0) return result
+
+  const today = todayISO()
+  const sorted = [...weekStarts].sort()
+  const rangeStart = sorted[0]
+  const rangeEnd = addDays(sorted[sorted.length - 1], 6)
+
+  const [habits, entries] = await Promise.all([
+    listAllHabits(),
+    getEntriesInRange(rangeStart, rangeEnd),
+  ])
+  const entriesByKey = new Map(entries.map((e) => [`${e.habitId}|${e.date}`, e.done]))
+
+  for (const weekStart of weekStarts) {
+    const weekEnd = addDays(weekStart, 6)
+    const relevant = habits.filter((h) => toISODate(new Date(h.createdAt)) <= weekEnd)
+    if (relevant.length === 0) continue // ningún hábito existía todavía esa semana: no hay nada que calcular
+
+    let hecho = 0
+    let diasTranscurridos = 0
+    let quizasIncompleto = false
+    const lastDay = weekEnd > today ? today : weekEnd
+    for (const habit of relevant) {
+      if (habit.archived) quizasIncompleto = true
+      const createdDate = toISODate(new Date(habit.createdAt))
+      for (let d = weekStart; d <= lastDay; d = addDays(d, 1)) {
+        if (d < createdDate) continue
+        diasTranscurridos++
+        if (entriesByKey.get(`${habit.id}|${d}`)) hecho++
+      }
+    }
+
+    if (diasTranscurridos > 0) {
+      result.set(weekStart, {
+        pct: Math.round((hecho / diasTranscurridos) * 100),
+        quizasIncompleto,
+      })
+    }
+  }
+
+  return result
 }

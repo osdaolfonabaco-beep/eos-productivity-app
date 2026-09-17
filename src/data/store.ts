@@ -26,6 +26,18 @@ export async function listHabits(): Promise<Habit[]> {
   return rows.map(rowToHabit)
 }
 
+/**
+ * Todos los hábitos, activos y archivados, sin ordenar por `order` (ese
+ * orden solo tiene sentido para la lista activa). Para cálculos que miran
+ * hacia atrás y necesitan hábitos que ya no están activos hoy pero sí lo
+ * estuvieron en el pasado -- ver `getWeekCompletionPercentages` en
+ * `./weeklyStats`, que es quien la usa.
+ */
+export async function listAllHabits(): Promise<Habit[]> {
+  const rows = unwrap(await supabase.from('habits').select(HABIT_COLS), 'listAllHabits')
+  return rows.map(rowToHabit)
+}
+
 /** Un hábito por id, o `undefined` si no existe. Incluye los archivados. */
 export async function getHabit(id: string): Promise<Habit | undefined> {
   const rows = unwrap(

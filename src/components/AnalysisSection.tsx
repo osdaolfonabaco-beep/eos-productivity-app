@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { archiveMentorAnalysis, listMentorAnalyses, requestAnalysis, todayISO } from '../data'
+import {
+  archiveMentorAnalysis,
+  firstWords,
+  formatAnalysisDate,
+  listMentorAnalyses,
+  requestAnalysis,
+  todayISO,
+} from '../data'
 import { useAsyncData } from '../useAsyncData'
 import { useMounted } from '../useMounted'
 import { ActionError, LoadError, Loading } from './ViewState'
@@ -23,20 +30,6 @@ function ChevronIcon() {
       <path d="M6 9l6 6 6-6" />
     </svg>
   )
-}
-
-/** "Hoy" si `periodStart` es hoy; si no, una fecha corta ("08 sept"). Solo para mostrar. */
-function formatAnalysisDate(periodStart: string, today: string): string {
-  if (periodStart === today) return 'Hoy'
-  const [y, m, d] = periodStart.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
-}
-
-/** Las primeras `maxWords` palabras de `text`, con "…" si se corta. Para la vista plegada. */
-function firstWords(text: string, maxWords = 12): string {
-  const words = text.trim().split(/\s+/)
-  if (words.length <= maxWords) return text.trim()
-  return `${words.slice(0, maxWords).join(' ')}…`
 }
 
 /**
@@ -197,8 +190,9 @@ interface PendingEntry {
 /**
  * La sección Mentor de Hoy: pide un análisis diario y muestra el historial
  * reciente (el más reciente desplegado, los dos anteriores plegados).
+ * `onOpenMentor` abre la pantalla completa del historial (ver App.tsx).
  */
-export default function AnalysisSection() {
+export default function AnalysisSection({ onOpenMentor }: { onOpenMentor: () => void }) {
   const today = todayISO()
   const fetcher = useCallback(() => listMentorAnalyses('diario', HISTORY_LIMIT), [])
   const { data: history, loading, error, reload } = useAsyncData(fetcher)
@@ -334,13 +328,13 @@ export default function AnalysisSection() {
         )}
       </div>
 
-      {/*
-       * Sin onClick a propósito: todavía no hay pantalla del Mentor a la que
-       * llevar. Texto plano, no un <button>/<a> que finja una navegación que
-       * no existe -- cuando esa pantalla se construya, cambiar esto por un
-       * enlace real es un cambio de una línea.
-       */}
-      <p className="mt-3 text-center text-xs text-texto-tenue">Ver todo el historial</p>
+      <button
+        type="button"
+        onClick={onOpenMentor}
+        className="mt-3 block w-full text-center text-xs font-medium text-texto-apagado underline"
+      >
+        Ver todo el historial
+      </button>
     </section>
   )
 }

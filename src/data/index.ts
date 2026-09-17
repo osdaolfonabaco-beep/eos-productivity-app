@@ -50,6 +50,7 @@ export {
 
 export {
   listHabits,
+  listAllHabits,
   getHabit,
   createHabit,
   renameHabit,
@@ -142,9 +143,15 @@ export { getDayComment, getDayCommentsInRange, saveDayComment } from './dayComme
 
 export { requestAnalysis, requestWeeklyAnalysis, requestIdeaAnalysis } from './analysis'
 
-export type { WeekRange, HabitWeekStats, HabitWeeklyBreakdown, WeeklyStats } from './weeklyStats'
+export type {
+  WeekRange,
+  HabitWeekStats,
+  HabitWeeklyBreakdown,
+  WeeklyStats,
+  WeekCompletion,
+} from './weeklyStats'
 
-export { getWeeklyHabitStats } from './weeklyStats'
+export { getWeeklyHabitStats, getWeekCompletionPercentages } from './weeklyStats'
 
 export type { Tone, ReminderTimes } from './preferences'
 
@@ -225,12 +232,17 @@ export {
   fixedExpenseIdsWithExpenseInRange,
 } from './expenses'
 
-export type { MentorAnalysisInput } from './mentor'
+export type { MentorAnalysisInput, MentorActivitySummary, MentorMonthGroup } from './mentor'
 
 export {
   saveMentorAnalysis,
   listMentorAnalyses,
+  listAllMentorAnalyses,
   archiveMentorAnalysis,
   getMentorSummary,
   saveMentorSummary,
+  getMentorActivitySummary,
+  groupMentorAnalysesByMonth,
+  formatAnalysisDate,
+  firstWords,
 } from './mentor'
