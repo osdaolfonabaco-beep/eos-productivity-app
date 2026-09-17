@@ -127,7 +127,7 @@ function TasksToday() {
           <ul>
             {rows.map(({ task: t, overdueLabel: label }) => (
               <li key={t.id} className="border-b-[0.5px] border-separador">
-                <TaskRow task={t} variant="row" overdueLabel={label} {...rowProps(t)} />
+                <TaskRow task={t} overdueLabel={label} {...rowProps(t)} />
               </li>
             ))}
             <li>

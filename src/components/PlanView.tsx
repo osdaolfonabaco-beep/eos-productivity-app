@@ -157,7 +157,7 @@ export default function PlanView() {
                           i < day.tasks.length - 1 ? 'border-b-[0.5px] border-separador' : ''
                         }
                       >
-                        <TaskRow task={t} variant="row" {...rowProps(t)} />
+                        <TaskRow task={t} {...rowProps(t)} />
                       </li>
                     ))}
                   </ul>

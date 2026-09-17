@@ -9,21 +9,11 @@ interface TaskRowProps {
   onArchive: () => void
   /** Solo si se pasa: mueve la tarea a otro día (o a "hoy", con `null`). Solo Plan la pasa; por eso "Mover" solo aparece ahí. */
   onMove?: (plannedFor: string | null) => void
-  /**
-   * `'row'` es la fila compacta del patrón (casilla + texto, con Editar/
-   * Mover/Archivar ocultos tras el menú "⋯") — la usan Hoy y Plan.
-   * `'card'` es el diseño anterior, sin ningún uso ahora mismo; se deja tal
-   * cual (código muerto, a propósito) hasta un paso de limpieza aparte.
-   */
-  variant?: 'card' | 'row'
-  /** Solo `variant="row"`: si la tarea está atrasada, su etiqueta ("ayer", "hace 3 días"). */
+  /** Si la tarea está atrasada, su etiqueta ("ayer", "hace 3 días"). */
   overdueLabel?: string
 }
 
 type Mode = 'view' | 'edit' | 'move' | 'confirm-archive'
-
-const CHECKBOX_BASE =
-  'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border'
 
 // El trazo va más grueso y con un contorno oscuro (drop-shadow, el
 // equivalente real de text-shadow sobre un <path> de SVG) para que aguante
@@ -48,7 +38,7 @@ const CHECK_GLYPH = (
  * Una tarea. Tocar el texto o la casilla la marca/desmarca; "Editar" cambia
  * el texto en línea, "Mover" (si se pasa `onMove`) cambia el día, y
  * "Archivar" pide confirmación de dos toques. Estas tres viven detrás del
- * menú "⋯" de la fila (`variant="row"`, usado por Hoy y Plan).
+ * menú "⋯" de la fila.
  */
 export default function TaskRow({
   task,
@@ -56,7 +46,6 @@ export default function TaskRow({
   onSaveText,
   onArchive,
   onMove,
-  variant = 'card',
   overdueLabel,
 }: TaskRowProps) {
   const [mode, setMode] = useState<Mode>('view')
@@ -163,139 +152,77 @@ export default function TaskRow({
     )
   }
 
-  if (variant === 'row') {
-    // La franja izquierda de 3px: atrasada (fallado) manda sobre hecha
-    // (hecho), y una tarea de hoy sin marcar queda transparente. Mismo
-    // ancho siempre, para que las filas no se desalineen entre sí.
-    const stripe = overdueLabel
-      ? 'border-l-fallado'
-      : task.done
-        ? 'border-l-hecho'
-        : 'border-l-transparent'
-    // El lavado de fondo solo acompaña a "hecho": una atrasada ya lleva su
-    // propia franja roja, y las dos lavadas juntas se pisarían.
-    const wash =
-      task.done && !overdueLabel
-        ? { background: 'linear-gradient(90deg, var(--color-hecho-lavado), transparent 42%)' }
-        : undefined
-    return (
-      <div
-        className={`border-l-[3px] transition-colors duration-[var(--dur-estado)] ease-salida ${stripe}`}
-        style={wash}
-      >
-        <div className="flex min-h-11 items-center gap-3 py-2 pl-3 pr-1">
-          {/*
-           * key={task.done}: remonta el botón en cada toggle para que
-           * --animate-salto-indicador se dispare de nuevo, mismo mecanismo
-           * que key={status} en el badge de HabitRow.
-           */}
-          <button
-            key={String(task.done)}
-            type="button"
-            onClick={onToggle}
-            aria-pressed={task.done}
-            aria-label={task.done ? 'Marcar como no hecha' : 'Marcar como hecha'}
-            className={`flex h-5 w-5 shrink-0 animate-salto-indicador items-center justify-center rounded-[7px] border transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
-              task.done
-                ? 'border-transparent bg-ind-hecho text-tarjeta shadow-[var(--sombra-ind-hecho)] active:shadow-[var(--sombra-ind-hecho-toque)]'
-                : 'border-[var(--color-campo-borde)] bg-[var(--color-campo)] shadow-[var(--sombra-hundida)] active:bg-separador'
-            }`}
-          >
-            {task.done && CHECK_GLYPH}
-          </button>
-
-          <button
-            type="button"
-            onClick={onToggle}
-            className="min-w-0 flex-1 break-words rounded-campo text-left transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
-          >
-            <span className={task.done ? 'text-texto-apagado line-through' : 'text-texto-cuerpo'}>
-              {task.text}
-            </span>
-            {overdueLabel && <span className="ml-2 text-meta text-fallado">{overdueLabel}</span>}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-expanded={menuOpen}
-            aria-label="Más acciones para esta tarea"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-campo text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
-          >
-            ⋯
-          </button>
-        </div>
-
-        {menuOpen && (
-          <div className="flex gap-2 border-y-[0.5px] border-separador bg-[var(--color-menu-fondo)] px-3 py-2">
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false)
-                startEdit()
-              }}
-              className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
-            >
-              Editar
-            </button>
-            {onMove && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false)
-                  setMoveTo(task.plannedFor)
-                  setMode('move')
-                }}
-                className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
-              >
-                Mover
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false)
-                setMode('confirm-archive')
-              }}
-              className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
-            >
-              Archivar
-            </button>
-          </div>
-        )}
-      </div>
-    )
-  }
-
+  // La franja izquierda de 3px: atrasada (fallado) manda sobre hecha
+  // (hecho), y una tarea de hoy sin marcar queda transparente. Mismo
+  // ancho siempre, para que las filas no se desalineen entre sí.
+  const stripe = overdueLabel
+    ? 'border-l-fallado'
+    : task.done
+      ? 'border-l-hecho'
+      : 'border-l-transparent'
+  // El lavado de fondo solo acompaña a "hecho": una atrasada ya lleva su
+  // propia franja roja, y las dos lavadas juntas se pisarían.
+  const wash =
+    task.done && !overdueLabel
+      ? { background: 'linear-gradient(90deg, var(--color-hecho-lavado), transparent 42%)' }
+      : undefined
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-pressed={task.done}
-        aria-label={task.done ? 'Marcar como no hecha' : 'Marcar como hecha'}
-        className={`${CHECKBOX_BASE} ${
-          task.done ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-400'
-        }`}
-      >
-        {task.done && CHECK_GLYPH}
-      </button>
+    <div
+      className={`border-l-[3px] transition-colors duration-[var(--dur-estado)] ease-salida ${stripe}`}
+      style={wash}
+    >
+      <div className="flex min-h-11 items-center gap-3 py-2 pl-3 pr-1">
+        {/*
+         * key={task.done}: remonta el botón en cada toggle para que
+         * --animate-salto-indicador se dispare de nuevo, mismo mecanismo
+         * que key={status} en el badge de HabitRow.
+         */}
+        <button
+          key={String(task.done)}
+          type="button"
+          onClick={onToggle}
+          aria-pressed={task.done}
+          aria-label={task.done ? 'Marcar como no hecha' : 'Marcar como hecha'}
+          className={`flex h-5 w-5 shrink-0 animate-salto-indicador items-center justify-center rounded-[7px] border transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+            task.done
+              ? 'border-transparent bg-ind-hecho text-tarjeta shadow-[var(--sombra-ind-hecho)] active:shadow-[var(--sombra-ind-hecho-toque)]'
+              : 'border-[var(--color-campo-borde)] bg-[var(--color-campo)] shadow-[var(--sombra-hundida)] active:bg-separador'
+          }`}
+        >
+          {task.done && CHECK_GLYPH}
+        </button>
 
-      <div className="min-w-0 flex-1">
         <button
           type="button"
           onClick={onToggle}
-          className={`block w-full break-words text-left ${
-            task.done ? 'text-gray-400 line-through' : 'text-gray-900'
-          }`}
+          className="min-w-0 flex-1 break-words rounded-campo text-left transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.985] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
         >
-          {task.text}
+          <span className={task.done ? 'text-texto-apagado line-through' : 'text-texto-cuerpo'}>
+            {task.text}
+          </span>
+          {overdueLabel && <span className="ml-2 text-meta text-fallado">{overdueLabel}</span>}
         </button>
-        <div className="mt-1 flex gap-3">
+
+        <button
+          type="button"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-expanded={menuOpen}
+          aria-label="Más acciones para esta tarea"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-campo text-texto-tenue transition-[transform,background-color] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+        >
+          ⋯
+        </button>
+      </div>
+
+      {menuOpen && (
+        <div className="flex gap-2 border-y-[0.5px] border-separador bg-[var(--color-menu-fondo)] px-3 py-2">
           <button
             type="button"
-            onClick={startEdit}
-            className="text-sm font-medium text-gray-500"
+            onClick={() => {
+              setMenuOpen(false)
+              startEdit()
+            }}
+            className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
           >
             Editar
           </button>
@@ -303,23 +230,27 @@ export default function TaskRow({
             <button
               type="button"
               onClick={() => {
+                setMenuOpen(false)
                 setMoveTo(task.plannedFor)
                 setMode('move')
               }}
-              className="text-sm font-medium text-gray-500"
+              className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
             >
               Mover
             </button>
           )}
           <button
             type="button"
-            onClick={() => setMode('confirm-archive')}
-            className="text-sm font-medium text-gray-500"
+            onClick={() => {
+              setMenuOpen(false)
+              setMode('confirm-archive')
+            }}
+            className="rounded-pastilla bg-tarjeta px-3 py-1.5 text-sm font-medium text-texto-apagado shadow-[var(--sombra-pastilla)] transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:bg-separador active:shadow-[var(--sombra-pastilla-toque)]"
           >
             Archivar
           </button>
         </div>
-      </div>
+      )}
     </div>
   )
 }
