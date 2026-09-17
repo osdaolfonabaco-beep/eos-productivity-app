@@ -23,6 +23,9 @@ import type {
   Income,
   JournalKey,
   JournalNote,
+  MentorAnalysis,
+  MentorAnalysisType,
+  MentorSummary,
   Payment,
   Quincena,
   SalaryPeriod,
@@ -32,6 +35,7 @@ import type {
   WeeklyGoal,
 } from './types'
 import type { JournalKeyWrapping } from '../lib/journalCrypto'
+import type { Tone } from './preferences'
 
 export const HABIT_COLS = 'id,name,archived,sort_order,created_at'
 export const ENTRY_COLS = 'id,habit_id,date,done'
@@ -51,6 +55,9 @@ export const SAVINGS_CONTRIBUTION_COLS = 'id,goal_id,date,amount,archived,create
 export const INCOME_COLS = 'id,date,amount,category,note,archived,created_at'
 export const EXPENSE_COLS =
   'id,date,amount,concept,category,note,fixed_expense_id,archived,created_at'
+export const MENTOR_ANALYSIS_COLS =
+  'id,tipo,period_start,period_end,tono,incluyo_dinero,contenido,archived,created_at'
+export const MENTOR_SUMMARY_COLS = 'id,contenido,previous_contenido,created_at,updated_at'
 export const JOURNAL_KEY_COLS =
   'id,wrapped_dek_password,salt_password,iv_password,wrapped_dek_recovery,salt_recovery,iv_recovery,created_at,updated_at'
 
@@ -565,3 +572,67 @@ export function journalKeyWrappingToRow(w: JournalKeyWrapping) {
     iv_recovery: w.ivRecovery,
   }
 }
+
+interface MentorAnalysisRow {
+  id: string
+  tipo: string
+  period_start: string
+  period_end: string
+  tono: string
+  incluyo_dinero: boolean
+  contenido: string
+  archived: boolean
+  created_at: string
+}
+
+export function rowToMentorAnalysis(r: MentorAnalysisRow): MentorAnalysis {
+  return {
+    id: r.id,
+    tipo: r.tipo as MentorAnalysisType,
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+    tono: r.tono as Tone,
+    incluyoDinero: r.incluyo_dinero,
+    contenido: r.contenido,
+    createdAt: r.created_at,
+    archived: r.archived,
+  }
+}
+
+export function mentorAnalysisToRow(a: MentorAnalysis) {
+  return {
+    id: a.id,
+    tipo: a.tipo,
+    period_start: a.periodStart,
+    period_end: a.periodEnd,
+    tono: a.tono,
+    incluyo_dinero: a.incluyoDinero,
+    contenido: a.contenido,
+    archived: a.archived,
+    created_at: a.createdAt,
+  }
+}
+
+interface MentorSummaryRow {
+  id: string
+  contenido: string
+  previous_contenido: string | null
+  created_at: string
+  updated_at: string
+}
+
+export function rowToMentorSummary(r: MentorSummaryRow): MentorSummary {
+  return {
+    id: r.id,
+    contenido: r.contenido,
+    previousContenido: r.previous_contenido,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+// No hay un "mentorSummaryToRow" simétrico: a diferencia de las demás
+// entidades, escribir el resumen no es convertir un objeto ya armado -- el
+// valor de `previous_contenido` depende de leer la fila anterior primero
+// (ver `saveMentorSummary` en `./mentor`), así que esa lógica vive ahí, no
+// en un conversor genérico aquí.

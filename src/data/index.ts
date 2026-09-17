@@ -32,6 +32,9 @@ export type {
   SavingsContribution,
   Income,
   Expense,
+  MentorAnalysisType,
+  MentorAnalysis,
+  MentorSummary,
 } from './types'
 
 export {
@@ -221,3 +224,13 @@ export {
   sumExpenses,
   fixedExpenseIdsWithExpenseInRange,
 } from './expenses'
+
+export type { MentorAnalysisInput } from './mentor'
+
+export {
+  saveMentorAnalysis,
+  listMentorAnalyses,
+  archiveMentorAnalysis,
+  getMentorSummary,
+  saveMentorSummary,
+} from './mentor'

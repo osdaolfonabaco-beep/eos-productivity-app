@@ -4,6 +4,7 @@
  */
 
 import type { JournalKeyWrapping } from '../lib/journalCrypto'
+import type { Tone } from './preferences'
 
 /**
  * La definición de un hábito. No guarda el historial de cumplimiento:
@@ -355,6 +356,56 @@ export interface Expense {
  */
 export interface JournalKey extends JournalKeyWrapping {
   id: string
+  createdAt: string
+  updatedAt: string
+}
+
+// --- Mentor -----------------------------------------------------------
+
+/** Con qué frecuencia se pidió un análisis del mentor. */
+export type MentorAnalysisType = 'diario' | 'semanal' | 'mensual'
+
+/**
+ * Un análisis que el mentor produjo, guardado para poder releerlo y para
+ * que un análisis nuevo pueda ver los anteriores. De solo-añadir, como
+ * `HabitEntry` o `Payment`: nunca se sobrescribe, se archiva.
+ */
+export interface MentorAnalysis {
+  id: string
+  tipo: MentorAnalysisType
+  /**
+   * El día (diario, donde siempre es igual a `periodEnd`) o el rango
+   * (semanal/mensual) al que se refiere, `YYYY-MM-DD`.
+   */
+  periodStart: string
+  periodEnd: string
+  /** El mismo tono que se elige en Ajustes (`Tone`, en `./preferences`). */
+  tono: Tone
+  /**
+   * `true` si el payload que se mandó a la IA para este análisis incluía
+   * datos de Dinero. Hoy siempre `false`: ningún payload los incluye
+   * todavía (ver `./analysis.ts`) — el día que exista el interruptor "el
+   * mentor ve Dinero" en Ajustes, esto registrará el hecho histórico de esa
+   * fila en concreto, no el ajuste en vivo.
+   */
+  incluyoDinero: boolean
+  contenido: string
+  createdAt: string
+  archived: boolean
+}
+
+/**
+ * El resumen acumulado que el mentor mantiene sobre lo que lleva observado.
+ * Una sola fila por usuario (`unique(user_id)` en la base); se reescribe, no
+ * se archiva — mismo patrón que `JournalKey`. `previousContenido` es la
+ * única versión anterior que se conserva, una red de un paso, no un
+ * historial completo: la fuente de verdad para reconstruir el resumen son
+ * los `MentorAnalysis` ya guardados.
+ */
+export interface MentorSummary {
+  id: string
+  contenido: string
+  previousContenido: string | null
   createdAt: string
   updatedAt: string
 }

@@ -28,6 +28,7 @@ import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
 import { getDayComment, getDayCommentsInRange } from './dayComments'
 import { listGoalUpdates, listWeeklyGoals } from './goals'
 import { listClosedIdeas } from './ideas'
+import { saveMentorAnalysis, type MentorAnalysisInput } from './mentor'
 import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
 import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
@@ -328,6 +329,25 @@ async function invokeAnalyze(
   return data.analysis
 }
 
+/**
+ * Guarda un análisis diario o semanal ya producido, para el historial del
+ * mentor (`./mentor`). `incluyoDinero` siempre en `false`: ningún payload de
+ * los de arriba manda datos de Dinero todavía.
+ *
+ * Si el guardado falla, el error se registra y NUNCA se propaga: la persona
+ * ya pidió este análisis y ya lo va a ver en pantalla, un fallo al
+ * guardarlo no puede quitárselo. Por eso quien llama a esta función lo hace
+ * sin `await` (ver `requestAnalysis`/`requestWeeklyAnalysis`) — no hay
+ * ninguna promesa sin capturar porque el `catch` de aquí ya la resuelve.
+ */
+async function saveAnalysisQuietly(input: Omit<MentorAnalysisInput, 'incluyoDinero'>): Promise<void> {
+  try {
+    await saveMentorAnalysis({ ...input, incluyoDinero: false })
+  } catch (err) {
+    console.error('No se pudo guardar el análisis del mentor:', err)
+  }
+}
+
 /** El análisis diario: hábitos de los últimos 14 días + tareas de hoy y atrasadas. */
 export async function requestAnalysis(): Promise<string> {
   const today = todayISO()
@@ -346,7 +366,12 @@ export async function requestAnalysis(): Promise<string> {
     comentarioDelDia: comentario?.text ?? null,
     tono,
   }
-  return invokeAnalyze(payload)
+  const contenido = await invokeAnalyze(payload)
+  // Sin `await` a propósito: guardar en segundo plano para no retrasar un
+  // análisis que la persona ya está esperando ver, justo después de haber
+  // esperado a la IA.
+  void saveAnalysisQuietly({ tipo: 'diario', periodStart: today, periodEnd: today, tono, contenido })
+  return contenido
 }
 
 /**
@@ -386,7 +411,17 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     hayIdeasCerradasSuficientes: ideasCerradasInfo.totalIdeasCerradas >= MIN_IDEAS_CERRADAS_PARA_PATRON,
     tono,
   }
-  return invokeAnalyze(payload)
+  const contenido = await invokeAnalyze(payload)
+  // Sin `await`, mismo criterio que en requestAnalysis: no retrasar lo que
+  // ya se puede leer.
+  void saveAnalysisQuietly({
+    tipo: 'semanal',
+    periodStart: stats.semanaActual.inicio,
+    periodEnd: stats.semanaActual.fin,
+    tono,
+    contenido,
+  })
+  return contenido
 }
 
 /**
