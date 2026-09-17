@@ -630,18 +630,43 @@ async function saveAnalysisQuietly(input: MentorAnalysisInput, onFailed?: () => 
 }
 
 /**
- * El token EXACTO que devuelve Gemini cuando no hay nada concreto que
- * proponer esta semana (ver `PROPOSAL_SCOPE_INSTRUCTIONS`, en
- * `supabase/functions/analyze/index.ts`). Comparación normalizada
- * (mayúsculas, sin espacios ni puntuación de cierre) en vez de una igualdad
- * exacta de cadena: así no depende de que Gemini devuelva el token carácter
- * por carácter, solo de que no haya dicho nada más.
+ * El token que pide el prompt (`PROPOSAL_SCOPE_INSTRUCTIONS`, en
+ * `supabase/functions/analyze/index.ts`) cuando no hay nada concreto que
+ * proponer esta semana. La comprobación es TOLERANTE, no una igualdad
+ * exacta de cadena -- un modelo de lenguaje no garantiza el formato exacto
+ * ni con instrucciones explícitas (ver la tabla de casos en el commit que
+ * introdujo esto):
+ *
+ * - Mayúsculas/minúsculas: se compara en mayúsculas.
+ * - Puntuación y espacios en CUALQUIER posición, no solo al final: se quita
+ *   todo lo que no sea letra o dígito antes de comparar -- "Sin propuesta.",
+ *   "**SIN_PROPUESTA**" o "sin  propuesta" dan lo mismo.
+ * - El token dentro de una frase más larga ("...esta semana: SIN_PROPUESTA"):
+ *   se usa `includes`, no igualdad exacta -- una propuesta real jamás trae
+ *   estas letras pegadas sin nada en medio, así que no hay riesgo real de
+ *   falso positivo.
+ * - Cualquier respuesta por debajo de `MIN_PROPOSAL_LENGTH` cuenta igual
+ *   como "sin propuesta", tenga o no el token -- una propuesta de verdad
+ *   nunca es tan corta.
+ *
+ * Lo que esto NO detecta: una explicación en prosa, sin el token, de que no
+ * hay nada que proponer ("Esta semana no veo un patrón claro para sugerir
+ * algo concreto.") y que además supere `MIN_PROPOSAL_LENGTH`. Ningún cotejo
+ * de texto puede distinguir eso de una propuesta real sin arriesgar el
+ * error contrario (descartar una propuesta válida por sonar parecida) -- si
+ * en la práctica Gemini hace esto seguido, la solución es afinar el prompt,
+ * no este chequeo.
  */
 const NO_PROPOSAL_SENTINEL = 'SIN_PROPUESTA'
 
+/** Ninguna propuesta real es más corta que esto -- ver el comentario de arriba. */
+const MIN_PROPOSAL_LENGTH = 15
+
 function isNoProposalResponse(text: string): boolean {
-  const normalized = text.trim().toUpperCase().replace(/[.!¡¿?"'`]+$/, '')
-  return normalized === NO_PROPOSAL_SENTINEL
+  const trimmed = text.trim()
+  if (trimmed.length < MIN_PROPOSAL_LENGTH) return true
+  const alnumOnly = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return alnumOnly.includes(NO_PROPOSAL_SENTINEL.replace(/_/g, ''))
 }
 
 /**
