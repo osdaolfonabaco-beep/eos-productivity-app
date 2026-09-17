@@ -291,9 +291,12 @@ export default function AnalysisSection({ onOpenMentor }: { onOpenMentor: () => 
         <button
           type="button"
           onClick={onOpenMentor}
-          className="-mr-2 flex min-h-11 items-center px-2 text-meta font-medium text-[var(--color-acento-texto)] transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
+          className="-mr-1 flex min-h-11 items-center gap-1 rounded-pastilla border border-borde bg-[image:var(--grad-neutro)] px-3 py-1.5 text-meta font-medium text-[var(--color-acento-texto)] shadow-[var(--sombra-pastilla)] transition-[transform,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] active:shadow-[var(--sombra-pastilla-toque)]"
         >
           Panel del mentor
+          <span aria-hidden="true" className="-rotate-90">
+            <ChevronIcon />
+          </span>
         </button>
       </div>
 
