@@ -35,7 +35,7 @@ export default function LoginScreen() {
 
   return (
     <main className="flex min-h-screen flex-col justify-center px-4 py-10 text-gray-900">
-      <h1 className="text-2xl font-semibold">Eos</h1>
+      <h1 className="text-titulo">Eos</h1>
 
       {status === 'sent' ? (
         <div className="mt-4">

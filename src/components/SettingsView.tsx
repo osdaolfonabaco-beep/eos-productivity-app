@@ -566,11 +566,11 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
       <button type="button" onClick={onClose} className="text-sm text-gray-600">
         ‹ Volver
       </button>
-      <h1 className="mb-6 mt-3 text-2xl font-semibold">Ajustes</h1>
+      <h1 className="mb-6 mt-3 text-titulo">Ajustes</h1>
 
       {/* -------- Respaldo (nube) -------- */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-700">Respaldo</h2>
+        <h2 className="text-etiqueta uppercase etiqueta-calido">Respaldo</h2>
         <p className="mt-1 text-sm text-gray-500">
           Descarga una copia de tus datos en la nube, o reemplázalos con un archivo.
         </p>
@@ -730,7 +730,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
       {/* -------- Copia local de este dispositivo -------- */}
       {hasLocal && (
         <section className="mt-8 border-t border-gray-200 pt-6">
-          <h2 className="text-sm font-semibold text-gray-700">
+          <h2 className="text-etiqueta uppercase etiqueta-calido">
             Datos de este dispositivo
           </h2>
           <p className="mt-1 text-sm text-gray-500">
@@ -820,7 +820,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
 
       {/* -------- Tono del análisis -------- */}
       <section className="mt-8 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-700">Tono del mentor</h2>
+        <h2 className="text-etiqueta uppercase etiqueta-calido">Tono del mentor</h2>
         <p className="mt-1 text-sm text-gray-500">
           Cómo quieres que te hable el mentor sobre tus hábitos y tareas.
         </p>
@@ -859,7 +859,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
 
       {/* -------- Recordatorios diarios -------- */}
       <section className="mt-8 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-700">Recordatorios diarios</h2>
+        <h2 className="text-etiqueta uppercase etiqueta-calido">Recordatorios diarios</h2>
         <p className="mt-1 text-sm text-gray-500">
           Hasta dos horas al día para un recordatorio de revisar tus hábitos, cada una
           activable por separado. Por ahora solo se guarda la hora; la notificación llega
@@ -888,7 +888,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
 
       {/* -------- Notificaciones push -------- */}
       <section className="mt-8 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-700">Notificaciones push</h2>
+        <h2 className="text-etiqueta uppercase etiqueta-calido">Notificaciones push</h2>
         <p className="mt-1 text-sm text-gray-500">
           Por ahora solo el permiso y un aviso de prueba; el recordatorio automático a la
           hora de arriba llega en un paso posterior.
@@ -941,7 +941,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
 
       {/* -------- Cifrado del Journal -------- */}
       <section className="mt-8 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-700">Cifrado del Journal</h2>
+        <h2 className="text-etiqueta uppercase etiqueta-calido">Cifrado del Journal</h2>
         <p className="mt-1 text-sm text-gray-500">
           Cambia la contraseña. No toca el código de recuperación ni vuelve a cifrar las
           notas ya guardadas.
@@ -951,7 +951,7 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
 
       {/* -------- Cuenta -------- */}
       <section className="mt-8 border-t border-gray-200 pt-6">
-        <h2 className="text-sm font-semibold text-gray-700">Cuenta</h2>
+        <h2 className="text-etiqueta uppercase etiqueta-calido">Cuenta</h2>
         {email && <p className="mt-1 break-words text-sm text-gray-500">{email}</p>}
         <button
           type="button"

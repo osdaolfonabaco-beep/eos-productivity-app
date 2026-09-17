@@ -70,7 +70,7 @@ export default function JournalSetup({ onCreated }: JournalSetupProps) {
   if (created) {
     return (
       <main className="px-4 pb-6 pt-4 text-gray-900">
-        <h1 className="text-xl font-semibold">Guarda tu código de recuperación</h1>
+        <h1 className="text-titulo">Guarda tu código de recuperación</h1>
         <p className="mt-2 text-sm text-gray-700">
           Este código se muestra <strong>una sola vez</strong>. Sin él y sin tu contraseña,
           las notas cifradas se pierden para siempre — nadie puede recuperarlas.
@@ -116,7 +116,7 @@ export default function JournalSetup({ onCreated }: JournalSetupProps) {
 
   return (
     <main className="px-4 pb-6 pt-4 text-gray-900">
-      <h1 className="text-xl font-semibold">Cifrar el Journal</h1>
+      <h1 className="text-titulo">Cifrar el Journal</h1>
       <p className="mt-2 text-sm text-gray-700">
         Tus notas se cifran en este dispositivo antes de guardarse: nadie más puede leerlas.
         Si olvidas la contraseña y pierdes el código de recuperación, las notas cifradas se

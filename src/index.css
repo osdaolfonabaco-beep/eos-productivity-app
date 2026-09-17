@@ -53,6 +53,17 @@ body {
   --color-fallado-suave: #FEF2F2;
 
   /*
+   * Color plano de INDICADOR: círculos y casillas de estado pequeñas con un
+   * glifo blanco encima (el disco de hábito, la casilla de tarea, el punto
+   * de resultado de meta). A propósito sólido y no degradado: un degradado
+   * tiene un extremo más oscuro por definición, y eso hacía que el círculo
+   * se viera desigual. Nunca en la cuadrícula de Semana entera: esa se
+   * queda con sus lavados pálidos de siempre.
+   */
+  --color-ind-hecho: #22C55E;
+  --color-ind-fallado: #F35B4F;
+
+  /*
    * Lavado de fondo de una fila cumplida/fallada (tarea u hábito): un
    * degradado horizontal muy leve, más claro que --color-*-suave porque
    * cubre la fila entera, no un texto encima.
@@ -167,6 +178,8 @@ body {
   --dur-toque: 120ms;
   --dur-estado: 260ms;
   --dur-entrada: 320ms;
+  /* El salto del indicador al cambiar de estado (ver --animate-salto-indicador). */
+  --dur-salto: 450ms;
 
   --ease-salida: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-toque: cubic-bezier(0.4, 0, 0.2, 1);
@@ -242,15 +255,14 @@ body {
   --grad-neutro: linear-gradient(to top, #EDEFF3, #FFFFFF);
 
   /*
-   * Degradados de INDICADOR: el neón completo, solo para círculos, celdas
-   * y pastillas de estado pequeñas sin texto largo (el disco de hábito, la
-   * casilla de tarea, el círculo de "hoy" en Semana). Nunca detrás de
-   * texto, y nunca en la cuadrícula de Semana entera: decenas de celdas en
-   * neón serían ruido, así que esa cuadrícula se queda con sus lavados
-   * pálidos de siempre.
+   * Degradado de INDICADOR, solo para --color-ind-acento: el círculo de
+   * "hoy" en Semana y similares, donde no hay ningún glifo encima y un
+   * degradado sí funciona bien. "Hecho" y "no hecho" pasaron a color plano
+   * (--color-ind-hecho/--color-ind-fallado, arriba): llevan un glifo blanco
+   * encima, y un degradado ahí se veía desigual (el extremo oscuro apagaba
+   * el borde). Nunca en la cuadrícula de Semana entera: esa se queda con
+   * sus lavados pálidos de siempre.
    */
-  --grad-ind-hecho: linear-gradient(to top, #12D084, #5DF8BA);
-  --grad-ind-fallado: linear-gradient(to top, #FF5A46, #FFB35C);
   --grad-ind-acento: linear-gradient(to top, #7B5AF0, #5BE7FF);
 
   /*
@@ -270,20 +282,20 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
 
   --sombra-ind-hecho:
-    0 0 16px rgba(53, 239, 163, 0.78),
-    0 0 4px rgba(53, 239, 163, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.60);
+    0 0 15px rgba(34, 197, 94, 0.55),
+    0 0 4px rgba(34, 197, 94, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.40);
   --sombra-ind-hecho-toque:
-    0 0 9px rgba(53, 239, 163, 0.58),
-    0 0 3px rgba(53, 239, 163, 0.40);
+    0 0 8px rgba(34, 197, 94, 0.42),
+    0 0 3px rgba(34, 197, 94, 0.32);
 
   --sombra-ind-fallado:
-    0 0 16px rgba(255, 147, 64, 0.78),
-    0 0 4px rgba(255, 120, 80, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    0 0 15px rgba(243, 91, 79, 0.55),
+    0 0 4px rgba(243, 91, 79, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
   --sombra-ind-fallado-toque:
-    0 0 9px rgba(255, 147, 64, 0.58),
-    0 0 3px rgba(255, 120, 80, 0.40);
+    0 0 8px rgba(243, 91, 79, 0.42),
+    0 0 3px rgba(243, 91, 79, 0.32);
 
   --sombra-ind-acento:
     0 0 16px rgba(40, 217, 255, 0.78),
@@ -315,8 +327,12 @@ body {
     0 1px 3px rgba(123, 90, 240, 0.14),
     0 6px 14px -4px rgba(123, 90, 240, 0.2);
 
-  /* Animación de entrada del indicador de estado del hábito (ver HabitRow). */
-  --animate-entrada-indicador: entrada-indicador var(--dur-estado) var(--ease-salida);
+  /*
+   * El salto del indicador de estado al cambiar (ver HabitRow y TaskRow):
+   * sube, crece un poco, baja rebotando y se asienta. Con --ease-rebote
+   * porque "llega con energía", no solo desacelera.
+   */
+  --animate-salto-indicador: salto-indicador var(--dur-salto) var(--ease-rebote);
 
   /*
    * Fondo de la app: pila de degradados radiales sobre un color de
@@ -368,22 +384,25 @@ body {
 }
 
 /*
- * Entrada del indicador de estado (el disco con el check/la equis) en
- * HabitRow: arranca pequeño y algo transparente, se pasa de tamaño y se
- * asienta. Se dispara remontando el elemento (key={status}) cada vez que
- * cambia el estado del hábito, ver HabitRow.tsx.
+ * Salto del indicador de estado (el disco con el check/la equis en
+ * HabitRow, la casilla en TaskRow) al cambiar: sube, crece un poco, baja
+ * rebotando y se asienta. Se dispara remontando el elemento (key={status}
+ * o key={task.done}) cada vez que cambia el estado, ver HabitRow.tsx y
+ * TaskRow.tsx.
  */
-@keyframes entrada-indicador {
-  0% {
-    transform: scale(0.6);
-    opacity: 0.4;
-  }
-  70% {
-    transform: scale(1.08);
-    opacity: 1;
-  }
+@keyframes salto-indicador {
+  0%,
   100% {
-    transform: scale(1);
+    transform: translateY(0) scale(1);
+  }
+  22% {
+    transform: translateY(-5px) scale(1.18);
+  }
+  42% {
+    transform: translateY(0) scale(0.96);
+  }
+  62% {
+    transform: translateY(0) scale(1);
   }
 }
 

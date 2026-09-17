@@ -27,7 +27,7 @@ const CHECKBOX_BASE =
 
 // El trazo va más grueso y con un contorno oscuro (drop-shadow, el
 // equivalente real de text-shadow sobre un <path> de SVG) para que aguante
-// sobre el neón de --grad-ind-hecho -- ver el mismo criterio en HabitRow.
+// sobre el color sólido --color-ind-hecho -- ver el mismo criterio en HabitRow.
 const CHECK_GLYPH = (
   <svg
     viewBox="0 0 24 24"
@@ -184,14 +184,20 @@ export default function TaskRow({
         style={wash}
       >
         <div className="flex min-h-11 items-center gap-3 py-2 pl-3 pr-1">
+          {/*
+           * key={task.done}: remonta el botón en cada toggle para que
+           * --animate-salto-indicador se dispare de nuevo, mismo mecanismo
+           * que key={status} en el badge de HabitRow.
+           */}
           <button
+            key={String(task.done)}
             type="button"
             onClick={onToggle}
             aria-pressed={task.done}
             aria-label={task.done ? 'Marcar como no hecha' : 'Marcar como hecha'}
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[7px] border transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+            className={`flex h-5 w-5 shrink-0 animate-salto-indicador items-center justify-center rounded-[7px] border transition-[transform,background-color,box-shadow] duration-[var(--dur-toque)] ease-toque active:scale-[0.96] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
               task.done
-                ? 'border-transparent bg-[image:var(--grad-ind-hecho)] text-tarjeta shadow-[var(--sombra-ind-hecho)] active:shadow-[var(--sombra-ind-hecho-toque)]'
+                ? 'border-transparent bg-ind-hecho text-tarjeta shadow-[var(--sombra-ind-hecho)] active:shadow-[var(--sombra-ind-hecho-toque)]'
                 : 'border-[var(--color-campo-borde)] bg-[var(--color-campo)] shadow-[var(--sombra-hundida)] active:bg-separador'
             }`}
           >

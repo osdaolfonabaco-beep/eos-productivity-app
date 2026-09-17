@@ -53,7 +53,7 @@ const STATUS_META: Record<
     nextLabel: 'no hecho',
     stripe: 'border-l-hecho',
     badge:
-      'border-transparent bg-[image:var(--grad-ind-hecho)] text-white shadow-[var(--sombra-ind-hecho)] group-active:shadow-[var(--sombra-ind-hecho-toque)]',
+      'border-transparent bg-ind-hecho text-white shadow-[var(--sombra-ind-hecho)] group-active:shadow-[var(--sombra-ind-hecho-toque)]',
     name: 'text-texto-apagado line-through',
     wash: 'linear-gradient(90deg, var(--color-hecho-lavado), transparent 42%)',
   },
@@ -62,7 +62,7 @@ const STATUS_META: Record<
     nextLabel: 'sin responder',
     stripe: 'border-l-fallado',
     badge:
-      'border-transparent bg-[image:var(--grad-ind-fallado)] text-white shadow-[var(--sombra-ind-fallado)] group-active:shadow-[var(--sombra-ind-fallado-toque)]',
+      'border-transparent bg-ind-fallado text-white shadow-[var(--sombra-ind-fallado)] group-active:shadow-[var(--sombra-ind-fallado-toque)]',
     name: 'text-texto-cuerpo',
     wash: 'linear-gradient(90deg, var(--color-fallado-lavado), transparent 42%)',
   },
@@ -73,7 +73,7 @@ const STATUS_META: Record<
  * color: check para "hecho", cruz para "no hecho", nada (anillo vacío) para
  * "sin responder".
  *
- * Sobre el degradado de indicador (ver --grad-ind-hecho/fallado en
+ * Sobre el color sólido de indicador (ver --color-ind-hecho/fallado en
  * index.css), el trazo blanco pierde contraste sin ayuda: un trazo más
  * grueso y un contorno oscuro del mismo color de estado lo mantienen
  * legible. `text-shadow` no pinta sobre un `<path>` de SVG -- el
@@ -174,7 +174,7 @@ export default function HabitRow({ name, status, nextStatus, onCycle }: HabitRow
       />
       <span
         key={status}
-        className={`flex h-6 w-6 shrink-0 animate-entrada-indicador items-center justify-center rounded-full border-2 ${meta.badge}`}
+        className={`flex h-6 w-6 shrink-0 animate-salto-indicador items-center justify-center rounded-full border-2 ${meta.badge}`}
         aria-hidden="true"
       >
         <Glyph status={status} />

@@ -158,8 +158,8 @@ function GoalRow({ goal, updates, busy, onSaveText, onSetResult, onArchive, onAd
             aria-hidden="true"
             className={`h-2 w-2 shrink-0 rounded-full ${
               goal.resultado === 'cumplida'
-                ? 'bg-[image:var(--grad-ind-hecho)] shadow-[var(--sombra-ind-hecho)]'
-                : 'bg-[image:var(--grad-ind-fallado)] shadow-[var(--sombra-ind-fallado)]'
+                ? 'bg-ind-hecho shadow-[var(--sombra-ind-hecho)]'
+                : 'bg-ind-fallado shadow-[var(--sombra-ind-fallado)]'
             }`}
           />
         )}

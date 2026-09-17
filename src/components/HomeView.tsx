@@ -198,7 +198,7 @@ export default function HomeView() {
   return (
     <main className="pb-2 text-gray-900">
       <header className="px-4 pt-4">
-        <h1 className="text-2xl font-semibold">Hoy</h1>
+        <h1 className="text-titulo">Hoy</h1>
         <p className="text-sm text-gray-500">{formatToday(todayISO())}</p>
       </header>
       <TodayHabits />
