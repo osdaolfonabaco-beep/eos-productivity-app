@@ -339,17 +339,31 @@ async function invokeAnalyze(
  * guardarlo no puede quitárselo. Por eso quien llama a esta función lo hace
  * sin `await` (ver `requestAnalysis`/`requestWeeklyAnalysis`) — no hay
  * ninguna promesa sin capturar porque el `catch` de aquí ya la resuelve.
+ *
+ * `onFailed`, si se pasa, avisa de un fallo TOTAL (nunca de que vaya bien:
+ * eso no lo necesita nadie todavía). `AnalysisSection` lo usa para marcar
+ * "no guardado" en la entrada local que muestra mientras tanto — sigue sin
+ * ser un `await`, solo una notificación que llega cuando llega.
  */
-async function saveAnalysisQuietly(input: Omit<MentorAnalysisInput, 'incluyoDinero'>): Promise<void> {
+async function saveAnalysisQuietly(
+  input: Omit<MentorAnalysisInput, 'incluyoDinero'>,
+  onFailed?: () => void,
+): Promise<void> {
   try {
     await saveMentorAnalysis({ ...input, incluyoDinero: false })
   } catch (err) {
     console.error('No se pudo guardar el análisis del mentor:', err)
+    onFailed?.()
   }
 }
 
-/** El análisis diario: hábitos de los últimos 14 días + tareas de hoy y atrasadas. */
-export async function requestAnalysis(): Promise<string> {
+/**
+ * El análisis diario: hábitos de los últimos 14 días + tareas de hoy y
+ * atrasadas. `onSaveFailed`, opcional, avisa si el guardado en segundo plano
+ * falló del todo (ver `saveAnalysisQuietly`) — nada más lo necesita hoy
+ * salvo `AnalysisSection`, para marcar la entrada como "no guardada".
+ */
+export async function requestAnalysis(onSaveFailed?: () => void): Promise<string> {
   const today = todayISO()
   const [habitos, tareas, comentario, tono] = await Promise.all([
     buildHabitsSummary(today),
@@ -370,7 +384,10 @@ export async function requestAnalysis(): Promise<string> {
   // Sin `await` a propósito: guardar en segundo plano para no retrasar un
   // análisis que la persona ya está esperando ver, justo después de haber
   // esperado a la IA.
-  void saveAnalysisQuietly({ tipo: 'diario', periodStart: today, periodEnd: today, tono, contenido })
+  void saveAnalysisQuietly(
+    { tipo: 'diario', periodStart: today, periodEnd: today, tono, contenido },
+    onSaveFailed,
+  )
   return contenido
 }
 
