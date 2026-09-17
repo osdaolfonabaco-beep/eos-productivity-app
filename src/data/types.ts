@@ -429,3 +429,40 @@ export interface MentorPurpose {
   createdAt: string
   updatedAt: string
 }
+
+/** En qué etapa del ciclo va una propuesta del mentor -- ver `supabase/mentor-proposals.sql`. */
+export type MentorProposalStatus = 'propuesta' | 'aceptada' | 'descartada' | 'cerrada'
+
+/**
+ * Cómo terminó una propuesta ya cerrada. Solo tiene sentido si
+ * `status === 'cerrada'`. Este `'descartada'` NO es el mismo que
+ * `status === 'descartada'`: uno es "nunca se aceptó", el otro es "se
+ * aceptó y se abandonó durante el plazo" -- viven en columnas distintas.
+ */
+export type MentorProposalResult = 'funciono' | 'en-progreso' | 'descartada'
+
+/**
+ * Una propuesta de mejora que el mentor hace al final de un análisis
+ * semanal: una sola cosa, sobre hábitos/tareas/rutinas, nunca sobre dinero
+ * (ver el candado financiero en `supabase/functions/analyze/index.ts`).
+ * Solo puede haber una activa (`status` 'propuesta' o 'aceptada', no
+ * archivada) a la vez -- índice único en la base, reforzado en
+ * `./mentorProposals`.
+ */
+export interface MentorProposal {
+  id: string
+  contenido: string
+  status: MentorProposalStatus
+  /** `null` mientras no está `'cerrada'`. */
+  resultado: MentorProposalResult | null
+  /** `null` mientras no se acepta. Puesto una sola vez, al aceptar. */
+  aceptadaEn: string | null
+  /** `null` mientras no se acepta. `YYYY-MM-DD`, calculado una sola vez al aceptar. */
+  venceEn: string | null
+  /** `null` mientras no se cierra. Puesto una sola vez, al cerrar (a mano o por el cierre automático). */
+  cerradaEn: string | null
+  /** De qué análisis salió esta propuesta, o `null` si el análisis se borró o nunca se supo. */
+  analisisId: string | null
+  createdAt: string
+  updatedAt: string
+}

@@ -36,6 +36,9 @@ export type {
   MentorAnalysis,
   MentorSummary,
   MentorPurpose,
+  MentorProposalStatus,
+  MentorProposalResult,
+  MentorProposal,
 } from './types'
 
 export {
@@ -259,3 +262,13 @@ export {
   confirmMentorPurposeReviewed,
   isMentorPurposeStale,
 } from './mentorPurpose'
+
+export {
+  getActiveMentorProposal,
+  createMentorProposal,
+  acceptMentorProposal,
+  discardMentorProposal,
+  closeMentorProposal,
+  listRecentInactiveMentorProposals,
+  autoCloseExpiredMentorProposals,
+} from './mentorProposals'

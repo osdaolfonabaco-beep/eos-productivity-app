@@ -25,6 +25,9 @@ import type {
   JournalNote,
   MentorAnalysis,
   MentorAnalysisType,
+  MentorProposal,
+  MentorProposalResult,
+  MentorProposalStatus,
   MentorPurpose,
   MentorSummary,
   Payment,
@@ -60,6 +63,8 @@ export const MENTOR_ANALYSIS_COLS =
   'id,tipo,period_start,period_end,tono,incluyo_dinero,contenido,archived,created_at'
 export const MENTOR_SUMMARY_COLS = 'id,contenido,previous_contenido,created_at,updated_at'
 export const MENTOR_PURPOSE_COLS = 'id,objetivo,plazo,dificultad,reviewed_at,created_at,updated_at'
+export const MENTOR_PROPOSAL_COLS =
+  'id,contenido,status,resultado,aceptada_en,vence_en,cerrada_en,analisis_id,created_at,updated_at'
 export const JOURNAL_KEY_COLS =
   'id,wrapped_dek_password,salt_password,iv_password,wrapped_dek_recovery,salt_recovery,iv_recovery,created_at,updated_at'
 
@@ -665,3 +670,37 @@ export function rowToMentorPurpose(r: MentorPurposeRow): MentorPurpose {
 // mentor_summary: guardar el propósito no es convertir un objeto ya armado
 // -- recorta, normaliza vacío a null y decide insertar/actualizar/borrar
 // (ver `saveMentorPurpose` en `./mentorPurpose`).
+
+interface MentorProposalRow {
+  id: string
+  contenido: string
+  status: string
+  resultado: string | null
+  aceptada_en: string | null
+  vence_en: string | null
+  cerrada_en: string | null
+  analisis_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export function rowToMentorProposal(r: MentorProposalRow): MentorProposal {
+  return {
+    id: r.id,
+    contenido: r.contenido,
+    status: r.status as MentorProposalStatus,
+    resultado: r.resultado as MentorProposalResult | null,
+    aceptadaEn: r.aceptada_en,
+    venceEn: r.vence_en,
+    cerradaEn: r.cerrada_en,
+    analisisId: r.analisis_id,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+// No hay un "mentorProposalToRow" simétrico, por la misma razón que
+// mentor_summary/mentor_purpose: cada escritura (crear, aceptar, descartar,
+// cerrar) toca un subconjunto distinto de columnas y depende de leer el
+// estado antes (ver `./mentorProposals`), no es convertir un objeto ya
+// armado.
