@@ -159,6 +159,8 @@ export type { Tone, ReminderTimes } from './preferences'
 export {
   getTone,
   setTone,
+  getMentorSeesMoney,
+  setMentorSeesMoney,
   getReminderTimes,
   setReminderSlot,
   REMINDER_SLOT_COUNT,

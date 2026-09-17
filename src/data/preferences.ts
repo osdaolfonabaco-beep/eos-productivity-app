@@ -30,6 +30,30 @@ export async function setTone(tone: Tone): Promise<void> {
   if (error) throw new Error(`setTone: ${error.message}`)
 }
 
+// --- El mentor y el dinero ------------------------------------------------
+
+const DEFAULT_MENTOR_VE_DINERO = true
+
+/**
+ * Si el mentor ve los datos de dinero (sueldo, gastos por categoría,
+ * disponible y deudas) en los análisis diario y semanal. Encendido por
+ * defecto -- mismo criterio de "activo salvo que se apague" que el resto de
+ * interruptores de la app. Mismo patrón que `getTone`: `user_metadata`, sin
+ * tabla propia.
+ */
+export async function getMentorSeesMoney(): Promise<boolean> {
+  const { data, error } = await supabase.auth.getUser()
+  if (error) throw new Error(`getMentorSeesMoney: ${error.message}`)
+  const value = data.user?.user_metadata?.mentorVeDinero
+  return typeof value === 'boolean' ? value : DEFAULT_MENTOR_VE_DINERO
+}
+
+/** Guarda si el mentor ve los datos de dinero. */
+export async function setMentorSeesMoney(value: boolean): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ data: { mentorVeDinero: value } })
+  if (error) throw new Error(`setMentorSeesMoney: ${error.message}`)
+}
+
 // --- Recordatorios diarios (dos, cada uno activable por separado) --------
 
 /** Cuántos recordatorios independientes admite la app. */

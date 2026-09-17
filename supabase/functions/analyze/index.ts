@@ -30,6 +30,17 @@
 // no ha escrito ninguno, la clave viene ausente. "idea" nunca lo lleva, a
 // propósito: ver el comentario de cabecera de src/data/analysis.ts.
 //
+// "diario" y "semanal" también pueden traer "dinero" -- sueldo/ingresos/
+// gastos/disponible de la quincena actual, gastos AGREGADOS por categoría
+// (nunca el gasto suelto) y las deudas activas -- si la persona apagó el
+// interruptor correspondiente en Ajustes, la clave viene ausente y el
+// prompt instruye no mencionar el dinero en absoluto (NO_DINERO_INSTRUCTIONS).
+// Cuando sí viaja, y también en "resumen" (que nunca recibe esta clave pero
+// puede leer dinero en análisis anteriores), rige el candado financiero
+// incondicional -- ver FINANCIAL_LOCK_INSTRUCTIONS, la parte más importante
+// de este archivo: con cifras reales delante, la tentación del modelo de
+// opinar o de hacer cálculos financieros es mucho mayor que antes.
+//
 // Requiere el secreto GEMINI_API_KEY:
 //   supabase secrets set GEMINI_API_KEY=tu-clave
 //
@@ -108,6 +119,80 @@ function isPropositoPayload(v: unknown): v is PropositoPayload {
 }
 
 /**
+ * Lo que ve el mentor de Dinero, si la persona lo tiene encendido (por
+ * defecto sí) -- ver `getMentorSeesMoney`/`setMentorSeesMoney` en
+ * src/data/preferences.ts. Ausente entero si está apagado, nunca `null`.
+ * Nunca lleva ingresos/gastos individuales ni sus notas de texto -- solo
+ * agregados de la quincena actual y lo que ya es público de cada deuda.
+ */
+interface QuincenaDineroPayload {
+  sueldo: number
+  totalIngresos: number
+  totalGastos: number
+  disponible: number
+}
+
+interface GastoCategoriaPayload {
+  categoria: string
+  total: number
+}
+
+interface DeudaPayload {
+  nombre: string
+  saldo: number
+  tasaAnual: number | null
+  cuota: number
+  enMora: boolean
+}
+
+interface DineroPayload {
+  quincena: QuincenaDineroPayload
+  gastosPorCategoria: GastoCategoriaPayload[]
+  deudas: DeudaPayload[]
+}
+
+function isQuincenaDineroPayload(v: unknown): v is QuincenaDineroPayload {
+  if (typeof v !== 'object' || v === null) return false
+  const q = v as Record<string, unknown>
+  return (
+    typeof q.sueldo === 'number' &&
+    typeof q.totalIngresos === 'number' &&
+    typeof q.totalGastos === 'number' &&
+    typeof q.disponible === 'number'
+  )
+}
+
+function isGastoCategoriaPayload(v: unknown): v is GastoCategoriaPayload {
+  if (typeof v !== 'object' || v === null) return false
+  const g = v as Record<string, unknown>
+  return typeof g.categoria === 'string' && typeof g.total === 'number'
+}
+
+function isDeudaPayload(v: unknown): v is DeudaPayload {
+  if (typeof v !== 'object' || v === null) return false
+  const d = v as Record<string, unknown>
+  return (
+    typeof d.nombre === 'string' &&
+    typeof d.saldo === 'number' &&
+    (d.tasaAnual === null || typeof d.tasaAnual === 'number') &&
+    typeof d.cuota === 'number' &&
+    typeof d.enMora === 'boolean'
+  )
+}
+
+function isDineroPayload(v: unknown): v is DineroPayload {
+  if (typeof v !== 'object' || v === null) return false
+  const d = v as Record<string, unknown>
+  return (
+    isQuincenaDineroPayload(d.quincena) &&
+    Array.isArray(d.gastosPorCategoria) &&
+    (d.gastosPorCategoria as unknown[]).every(isGastoCategoriaPayload) &&
+    Array.isArray(d.deudas) &&
+    (d.deudas as unknown[]).every(isDeudaPayload)
+  )
+}
+
+/**
  * Nombres deliberadamente explícitos y sin solapar ("fechaDeHoy" en vez de
  * "hoy", que además era el nombre de una lista de tareas): dos ejecuciones
  * con los mismos datos llegaron a confundir tareas de hoy con atrasadas.
@@ -128,6 +213,8 @@ interface DailyPayload {
   tono: Tone
   /** Ausente si el usuario no ha escrito un propósito. */
   proposito?: PropositoPayload
+  /** Ausente si el interruptor de dinero está apagado. */
+  dinero?: DineroPayload
 }
 
 function isDailyPayload(v: Record<string, unknown>): v is DailyPayload {
@@ -135,6 +222,7 @@ function isDailyPayload(v: Record<string, unknown>): v is DailyPayload {
     return false
   }
   if (v.proposito !== undefined && !isPropositoPayload(v.proposito)) return false
+  if (v.dinero !== undefined && !isDineroPayload(v.dinero)) return false
   return (
     typeof v.fechaDeHoy === 'string' &&
     Array.isArray(v.habitos) &&
@@ -217,6 +305,8 @@ interface WeeklyPayload {
   tono: Tone
   /** Ausente si el usuario no ha escrito un propósito. */
   proposito?: PropositoPayload
+  /** Ausente si el interruptor de dinero está apagado. */
+  dinero?: DineroPayload
 }
 
 function isWeeklyHabitStats(v: unknown): v is WeeklyHabitStats {
@@ -295,6 +385,7 @@ function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
     return false
   }
   if (v.proposito !== undefined && !isPropositoPayload(v.proposito)) return false
+  if (v.dinero !== undefined && !isDineroPayload(v.dinero)) return false
   return (v.habitos as unknown[]).every((h) => {
     if (typeof h !== 'object' || h === null) return false
     const hh = h as Record<string, unknown>
@@ -361,11 +452,44 @@ No inventes datos que no estén aquí. No repitas los datos tal cual ni cites lo
 
 /**
  * Cómo leer "proposito", compartido entre diario y semanal -- ambos lo
- * reciben igual (ver el comentario de cabecera de este archivo). Una sola
- * copia para no repetir dos veces el candado de "no consejo financiero",
- * que es el que más importa que no se desalinee entre los dos prompts.
+ * reciben igual (ver el comentario de cabecera de este archivo).
  */
-const PROPOSITO_INSTRUCTIONS = `"proposito" (puede faltar, si la persona no ha escrito ninguno) es lo que dijo que está intentando lograr en general -- no algo de hoy ni de esta semana en particular. Trae "objetivo", "plazo" y "dificultad", cada uno null si no se escribió. Relaciona lo que observas en los datos con este propósito cuando de verdad tenga sentido (por ejemplo, si el objetivo habla de ahorrar y hay un patrón de tareas de dinero atrasadas, coméntalo en relación a eso); no lo repitas ni lo cites tal cual de vuelta, y no fuerces la conexión si no hay ninguna real que señalar. Si "masDeUnMesSinRevisar" es true, puedes mencionar una sola vez, de forma breve y sin insistir, que hace tiempo que no se revisa este propósito -- por ejemplo, invitar a confirmar si sigue vigente -- sin convertirlo en el tema central del análisis. Importante: aunque "dificultad" u "objetivo" mencionen deudas o dinero, NO das consejo financiero -- puedes relacionar hábitos con ese objetivo, pero nunca recomendar qué pagar, refinanciar, negociar con un acreedor ni ninguna otra decisión financiera concreta.`
+const PROPOSITO_INSTRUCTIONS = `"proposito" (puede faltar, si la persona no ha escrito ninguno) es lo que dijo que está intentando lograr en general -- no algo de hoy ni de esta semana en particular. Trae "objetivo", "plazo" y "dificultad", cada uno null si no se escribió. Relaciona lo que observas en los datos con este propósito cuando de verdad tenga sentido (por ejemplo, si el objetivo habla de ahorrar y hay un patrón de tareas de dinero atrasadas, coméntalo en relación a eso); no lo repitas ni lo cites tal cual de vuelta, y no fuerces la conexión si no hay ninguna real que señalar. Si "masDeUnMesSinRevisar" es true, puedes mencionar una sola vez, de forma breve y sin insistir, que hace tiempo que no se revisa este propósito -- por ejemplo, invitar a confirmar si sigue vigente -- sin convertirlo en el tema central del análisis.`
+
+/**
+ * El candado financiero. Antes era preventivo (el mentor no veía cifras);
+ * con saldos, tasas y deudas en mora delante, la tentación de recomendar
+ * qué pagar primero es mucho mayor, así que esto tiene que quedar sin
+ * resquicios. Compartido e INCONDICIONAL: va en diario, semanal y resumen
+ * SIEMPRE, tenga o no la persona el interruptor de dinero encendido --
+ * incluso sin cifras nuevas, el propósito o un análisis anterior pueden
+ * traer el tema, y el candado tiene que sostenerse ahí también.
+ */
+const FINANCIAL_LOCK_INSTRUCTIONS = `Sobre dinero: puedes describir lo que ves en los datos (cifras, categorías, deudas) y señalar patrones concretos -- por ejemplo, que una categoría de gasto subió o bajó respecto a la quincena pasada, o que el disponible quedó más ajustado de lo habitual -- y puedes relacionar los hábitos con el propósito de la persona aunque ese propósito hable de deudas o de dinero. Puedes repetir un dato tal como te llega (el saldo es X, la tasa es Y), pero nunca derivar uno nuevo a partir de ellos.
+
+Pero bajo NINGUNA circunstancia, ni aunque la persona te lo pida directamente, haces esto:
+- Recomendar a qué deuda abonar, en qué orden o cuánto.
+- Sugerir refinanciar, negociar, consolidar o cambiar de acreedor.
+- Decir cuánto ahorrar, cuánto recortar o en qué categoría.
+- Estimar en cuánto tiempo saldría de una deuda.
+- Comparar tasas de interés para aconsejar cuál conviene más.
+- Dar cualquier opinión sobre si una decisión financiera es buena o mala.
+- Hacer o mostrar NINGÚN cálculo financiero: nada de proyecciones, intereses acumulados, cuánto tiempo tardaría algo, cuánto costaría una opción frente a otra, ni ninguna aritmética sobre los saldos o las tasas.
+
+Si el comentario del día, el propósito o la propia persona piden consejo financiero, no lo des: di que no eres asesor financiero y que lo hable con un profesional o con su entidad. Los cálculos financieros los hace la app, no el mentor: tú describes y observas, la aritmética es de otra parte.`
+
+/** Cómo leer "dinero" cuando el interruptor está encendido, más el candado de arriba -- van siempre juntos. */
+const DINERO_DATA_INSTRUCTIONS = `"dinero" trae la quincena actual: "sueldo", "totalIngresos", "totalGastos" y "disponible" (lo que ya entró menos lo que ya salió; puede ser negativo); "gastosPorCategoria", el total gastado en cada categoría (nunca los gastos sueltos, que no viajan aquí); y "deudas", cada una con "nombre", "saldo", "tasaAnual" (null si no se indicó), "cuota" mensual y "enMora".
+
+${FINANCIAL_LOCK_INSTRUCTIONS}`
+
+/** Cuando el interruptor está apagado: "dinero" ni siquiera viaja en el JSON, y el silencio debe ser total. */
+const NO_DINERO_INSTRUCTIONS = `Esta persona no comparte sus datos de dinero contigo: no tienes sueldo, ingresos, gastos ni deudas suyas en este análisis. No menciones el dinero en ningún momento, ni de pasada, ni para decir que no tienes esos datos -- para este análisis, el dinero no es un tema.`
+
+/** El bloque sobre dinero para diario/semanal: cuál de los dos según si "dinero" viene en el payload. */
+function dineroBlockFor(payload: { dinero?: DineroPayload }): string {
+  return payload.dinero ? DINERO_DATA_INSTRUCTIONS : NO_DINERO_INSTRUCTIONS
+}
 
 function buildDailyPrompt(payload: DailyPayload): string {
   // "tono" ya se tradujo a instrucción; no hace falta que también viaje en
@@ -381,7 +505,9 @@ En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días 
 
 "comentarioDelDia" es lo que la persona escribió sobre cómo fue hoy (puede ser null si no escribió nada). Es contexto para leer junto a los hábitos y tareas, no el dato principal: úsalo para matizar o explicar lo que ya muestran las casillas, no lo repitas ni lo cites entero. Si es null, no lo menciones — no es un hueco que señalar.
 
-${PROPOSITO_INSTRUCTIONS}`
+${PROPOSITO_INSTRUCTIONS}
+
+${dineroBlockFor(payload)}`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }
@@ -402,7 +528,9 @@ Además de los hábitos hay metas de la semana, en "metas": cada una es "texto" 
 
 "ideasCerradas" trae las ideas que se cerraron esta semana (pasaron a "hecha" o a "descartada"), cada una con su "texto" y su "estado" -- las que siguen abiertas (pendiente/en-marcha) no aparecen aquí. "hayIdeasCerradasSuficientes" no cuenta solo esta semana: dice si el TOTAL histórico de ideas cerradas, de cualquier semana, ya es suficiente para que un patrón signifique algo. Si es true, puedes comentar qué tipo de ideas se están ejecutando y cuáles se quedan sin avanzar, describiendo un patrón real a partir de los datos. Si es false, NO afirmes ningún patrón ni tendencia -- como mucho, menciona qué pasó esta semana en concreto con "ideasCerradas" (cuántas se cerraron y en qué quedaron), sin generalizar: dos o tres casos no son un patrón, ni siquiera si son los únicos que hay hasta ahora. Si "ideasCerradas" viene vacía o ausente, no hables de ideas: no es un hueco que señalar, simplemente no se cerró ninguna esta semana (aunque "hayIdeasCerradasSuficientes" sea true por cierres de semanas anteriores).
 
-${PROPOSITO_INSTRUCTIONS}`
+${PROPOSITO_INSTRUCTIONS}
+
+${dineroBlockFor(payload)}`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }
@@ -593,7 +721,7 @@ ${COMMON_CLOSING}
 
 "cifras" son datos ya calculados sobre los hábitos, verdad objetiva y no algo que tengas que deducir tú de los análisis: "cumplimientoPorHabito" (% de cumplimiento de cada hábito en los últimos meses), "peorHabito" (el de peor cumplimiento y desde cuándo le va mal, o null si ninguno destaca claramente), "rachaMasLarga" (la racha de días seguidos más larga conseguida en cualquier hábito, en todo su historial, o null si no hay ninguna) y "tendencia" ('sube', 'baja', 'estable' o null si no hay semanas suficientes para verla) de las últimas 4 semanas. Úsalas para anclar lo que dices en hechos concretos, sin repetirlas tal cual ni citar los porcentajes exactos salvo que de verdad ayude a lo que estás señalando.
 
-Igual que en el resto de análisis: aunque los datos toquen deudas o dinero, NO das consejo financiero -- puedes mencionar un patrón relacionado con dinero si aparece en los análisis, pero nunca recomendar qué pagar, refinanciar o negociar con un acreedor.`
+${FINANCIAL_LOCK_INSTRUCTIONS}`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify({ ultimosAnalisis, cifras })}`
 }

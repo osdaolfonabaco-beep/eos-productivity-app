@@ -36,19 +36,32 @@
  * escrito, la clave se omite entera (nunca se manda `proposito: null`).
  * `requestIdeaAnalysis` NO lo lleva a propósito: ahí no aporta nada y
  * sería mandar la situación personal del usuario a cambio de nada.
+ *
+ * El diario y el semanal también llevan `dinero` (`buildDineroPayload`,
+ * más abajo) si `getMentorSeesMoney()` está encendido (por defecto lo
+ * está): el sueldo/ingresos/gastos/disponible de la quincena actual, los
+ * gastos AGREGADOS por categoría (nunca el concepto de cada gasto suelto)
+ * y las deudas activas con su saldo, tasa, cuota y si están en mora. Si
+ * está apagado, la clave se omite entera, igual que `proposito` -- nunca
+ * se manda `dinero: null`. Nunca viajan aquí, esté encendido o apagado:
+ * las notas de texto de ingresos/gastos, ni nada del journal.
+ * `requestIdeaAnalysis` tampoco lleva esto, por la misma razón que no
+ * lleva `proposito`.
  */
 
-import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
+import { addDays, quincenaRange, startOfWeekISO, toISODate, todayISO } from './dates'
 import { getDayComment, getDayCommentsInRange } from './dayComments'
+import { debtBalance, getPayments, listDebts } from './finance'
 import { listGoalUpdates, listWeeklyGoals } from './goals'
 import { listClosedIdeas } from './ideas'
 import { listMentorAnalyses, saveMentorAnalysis, saveMentorSummary, type MentorAnalysisInput } from './mentor'
 import { getMentorPurpose, isMentorPurposeStale } from './mentorPurpose'
-import { getTone, type Tone } from './preferences'
+import { getMentorSeesMoney, getTone, type Tone } from './preferences'
+import { getPeriodBreakdown } from './salaryPeriods'
 import { getEntriesInRange, listHabits } from './store'
 import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
 import { bucketTasks, listTasks } from './tasks'
-import type { GoalDirection, GoalResult, MentorAnalysis, MentorSummary } from './types'
+import type { Expense, GoalDirection, GoalResult, MentorAnalysis, MentorSummary } from './types'
 import { getMentorCalculatedStats, getWeeklyHabitStats, type MentorCalculatedStats, type Tendencia } from './weeklyStats'
 
 const DAYS_BACK = 14
@@ -96,6 +109,90 @@ async function buildPropositoPayload(): Promise<PropositoPayload | undefined> {
   }
 }
 
+const SIN_CATEGORIA_DINERO = 'Sin categoría'
+
+/**
+ * Los gastos reales de la quincena, agregados por categoría con su total --
+ * nunca el concepto de cada gasto suelto. Mismo criterio de agrupación que
+ * `MovementCategoryBreakdown` (componente de UI), pero calculado aparte
+ * aquí: ese componente es para dibujar, esto es para el payload de la IA.
+ */
+function groupExpensesByCategory(expenses: Expense[]): GastoCategoriaPayload[] {
+  const totals = new Map<string, number>()
+  for (const e of expenses) {
+    const key = e.category ?? SIN_CATEGORIA_DINERO
+    totals.set(key, (totals.get(key) ?? 0) + e.amount)
+  }
+  return [...totals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([categoria, total]) => ({ categoria, total }))
+}
+
+/**
+ * Lo que ve el mentor de Dinero: la quincena actual (mismo desglose que ya
+ * pinta Vida -> Dinero, `getPeriodBreakdown`), los gastos de esa quincena
+ * agregados por categoría, y las deudas activas con su saldo derivado --
+ * mismo cálculo que ya usa `DebtsView` (`listDebts` + `getPayments` +
+ * `debtBalance` por cada una). Nada de esto es un cálculo nuevo: todo sale
+ * de funciones que ya existían para la pantalla de Dinero.
+ */
+async function buildDineroPayload(today: string): Promise<DineroPayload> {
+  const { start, end } = quincenaRange(today)
+  const [breakdown, debts] = await Promise.all([getPeriodBreakdown(start, end), listDebts()])
+  const paymentsByDebt = await Promise.all(debts.map((d) => getPayments(d.id)))
+
+  return {
+    quincena: {
+      sueldo: breakdown.salary?.amount ?? 0,
+      totalIngresos: breakdown.incomesTotal,
+      totalGastos: breakdown.expensesTotal,
+      disponible: breakdown.available,
+    },
+    gastosPorCategoria: groupExpensesByCategory(breakdown.expenses),
+    deudas: debts.map((d, i) => ({
+      nombre: d.name,
+      saldo: debtBalance(d, paymentsByDebt[i]),
+      tasaAnual: d.annualRate,
+      cuota: d.monthlyPayment,
+      enMora: d.status === 'en-mora',
+    })),
+  }
+}
+
+interface QuincenaDineroPayload {
+  sueldo: number
+  totalIngresos: number
+  totalGastos: number
+  /** Sueldo + ingresos − gastos − pagos a deudas de la quincena actual. Puede ser negativo. */
+  disponible: number
+}
+
+interface GastoCategoriaPayload {
+  categoria: string
+  total: number
+}
+
+interface DeudaPayload {
+  nombre: string
+  saldo: number
+  /** `null` si no se indicó una tasa. */
+  tasaAnual: number | null
+  cuota: number
+  enMora: boolean
+}
+
+/**
+ * Lo que ve el mentor de Dinero, si `getMentorSeesMoney()` está encendido
+ * (ver `buildDineroPayload`, más abajo). Nunca lleva gastos/ingresos
+ * individuales ni sus notas de texto -- solo agregados y lo que ya es
+ * público de cada deuda (nunca el detalle de sus pagos).
+ */
+interface DineroPayload {
+  quincena: QuincenaDineroPayload
+  gastosPorCategoria: GastoCategoriaPayload[]
+  deudas: DeudaPayload[]
+}
+
 interface TaskItem {
   texto: string
 }
@@ -126,6 +223,8 @@ interface DailyAnalysisPayload {
   tono: Tone
   /** Ausente si el usuario no ha escrito un propósito -- ver el comentario de cabecera. */
   proposito?: PropositoPayload
+  /** Ausente si el interruptor de dinero está apagado -- ver el comentario de cabecera. */
+  dinero?: DineroPayload
 }
 
 interface WeekRangePayload {
@@ -200,6 +299,8 @@ interface WeeklyAnalysisPayload {
   tono: Tone
   /** Ausente si el usuario no ha escrito un propósito -- ver el comentario de cabecera. */
   proposito?: PropositoPayload
+  /** Ausente si el interruptor de dinero está apagado -- ver el comentario de cabecera. */
+  dinero?: DineroPayload
 }
 
 /** Los dos estados desde los que se puede pedir análisis ("descartada" no ofrece el botón en la interfaz). */
@@ -422,8 +523,11 @@ async function invokeAnalyze(
 
 /**
  * Guarda un análisis diario o semanal ya producido, para el historial del
- * mentor (`./mentor`). `incluyoDinero` siempre en `false`: ningún payload de
- * los de arriba manda datos de Dinero todavía.
+ * mentor (`./mentor`). `incluyoDinero` es el valor real de si ESTE análisis
+ * en concreto llegó a mandar datos de Dinero (ver `requestAnalysis`/
+ * `requestWeeklyAnalysis`), no un valor fijo: es un hecho histórico de la
+ * fila (ver el comentario de `incluyo_dinero` en `supabase/mentor.sql`), no
+ * el ajuste en vivo del interruptor.
  *
  * Si el guardado falla, el error se registra y NUNCA se propaga: la persona
  * ya pidió este análisis y ya lo va a ver en pantalla, un fallo al
@@ -436,12 +540,9 @@ async function invokeAnalyze(
  * "no guardado" en la entrada local que muestra mientras tanto — sigue sin
  * ser un `await`, solo una notificación que llega cuando llega.
  */
-async function saveAnalysisQuietly(
-  input: Omit<MentorAnalysisInput, 'incluyoDinero'>,
-  onFailed?: () => void,
-): Promise<void> {
+async function saveAnalysisQuietly(input: MentorAnalysisInput, onFailed?: () => void): Promise<void> {
   try {
-    await saveMentorAnalysis({ ...input, incluyoDinero: false })
+    await saveMentorAnalysis(input)
   } catch (err) {
     console.error('No se pudo guardar el análisis del mentor:', err)
     onFailed?.()
@@ -456,13 +557,15 @@ async function saveAnalysisQuietly(
  */
 export async function requestAnalysis(onSaveFailed?: () => void): Promise<string> {
   const today = todayISO()
-  const [habitos, tareas, comentario, tono, proposito] = await Promise.all([
+  const [habitos, tareas, comentario, tono, proposito, veDinero] = await Promise.all([
     buildHabitsSummary(today),
     buildTasksSummary(today),
     getDayComment(today),
     getTone(),
     buildPropositoPayload(),
+    getMentorSeesMoney(),
   ])
+  const dinero = veDinero ? await buildDineroPayload(today) : undefined
 
   const payload: DailyAnalysisPayload = {
     tipo: 'diario',
@@ -472,13 +575,21 @@ export async function requestAnalysis(onSaveFailed?: () => void): Promise<string
     comentarioDelDia: comentario?.text ?? null,
     tono,
     ...(proposito ? { proposito } : {}),
+    ...(dinero ? { dinero } : {}),
   }
   const contenido = await invokeAnalyze(payload)
   // Sin `await` a propósito: guardar en segundo plano para no retrasar un
   // análisis que la persona ya está esperando ver, justo después de haber
   // esperado a la IA.
   void saveAnalysisQuietly(
-    { tipo: 'diario', periodStart: today, periodEnd: today, tono, contenido },
+    {
+      tipo: 'diario',
+      periodStart: today,
+      periodEnd: today,
+      tono,
+      contenido,
+      incluyoDinero: dinero !== undefined,
+    },
     onSaveFailed,
   )
   return contenido
@@ -495,14 +606,16 @@ export async function requestWeeklyAnalysis(): Promise<string> {
   const today = todayISO()
   const thisMonday = startOfWeekISO(today)
 
-  const [stats, goals, comentarios, ideasCerradasInfo, tono, proposito] = await Promise.all([
+  const [stats, goals, comentarios, ideasCerradasInfo, tono, proposito, veDinero] = await Promise.all([
     getWeeklyHabitStats(today),
     buildGoalsSummary(today),
     getDayCommentsInRange(thisMonday, today),
     buildClosedIdeasSummary(thisMonday, today),
     getTone(),
     buildPropositoPayload(),
+    getMentorSeesMoney(),
   ])
+  const dinero = veDinero ? await buildDineroPayload(today) : undefined
 
   const payload: WeeklyAnalysisPayload = {
     tipo: 'semanal',
@@ -522,6 +635,7 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     hayIdeasCerradasSuficientes: ideasCerradasInfo.totalIdeasCerradas >= MIN_IDEAS_CERRADAS_PARA_PATRON,
     tono,
     ...(proposito ? { proposito } : {}),
+    ...(dinero ? { dinero } : {}),
   }
   const contenido = await invokeAnalyze(payload)
   // Sin `await`, mismo criterio que en requestAnalysis: no retrasar lo que
@@ -532,6 +646,7 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     periodEnd: stats.semanaActual.fin,
     tono,
     contenido,
+    incluyoDinero: dinero !== undefined,
   })
   // También en segundo plano y también sin propagar el error: el resumen
   // acumulado se actualiza SOLO con el análisis semanal (nunca con el

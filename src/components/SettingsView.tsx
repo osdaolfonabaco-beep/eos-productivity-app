@@ -9,6 +9,7 @@ import {
   enablePushNotifications,
   exportAll,
   exportLocal,
+  getMentorSeesMoney,
   getPushPermission,
   getReminderTimes,
   getTone,
@@ -18,6 +19,7 @@ import {
   readLocalCounts,
   REMINDER_SLOT_COUNT,
   sendTestPush,
+  setMentorSeesMoney,
   setReminderSlot,
   setTone,
   todayISO,
@@ -384,6 +386,32 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
       setToneError(err instanceof Error ? err.message : 'No se pudo guardar el tono.')
     } finally {
       setToneBusy(false)
+    }
+  }
+
+  // --- El mentor y el dinero ---
+  const [seesMoney, setSeesMoneyState] = useState<boolean | null>(null) // null = cargando
+  const [seesMoneyBusy, setSeesMoneyBusy] = useState(false)
+  const [seesMoneyError, setSeesMoneyError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getMentorSeesMoney()
+      .then(setSeesMoneyState)
+      .catch(() => setSeesMoneyState(true))
+  }, [])
+
+  async function toggleSeesMoney() {
+    if (seesMoney === null || seesMoneyBusy) return
+    const next = !seesMoney
+    setSeesMoneyBusy(true)
+    setSeesMoneyError(null)
+    try {
+      await setMentorSeesMoney(next)
+      setSeesMoneyState(next)
+    } catch (err) {
+      setSeesMoneyError(err instanceof Error ? err.message : 'No se pudo guardar.')
+    } finally {
+      setSeesMoneyBusy(false)
     }
   }
 
@@ -855,6 +883,48 @@ export default function SettingsView({ onClose, email }: SettingsViewProps) {
             )
           })}
         </div>
+      </section>
+
+      {/* -------- El mentor y el dinero -------- */}
+      <section className="mt-8 border-t border-gray-200 pt-6">
+        <h2 className="text-etiqueta uppercase etiqueta-calido">El mentor y el dinero</h2>
+
+        {seesMoneyError && (
+          <div className="mt-3">
+            <ActionError message={seesMoneyError} onDismiss={() => setSeesMoneyError(null)} />
+          </div>
+        )}
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={seesMoney ?? true}
+          onClick={() => void toggleSeesMoney()}
+          disabled={seesMoney === null || seesMoneyBusy}
+          className="mt-4 flex w-full items-center justify-between gap-3 rounded-lg border border-gray-300 px-4 py-3 text-left disabled:opacity-60"
+        >
+          <span className="text-sm font-medium text-gray-700">El mentor ve tus datos de dinero</span>
+          <span
+            aria-hidden="true"
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-[var(--dur-toque)] ${
+              seesMoney ? 'bg-[image:var(--grad-secundario)]' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-[var(--dur-toque)] ${
+                seesMoney ? 'translate-x-5' : 'translate-x-0.5'
+              }`}
+            />
+          </span>
+        </button>
+
+        <p className="mt-3 text-xs text-gray-500">
+          Si está encendido, cada análisis diario y semanal incluye: el sueldo, el total de ingresos y
+          de gastos y el disponible de la quincena actual; tus gastos agrupados por categoría con su
+          total (nunca el concepto de cada gasto suelto); y tus deudas (nombre, saldo, tasa, cuota y si
+          está en mora). Nunca se manda, esté encendido o apagado: las notas de texto de tus ingresos y
+          gastos, ni nada de tu diario. Si está apagado, el mentor no ve ni menciona nada de dinero.
+        </p>
       </section>
 
       {/* -------- Recordatorios diarios -------- */}
