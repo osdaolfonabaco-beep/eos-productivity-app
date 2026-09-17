@@ -1,23 +1,28 @@
 // Edge Function "analyze": manda un resumen de hábitos y tareas a Gemini y
 // devuelve un análisis breve en español.
 //
-// Sirve TRES tipos de análisis, discriminados por "tipo" en el payload:
+// Sirve CUATRO tipos de análisis, discriminados por "tipo" en el payload:
 // "diario" (hábitos de los últimos 14 días + tareas de hoy/atrasadas + el
 // comentario del día, el original), "semanal" (el dashboard de Vida ->
 // Semana: cumplimiento de esta semana por hábito y comparación con la
 // anterior, las metas de la semana y sus avances, los comentarios del día
-// de esta semana, y las ideas que se cerraron esta semana), y "idea" (una
+// de esta semana, y las ideas que se cerraron esta semana), "idea" (una
 // sola idea de la pestaña Ideas, con su texto y su estado -- ver
-// buildIdeaPrompt). Se reutiliza la misma función
-// -- y el mismo mecanismo de tono (toneOf/getTone) -- en vez de crear una
-// nueva; solo cambia qué prompt se construye antes de llamar a Gemini. Los
-// prompts diario y semanal (buildDailyPrompt/buildWeeklyPrompt,
-// TONE_INSTRUCTIONS) no se tocan para añadir "idea".
+// buildIdeaPrompt), y "resumen" (reescribe mentor_summary, la nota de
+// memoria larga del mentor, a partir de los últimos análisis y de cuatro
+// cifras ya calculadas del lado del cliente -- ver buildResumenPrompt). Se
+// reutiliza la misma función -- y el mismo mecanismo de tono (toneOf/
+// getTone) -- en vez de crear una nueva; solo cambia qué prompt se
+// construye antes de llamar a Gemini. Los prompts existentes
+// (buildDailyPrompt/buildWeeklyPrompt/buildIdeaPrompt, TONE_INSTRUCTIONS)
+// no se tocan para añadir uno nuevo.
 //
 // No toca la base de datos: el cliente (src/data/analysis.ts) arma el JSON
-// y se lo manda ya listo. El journal nunca pasa por aquí, en ninguno de los
-// tres tipos; el modo "idea" además no recibe la lista de ideas, hábitos,
-// tareas ni comentarios -- solo el texto y el estado de la idea que se pidió.
+// y se lo manda ya listo -- incluido "resumen", que solo devuelve el texto;
+// quien lo guarda en mentor_summary es el cliente. El journal nunca pasa
+// por aquí, en ninguno de los cuatro tipos; el modo "idea" además no
+// recibe la lista de ideas, hábitos, tareas ni comentarios -- solo el
+// texto y el estado de la idea que se pidió.
 //
 // "diario" y "semanal" también pueden traer "proposito" -- qué está
 // intentando lograr el usuario, en qué plazo y qué le está costando (lo
@@ -443,6 +448,156 @@ Escribe en segunda persona (tú). Sin markdown pesado: nada de negritas, asteris
   return `${instrucciones}\n\nIdea (estado: ${estado}):\n${texto}`
 }
 
+// --- "resumen": reescribe la nota de memoria larga del mentor -----------
+
+/** Un análisis previo tal como llega en "ultimosAnalisis" -- ver el comentario de `ResumenPayload`. */
+interface UltimoAnalisisSummary {
+  tipo: 'semanal' | 'diario'
+  periodoInicio: string
+  periodoFin: string
+  contenido: string
+}
+
+interface HabitComplianceSummary {
+  nombre: string
+  pct: number
+}
+
+interface PeorHabitoSummary {
+  nombre: string
+  pct: number
+  sinCumplirDesde: string
+}
+
+interface RachaMasLargaSummary {
+  habito: string
+  dias: number
+}
+
+type Tendencia = 'sube' | 'baja' | 'estable'
+
+/** Las cuatro cifras, ya calculadas del lado del cliente -- nunca las escribe la IA. */
+interface CifrasSummary {
+  cumplimientoPorHabito: HabitComplianceSummary[]
+  peorHabito: PeorHabitoSummary | null
+  rachaMasLarga: RachaMasLargaSummary | null
+  tendencia: Tendencia | null
+}
+
+/**
+ * Payload de "resumen": los últimos análisis + las cifras calculadas.
+ * Deliberadamente NO lleva el contenido actual de mentor_summary -- ver el
+ * comentario de cabecera de `buildResumenPrompt`, justo abajo.
+ */
+interface ResumenPayload {
+  tipo: 'resumen'
+  ultimosAnalisis: UltimoAnalisisSummary[]
+  cifras: CifrasSummary
+  tono: Tone
+}
+
+function isUltimoAnalisisSummary(v: unknown): v is UltimoAnalisisSummary {
+  if (typeof v !== 'object' || v === null) return false
+  const a = v as Record<string, unknown>
+  return (
+    (a.tipo === 'semanal' || a.tipo === 'diario') &&
+    typeof a.periodoInicio === 'string' &&
+    typeof a.periodoFin === 'string' &&
+    typeof a.contenido === 'string'
+  )
+}
+
+function isHabitComplianceSummary(v: unknown): v is HabitComplianceSummary {
+  if (typeof v !== 'object' || v === null) return false
+  const c = v as Record<string, unknown>
+  return typeof c.nombre === 'string' && typeof c.pct === 'number'
+}
+
+function isPeorHabitoSummary(v: unknown): v is PeorHabitoSummary | null {
+  if (v === null) return true
+  if (typeof v !== 'object') return false
+  const p = v as Record<string, unknown>
+  return typeof p.nombre === 'string' && typeof p.pct === 'number' && typeof p.sinCumplirDesde === 'string'
+}
+
+function isRachaMasLargaSummary(v: unknown): v is RachaMasLargaSummary | null {
+  if (v === null) return true
+  if (typeof v !== 'object') return false
+  const r = v as Record<string, unknown>
+  return typeof r.habito === 'string' && typeof r.dias === 'number'
+}
+
+function isTendencia(v: unknown): v is Tendencia | null {
+  return v === null || v === 'sube' || v === 'baja' || v === 'estable'
+}
+
+function isCifrasSummary(v: unknown): v is CifrasSummary {
+  if (typeof v !== 'object' || v === null) return false
+  const c = v as Record<string, unknown>
+  return (
+    Array.isArray(c.cumplimientoPorHabito) &&
+    (c.cumplimientoPorHabito as unknown[]).every(isHabitComplianceSummary) &&
+    isPeorHabitoSummary(c.peorHabito) &&
+    isRachaMasLargaSummary(c.rachaMasLarga) &&
+    isTendencia(c.tendencia)
+  )
+}
+
+function isResumenPayload(v: Record<string, unknown>): v is ResumenPayload {
+  return (
+    v.tipo === 'resumen' &&
+    Array.isArray(v.ultimosAnalisis) &&
+    (v.ultimosAnalisis as unknown[]).every(isUltimoAnalisisSummary) &&
+    isCifrasSummary(v.cifras)
+  )
+}
+
+/**
+ * Cómo modula el tono la nota de memoria larga. Deliberadamente distinto de
+ * TONE_INSTRUCTIONS: ahí el tono decide la ESTRUCTURA del análisis (cuánto
+ * de crítica, cuántas palabras); aquí la estructura ya está fijada (las
+ * tres partes pedidas en buildResumenPrompt) y el tono solo ajusta cuánto
+ * se suaviza o se abrevia el texto dentro de esa estructura -- mismo
+ * criterio que IDEA_TONE_HINTS para las ideas.
+ */
+const RESUMEN_TONE_HINTS: Record<Tone, string> = {
+  directo: 'Sé directo: nombra lo que se repite sin suavizarlo ni matizarlo de más.',
+  equilibrado: 'Sé honesto y concreto, sin dulcificar lo que describes ni endurecerlo tampoco.',
+  breve: 'Sé lo más económico posible en palabras, sin perder ninguna de las tres partes pedidas.',
+}
+
+/**
+ * La nota de memoria larga del mentor: no un análisis nuevo, sino la
+ * reescritura de lo que lleva observado. Deliberadamente NUNCA recibe la
+ * nota anterior (mentor_summary.contenido) en el payload -- si algún día
+ * "para ahorrar una llamada" alguien decide pasársela para que la corrija
+ * en vez de reescribirla desde los análisis, esta nota deriva con el
+ * tiempo: cada reescritura hereda los sesgos y posibles inventos de la
+ * anterior en vez de volver a apoyarse en datos reales. La fuente de
+ * verdad son SIEMPRE los últimos análisis y las cifras calculadas, nunca
+ * la nota de sí misma.
+ */
+function buildResumenPrompt(payload: ResumenPayload): string {
+  const { tono, ultimosAnalisis, cifras } = payload
+  const instrucciones = `Eres el mentor de esta persona. No estás analizando nada nuevo: estás escribiendo la nota que resume lo que llevas observado de ella en los últimos meses. ${RESUMEN_TONE_HINTS[tono]}
+
+No existe una versión anterior de esta nota que debas continuar, corregir o mencionar -- la escribes de cero cada vez, apoyado solo en lo que recibes aquí. No te refieras a "la nota anterior", a que estás "actualizando" nada, ni a que ya la habías escrito antes -- para quien la lee, es la primera vez que ve este texto. Escribe en segunda persona (tú), hablándole directamente a la persona -- nunca en tercera persona ni como si describieras a alguien ausente: este texto también lo vas a leer tú mismo en análisis futuros, y si sale en tercera persona acabarías hablando de tu propio usuario como de un desconocido.
+
+Escribe TRES cosas, en este orden, como prosa corrida (sin títulos, sin viñetas, sin numerarlas): qué patrones se repiten una y otra vez en estos análisis; qué ha cambiado desde los análisis más antiguos de la lista hasta los más recientes; y qué se mantiene igual pese al tiempo. Esto NO es un resumen de cada análisis ni una lista de consejos -- es lo que un mentor que lleva meses viendo a esta persona recordaría de ella si tuviera que describirla en pocas frases, no lo que le diría hoy. Si lo que tienes no alcanza para hablar de alguna de las tres partes (por ejemplo, muy pocos análisis todavía para ver qué cambió), dilo brevemente en esa parte en vez de inventar un patrón que no está.
+
+Tope estricto de 1000 caracteres (no palabras). Escríbelo corto y denso -- no lo alargues con relleno para acercarte al límite.
+
+${COMMON_CLOSING}
+
+"ultimosAnalisis" trae los últimos análisis SEMANALES que existen (hasta 4, del más antiguo al más reciente; menos si todavía no hay tantos) y, al final de la lista, el último análisis DIARIO como contexto de lo más inmediato -- ese diario NO forma parte del patrón de varias semanas, solo te dice cómo van los últimos días. Cada uno trae "tipo" ('semanal' o 'diario'), "periodoInicio"/"periodoFin" y "contenido" (el texto que ya se escribió en ese momento). Son tu memoria de lo que se fue observando -- básate en lo que dicen, no los cites literalmente ni menciones sus fechas exactas.
+
+"cifras" son datos ya calculados sobre los hábitos, verdad objetiva y no algo que tengas que deducir tú de los análisis: "cumplimientoPorHabito" (% de cumplimiento de cada hábito en los últimos meses), "peorHabito" (el de peor cumplimiento y desde cuándo le va mal, o null si ninguno destaca claramente), "rachaMasLarga" (la racha de días seguidos más larga conseguida en cualquier hábito, en todo su historial, o null si no hay ninguna) y "tendencia" ('sube', 'baja', 'estable' o null si no hay semanas suficientes para verla) de las últimas 4 semanas. Úsalas para anclar lo que dices en hechos concretos, sin repetirlas tal cual ni citar los porcentajes exactos salvo que de verdad ayude a lo que estás señalando.
+
+Igual que en el resto de análisis: aunque los datos toquen deudas o dinero, NO das consejo financiero -- puedes mencionar un patrón relacionado con dinero si aparece en los análisis, pero nunca recomendar qué pagar, refinanciar o negociar con un acreedor.`
+
+  return `${instrucciones}\n\nDatos:\n${JSON.stringify({ ultimosAnalisis, cifras })}`
+}
+
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -530,6 +685,11 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Faltan datos de la idea.' }, 400)
     }
     prompt = buildIdeaPrompt({ ...v, tono })
+  } else if (v.tipo === 'resumen') {
+    if (!isResumenPayload(v)) {
+      return json({ error: 'Faltan datos del resumen.' }, 400)
+    }
+    prompt = buildResumenPrompt({ ...v, tono })
   } else {
     if (!isDailyPayload(v)) {
       return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)

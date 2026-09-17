@@ -15,6 +15,12 @@
  * - `requestIdeaAnalysis` (idea): una sola idea de la pestaña Ideas, con
  *   nada más que su texto y su estado — a propósito no lleva ni la lista de
  *   ideas ni ningún otro dato de la cuenta.
+ * - `updateMentorSummary` (resumen): no es un análisis nuevo -- reescribe
+ *   `mentor_summary`, la nota de memoria larga del mentor, a partir de los
+ *   últimos análisis semanales (hasta 4) + el último diario, y de las
+ *   cuatro cifras calculadas en `./weeklyStats`. Se dispara sola después de
+ *   un análisis semanal y también a mano desde un botón (ver su propio
+ *   comentario, más abajo).
  *
  * Los payloads usan campos explícitos y sin solapar — nunca inferir de un
  * booleano o de una clave repetida qué es cada cosa — y llevan el tono
@@ -36,14 +42,14 @@ import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
 import { getDayComment, getDayCommentsInRange } from './dayComments'
 import { listGoalUpdates, listWeeklyGoals } from './goals'
 import { listClosedIdeas } from './ideas'
-import { saveMentorAnalysis, type MentorAnalysisInput } from './mentor'
+import { listMentorAnalyses, saveMentorAnalysis, saveMentorSummary, type MentorAnalysisInput } from './mentor'
 import { getMentorPurpose, isMentorPurposeStale } from './mentorPurpose'
 import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
 import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
 import { bucketTasks, listTasks } from './tasks'
-import type { GoalDirection, GoalResult } from './types'
-import { getWeeklyHabitStats } from './weeklyStats'
+import type { GoalDirection, GoalResult, MentorAnalysis, MentorSummary } from './types'
+import { getMentorCalculatedStats, getWeeklyHabitStats, type MentorCalculatedStats, type Tendencia } from './weeklyStats'
 
 const DAYS_BACK = 14
 
@@ -207,6 +213,52 @@ interface IdeaAnalysisPayload {
   tono: Tone
 }
 
+/** Un análisis previo tal como viaja en el payload de "resumen" -- ver `buildUltimosAnalisisPayload`. */
+interface UltimoAnalisisPayload {
+  tipo: 'semanal' | 'diario'
+  periodoInicio: string
+  periodoFin: string
+  contenido: string
+}
+
+interface HabitCompliancePayload {
+  nombre: string
+  pct: number
+}
+
+interface PeorHabitoPayload {
+  nombre: string
+  pct: number
+  sinCumplirDesde: string
+}
+
+interface RachaMasLargaPayload {
+  habito: string
+  dias: number
+}
+
+/** Las cuatro cifras calculadas de `getMentorCalculatedStats`, tal como viajan en el payload -- nunca las escribe la IA. */
+interface CifrasPayload {
+  cumplimientoPorHabito: HabitCompliancePayload[]
+  peorHabito: PeorHabitoPayload | null
+  rachaMasLarga: RachaMasLargaPayload | null
+  tendencia: Tendencia | null
+}
+
+/**
+ * El payload de "resumen": los últimos análisis + las cifras calculadas.
+ * Deliberadamente NO lleva el `contenido` ni el `previousContenido` actual
+ * de `mentor_summary` -- ver el comentario de cabecera de
+ * `updateMentorSummary`, más abajo, sobre por qué eso rompería la
+ * fiabilidad de esta nota con el tiempo.
+ */
+interface ResumenAnalysisPayload {
+  tipo: 'resumen'
+  ultimosAnalisis: UltimoAnalisisPayload[]
+  cifras: CifrasPayload
+  tono: Tone
+}
+
 /** Diferencia en días de calendario entre dos fechas `YYYY-MM-DD` (`to` - `from`). */
 function daysBetween(from: string, to: string): number {
   const [fy, fm, fd] = from.split('-').map(Number)
@@ -349,7 +401,7 @@ function messageFromBody(body: Record<string, unknown> | null | undefined): stri
  * quien lo pidió.
  */
 async function invokeAnalyze(
-  payload: DailyAnalysisPayload | WeeklyAnalysisPayload | IdeaAnalysisPayload,
+  payload: DailyAnalysisPayload | WeeklyAnalysisPayload | IdeaAnalysisPayload | ResumenAnalysisPayload,
 ): Promise<string> {
   const { data, error } = await supabase.functions.invoke<{
     analysis?: string
@@ -481,6 +533,11 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     tono,
     contenido,
   })
+  // También en segundo plano y también sin propagar el error: el resumen
+  // acumulado se actualiza SOLO con el análisis semanal (nunca con el
+  // diario, que duplicaría esta llamada extra a la IA en cada análisis del
+  // día) y su fallo no puede quitarle a la persona el análisis que ya pidió.
+  void updateMentorSummaryQuietly()
   return contenido
 }
 
@@ -498,4 +555,131 @@ export async function requestIdeaAnalysis(
   const tono = await getTone()
   const payload: IdeaAnalysisPayload = { tipo: 'idea', texto, estado, tono }
   return invokeAnalyze(payload)
+}
+
+// --- Resumen acumulado ---------------------------------------------------
+
+const RESUMEN_MAX_ANALISIS_SEMANALES = 4
+
+function toUltimoAnalisisPayload(a: MentorAnalysis): UltimoAnalisisPayload {
+  // El cast es seguro: quien llama a esto siempre filtró antes por
+  // tipo 'semanal' o 'diario' (ver `buildUltimosAnalisisPayload`), nunca
+  // por 'mensual' -- ese tipo no tiene análisis todavía en ningún lado.
+  return {
+    tipo: a.tipo as 'semanal' | 'diario',
+    periodoInicio: a.periodStart,
+    periodoFin: a.periodEnd,
+    contenido: a.contenido,
+  }
+}
+
+/**
+ * Los últimos análisis SEMANALES (hasta `RESUMEN_MAX_ANALISIS_SEMANALES`,
+ * menos si todavía no existen tantos) y, al final, el último análisis
+ * DIARIO como contexto de lo más inmediato -- mismo orden que espera
+ * `buildResumenPrompt` en la Edge Function. Deliberadamente solo semanales
+ * para el grueso de la lista: si se pidieran varios diarios seguidos, "los
+ * últimos 4 análisis de cualquier tipo" podrían ser tres días sueltos en
+ * vez de meses de patrón, que es justo la escala que tiene sentido para
+ * esta nota.
+ */
+async function buildUltimosAnalisisPayload(): Promise<UltimoAnalisisPayload[]> {
+  const [semanales, diarios] = await Promise.all([
+    listMentorAnalyses('semanal', RESUMEN_MAX_ANALISIS_SEMANALES),
+    listMentorAnalyses('diario', 1),
+  ])
+  // `listMentorAnalyses` devuelve del más reciente al más antiguo; para que
+  // el mentor lea la evolución en orden, aquí van del más antiguo al más
+  // reciente.
+  const semanalesOrdenados = [...semanales].reverse().map(toUltimoAnalisisPayload)
+  const diario = diarios[0] ? [toUltimoAnalisisPayload(diarios[0])] : []
+  return [...semanalesOrdenados, ...diario]
+}
+
+function toCifrasPayload(stats: MentorCalculatedStats): CifrasPayload {
+  return {
+    cumplimientoPorHabito: stats.cumplimientoPorHabito.map((c) => ({ nombre: c.nombre, pct: c.pct })),
+    peorHabito: stats.peorHabito
+      ? {
+          nombre: stats.peorHabito.nombre,
+          pct: stats.peorHabito.pct,
+          sinCumplirDesde: stats.peorHabito.sinCumplirDesde,
+        }
+      : null,
+    rachaMasLarga: stats.rachaMasLarga,
+    tendencia: stats.tendencia,
+  }
+}
+
+/** Tope duro del resumen acumulado -- ver el comentario de `truncateAtSentenceEnd`. */
+const RESUMEN_MAX_CHARS = 1000
+
+/**
+ * Recorta `text` a como mucho `maxChars` caracteres, en el último punto
+ * antes del límite en vez de a mitad de frase -- un corte exacto en el
+ * carácter 1000 puede partir una palabra o una frase por la mitad y se ve
+ * roto. Esto hace cumplir el tope en código, no solo pidiéndolo en el
+ * prompt: el prompt ya se lo pide al modelo, pero nada garantiza que lo
+ * respete.
+ */
+function truncateAtSentenceEnd(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  const window = text.slice(0, maxChars)
+  const lastPeriod = window.lastIndexOf('.')
+  // No cortar en un punto tan temprano que deje la nota irrisoriamente
+  // corta: en ese caso, mejor un corte seco con "…" que perder la mitad del
+  // texto.
+  const MIN_KEPT_RATIO = 0.5
+  if (lastPeriod >= maxChars * MIN_KEPT_RATIO) {
+    return window.slice(0, lastPeriod + 1)
+  }
+  return `${window.trim()}…`
+}
+
+/**
+ * Reescribe la nota de memoria larga del mentor (`mentor_summary`) a partir
+ * de los últimos análisis y de las cuatro cifras calculadas en
+ * `./weeklyStats` -- NUNCA de la nota anterior. El payload que se arma aquí
+ * deliberadamente no incluye `contenido` ni `previousContenido` de
+ * `mentor_summary`: si en el futuro alguien "optimiza" esto pasándole la
+ * nota anterior en vez de reconstruirla desde los análisis, la nota deriva
+ * con el tiempo -- cada reescritura hereda los sesgos o inventos de la
+ * anterior en vez de volver a apoyarse en datos reales. La fuente de verdad
+ * son siempre los análisis y las cifras, nunca la nota de sí misma.
+ *
+ * Se llama de dos formas: automáticamente y en silencio después de un
+ * análisis semanal (`updateMentorSummaryQuietly`, en `requestWeeklyAnalysis`
+ * arriba), y a mano desde un botón en el panel del Mentor -- ahí sí debe
+ * poder mostrar un error si falla, por eso esta función en sí no atrapa
+ * nada y deja que quien la llama decida.
+ */
+export async function updateMentorSummary(): Promise<MentorSummary> {
+  const today = todayISO()
+  const [stats, ultimosAnalisis, tono] = await Promise.all([
+    getMentorCalculatedStats(today),
+    buildUltimosAnalisisPayload(),
+    getTone(),
+  ])
+
+  const payload: ResumenAnalysisPayload = {
+    tipo: 'resumen',
+    ultimosAnalisis,
+    cifras: toCifrasPayload(stats),
+    tono,
+  }
+  const contenido = await invokeAnalyze(payload)
+  return saveMentorSummary(truncateAtSentenceEnd(contenido, RESUMEN_MAX_CHARS))
+}
+
+/**
+ * Igual que `saveAnalysisQuietly`: si la reescritura del resumen falla, se
+ * registra y no se propaga -- el análisis semanal ya se mostró, un fallo
+ * aquí no puede romperlo.
+ */
+async function updateMentorSummaryQuietly(): Promise<void> {
+  try {
+    await updateMentorSummary()
+  } catch (err) {
+    console.error('No se pudo actualizar el resumen del mentor:', err)
+  }
 }

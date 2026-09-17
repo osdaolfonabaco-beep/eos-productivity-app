@@ -142,7 +142,7 @@ export {
 
 export { getDayComment, getDayCommentsInRange, saveDayComment } from './dayComments'
 
-export { requestAnalysis, requestWeeklyAnalysis, requestIdeaAnalysis } from './analysis'
+export { requestAnalysis, requestWeeklyAnalysis, requestIdeaAnalysis, updateMentorSummary } from './analysis'
 
 export type {
   WeekRange,
