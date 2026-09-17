@@ -409,3 +409,23 @@ export interface MentorSummary {
   createdAt: string
   updatedAt: string
 }
+
+/**
+ * El "para qué" del mentor: qué está intentando lograr el usuario, en qué
+ * plazo, y qué le está costando -- lo escribe el usuario, no el mentor (a
+ * diferencia de `MentorSummary`). Una sola fila por usuario, que se
+ * reescribe; los tres campos son independientes y pueden estar en `null`
+ * (nunca cadena vacía). `reviewedAt` es un hecho del dominio distinto de
+ * `updatedAt`: cuándo el usuario confirmó por última vez que esto sigue
+ * vigente, no cuándo cambió la fila por última vez (ver el comentario de
+ * cabecera de `supabase/mentor-purpose.sql`).
+ */
+export interface MentorPurpose {
+  id: string
+  objetivo: string | null
+  plazo: string | null
+  dificultad: string | null
+  reviewedAt: string
+  createdAt: string
+  updatedAt: string
+}

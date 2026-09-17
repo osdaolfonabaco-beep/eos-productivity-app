@@ -14,6 +14,7 @@ import {
   type WeekCompletion,
 } from '../data'
 import { useAsyncData } from '../useAsyncData'
+import MentorPurposeSection from './MentorPurposeSection'
 import SectionNav from './SectionNav'
 import { ActionError, LoadError, Loading } from './ViewState'
 
@@ -308,6 +309,8 @@ export default function MentorView({ onClose }: { onClose: () => void }) {
         <h1 className="text-titulo">Mentor</h1>
       </div>
 
+      <MentorPurposeSection />
+
       {/* D) Resumen de actividad */}
       <div className="px-4 pt-4">
         <div className="grid grid-cols-3 rounded-tarjeta border border-borde bg-tarjeta p-4 shadow-[var(--sombra-tarjeta)]">
@@ -321,10 +324,12 @@ export default function MentorView({ onClose }: { onClose: () => void }) {
       </div>
 
       {/*
-       * E) Sitio reservado para el resumen acumulado, el "para qué" y el
-       * plan de mejora -- pasos siguientes. A propósito no hay ningún
-       * elemento aquí todavía: nada de secciones vacías ni texto de
-       * relleno, solo este comentario marcando dónde van a entrar.
+       * E) Sitio reservado para el resumen acumulado y el plan de mejora --
+       * pasos siguientes. El "para qué" ya no está pendiente: vive arriba,
+       * en `MentorPurposeSection`, antes de "D) Resumen de actividad". A
+       * propósito no hay ningún elemento aquí todavía para lo que falta:
+       * nada de secciones vacías ni texto de relleno, solo este comentario
+       * marcando dónde van a entrar.
        */}
 
       <SectionNav items={FILTER_ITEMS} active={filter} onChange={setFilter} />

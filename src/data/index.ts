@@ -35,6 +35,7 @@ export type {
   MentorAnalysisType,
   MentorAnalysis,
   MentorSummary,
+  MentorPurpose,
 } from './types'
 
 export {
@@ -246,3 +247,13 @@ export {
   formatAnalysisDate,
   firstWords,
 } from './mentor'
+
+export { MENTOR_PURPOSE_LIMITS } from './mentorPurpose'
+export type { MentorPurposeInput } from './mentorPurpose'
+export {
+  getMentorPurpose,
+  saveMentorPurpose,
+  deleteMentorPurpose,
+  confirmMentorPurposeReviewed,
+  isMentorPurposeStale,
+} from './mentorPurpose'

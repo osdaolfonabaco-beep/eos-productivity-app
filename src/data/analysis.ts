@@ -22,6 +22,14 @@
  * comentario del día (uno o dos frases escritas en Hoy, `./dayComments`) —
  * a diferencia del journal, que nunca entra en este archivo y así
  * estructuralmente no hay forma de que se cuele en ningún análisis.
+ *
+ * El diario y el semanal también llevan `proposito` (`./mentorPurpose`) si
+ * el usuario ha escrito uno — qué está intentando lograr, en qué plazo y
+ * qué le está costando, para que el mentor relacione lo que observa con
+ * eso en vez de describir los datos en abstracto. Si no hay propósito
+ * escrito, la clave se omite entera (nunca se manda `proposito: null`).
+ * `requestIdeaAnalysis` NO lo lleva a propósito: ahí no aporta nada y
+ * sería mandar la situación personal del usuario a cambio de nada.
  */
 
 import { addDays, startOfWeekISO, toISODate, todayISO } from './dates'
@@ -29,6 +37,7 @@ import { getDayComment, getDayCommentsInRange } from './dayComments'
 import { listGoalUpdates, listWeeklyGoals } from './goals'
 import { listClosedIdeas } from './ideas'
 import { saveMentorAnalysis, type MentorAnalysisInput } from './mentor'
+import { getMentorPurpose, isMentorPurposeStale } from './mentorPurpose'
 import { getTone, type Tone } from './preferences'
 import { getEntriesInRange, listHabits } from './store'
 import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
@@ -53,6 +62,32 @@ interface HabitSummary {
   creadoEl: string
   /** Días de historial real dentro de la ventana, ya calculados (máx. 14). */
   diasConHistorial: number
+}
+
+/**
+ * El "para qué" del usuario, tal como viaja en el payload. `masDeUnMesSinRevisar`
+ * se manda ya calculado (`isMentorPurposeStale`), mismo criterio que
+ * `totalTareasAtrasadas` o `hayIdeasCerradasSuficientes` más abajo: el
+ * modelo no tiene que hacer aritmética de fechas sobre un timestamp, que es
+ * justo el tipo de cálculo que se le pide evitar en el resto de este
+ * archivo.
+ */
+interface PropositoPayload {
+  objetivo: string | null
+  plazo: string | null
+  dificultad: string | null
+  masDeUnMesSinRevisar: boolean
+}
+
+async function buildPropositoPayload(): Promise<PropositoPayload | undefined> {
+  const purpose = await getMentorPurpose()
+  if (!purpose) return undefined
+  return {
+    objetivo: purpose.objetivo,
+    plazo: purpose.plazo,
+    dificultad: purpose.dificultad,
+    masDeUnMesSinRevisar: isMentorPurposeStale(purpose),
+  }
 }
 
 interface TaskItem {
@@ -83,6 +118,8 @@ interface DailyAnalysisPayload {
   comentarioDelDia: string | null
   /** El tono elegido en Ajustes; decide qué instrucción usa la función. */
   tono: Tone
+  /** Ausente si el usuario no ha escrito un propósito -- ver el comentario de cabecera. */
+  proposito?: PropositoPayload
 }
 
 interface WeekRangePayload {
@@ -155,6 +192,8 @@ interface WeeklyAnalysisPayload {
    */
   hayIdeasCerradasSuficientes: boolean
   tono: Tone
+  /** Ausente si el usuario no ha escrito un propósito -- ver el comentario de cabecera. */
+  proposito?: PropositoPayload
 }
 
 /** Los dos estados desde los que se puede pedir análisis ("descartada" no ofrece el botón en la interfaz). */
@@ -365,11 +404,12 @@ async function saveAnalysisQuietly(
  */
 export async function requestAnalysis(onSaveFailed?: () => void): Promise<string> {
   const today = todayISO()
-  const [habitos, tareas, comentario, tono] = await Promise.all([
+  const [habitos, tareas, comentario, tono, proposito] = await Promise.all([
     buildHabitsSummary(today),
     buildTasksSummary(today),
     getDayComment(today),
     getTone(),
+    buildPropositoPayload(),
   ])
 
   const payload: DailyAnalysisPayload = {
@@ -379,6 +419,7 @@ export async function requestAnalysis(onSaveFailed?: () => void): Promise<string
     ...tareas,
     comentarioDelDia: comentario?.text ?? null,
     tono,
+    ...(proposito ? { proposito } : {}),
   }
   const contenido = await invokeAnalyze(payload)
   // Sin `await` a propósito: guardar en segundo plano para no retrasar un
@@ -402,12 +443,13 @@ export async function requestWeeklyAnalysis(): Promise<string> {
   const today = todayISO()
   const thisMonday = startOfWeekISO(today)
 
-  const [stats, goals, comentarios, ideasCerradasInfo, tono] = await Promise.all([
+  const [stats, goals, comentarios, ideasCerradasInfo, tono, proposito] = await Promise.all([
     getWeeklyHabitStats(today),
     buildGoalsSummary(today),
     getDayCommentsInRange(thisMonday, today),
     buildClosedIdeasSummary(thisMonday, today),
     getTone(),
+    buildPropositoPayload(),
   ])
 
   const payload: WeeklyAnalysisPayload = {
@@ -427,6 +469,7 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     ideasCerradas: ideasCerradasInfo.ideasCerradas,
     hayIdeasCerradasSuficientes: ideasCerradasInfo.totalIdeasCerradas >= MIN_IDEAS_CERRADAS_PARA_PATRON,
     tono,
+    ...(proposito ? { proposito } : {}),
   }
   const contenido = await invokeAnalyze(payload)
   // Sin `await`, mismo criterio que en requestAnalysis: no retrasar lo que

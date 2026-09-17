@@ -19,6 +19,12 @@
 // tres tipos; el modo "idea" además no recibe la lista de ideas, hábitos,
 // tareas ni comentarios -- solo el texto y el estado de la idea que se pidió.
 //
+// "diario" y "semanal" también pueden traer "proposito" -- qué está
+// intentando lograr el usuario, en qué plazo y qué le está costando (lo
+// escribe el usuario, no forma parte de los datos de hábitos/tareas) -- si
+// no ha escrito ninguno, la clave viene ausente. "idea" nunca lo lleva, a
+// propósito: ver el comentario de cabecera de src/data/analysis.ts.
+//
 // Requiere el secreto GEMINI_API_KEY:
 //   supabase secrets set GEMINI_API_KEY=tu-clave
 //
@@ -72,6 +78,31 @@ interface OverdueTaskItem {
 type Tone = 'directo' | 'equilibrado' | 'breve'
 
 /**
+ * El "para qué" del usuario. `masDeUnMesSinRevisar` llega ya calculado del
+ * cliente (`isMentorPurposeStale`, en src/data/mentorPurpose.ts): el modelo
+ * no tiene que hacer aritmética de fechas sobre un timestamp, mismo
+ * criterio que `totalTareasAtrasadas` más abajo.
+ */
+interface PropositoPayload {
+  objetivo: string | null
+  plazo: string | null
+  dificultad: string | null
+  masDeUnMesSinRevisar: boolean
+}
+
+function isPropositoPayload(v: unknown): v is PropositoPayload {
+  if (typeof v !== 'object' || v === null) return false
+  const p = v as Record<string, unknown>
+  const textField = (x: unknown) => x === null || typeof x === 'string'
+  return (
+    textField(p.objetivo) &&
+    textField(p.plazo) &&
+    textField(p.dificultad) &&
+    typeof p.masDeUnMesSinRevisar === 'boolean'
+  )
+}
+
+/**
  * Nombres deliberadamente explícitos y sin solapar ("fechaDeHoy" en vez de
  * "hoy", que además era el nombre de una lista de tareas): dos ejecuciones
  * con los mismos datos llegaron a confundir tareas de hoy con atrasadas.
@@ -90,12 +121,15 @@ interface DailyPayload {
   /** El comentario del día, o `null`/ausente si no se escribió ninguno. Distinto del journal, que nunca llega aquí. */
   comentarioDelDia?: string | null
   tono: Tone
+  /** Ausente si el usuario no ha escrito un propósito. */
+  proposito?: PropositoPayload
 }
 
 function isDailyPayload(v: Record<string, unknown>): v is DailyPayload {
   if (v.comentarioDelDia !== undefined && v.comentarioDelDia !== null && typeof v.comentarioDelDia !== 'string') {
     return false
   }
+  if (v.proposito !== undefined && !isPropositoPayload(v.proposito)) return false
   return (
     typeof v.fechaDeHoy === 'string' &&
     Array.isArray(v.habitos) &&
@@ -176,6 +210,8 @@ interface WeeklyPayload {
    */
   hayIdeasCerradasSuficientes?: boolean
   tono: Tone
+  /** Ausente si el usuario no ha escrito un propósito. */
+  proposito?: PropositoPayload
 }
 
 function isWeeklyHabitStats(v: unknown): v is WeeklyHabitStats {
@@ -253,6 +289,7 @@ function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
   if (v.hayIdeasCerradasSuficientes !== undefined && typeof v.hayIdeasCerradasSuficientes !== 'boolean') {
     return false
   }
+  if (v.proposito !== undefined && !isPropositoPayload(v.proposito)) return false
   return (v.habitos as unknown[]).every((h) => {
     if (typeof h !== 'object' || h === null) return false
     const hh = h as Record<string, unknown>
@@ -317,6 +354,14 @@ const COMMON_CLOSING = `Todo el texto EN ESPAÑOL, sin mezclar palabras ni frase
 
 No inventes datos que no estén aquí. No repitas los datos tal cual ni cites los nombres de los campos del JSON. No des consejos médicos ni psicológicos.`
 
+/**
+ * Cómo leer "proposito", compartido entre diario y semanal -- ambos lo
+ * reciben igual (ver el comentario de cabecera de este archivo). Una sola
+ * copia para no repetir dos veces el candado de "no consejo financiero",
+ * que es el que más importa que no se desalinee entre los dos prompts.
+ */
+const PROPOSITO_INSTRUCTIONS = `"proposito" (puede faltar, si la persona no ha escrito ninguno) es lo que dijo que está intentando lograr en general -- no algo de hoy ni de esta semana en particular. Trae "objetivo", "plazo" y "dificultad", cada uno null si no se escribió. Relaciona lo que observas en los datos con este propósito cuando de verdad tenga sentido (por ejemplo, si el objetivo habla de ahorrar y hay un patrón de tareas de dinero atrasadas, coméntalo en relación a eso); no lo repitas ni lo cites tal cual de vuelta, y no fuerces la conexión si no hay ninguna real que señalar. Si "masDeUnMesSinRevisar" es true, puedes mencionar una sola vez, de forma breve y sin insistir, que hace tiempo que no se revisa este propósito -- por ejemplo, invitar a confirmar si sigue vigente -- sin convertirlo en el tema central del análisis. Importante: aunque "dificultad" u "objetivo" mencionen deudas o dinero, NO das consejo financiero -- puedes relacionar hábitos con ese objetivo, pero nunca recomendar qué pagar, refinanciar, negociar con un acreedor ni ninguna otra decisión financiera concreta.`
+
 function buildDailyPrompt(payload: DailyPayload): string {
   // "tono" ya se tradujo a instrucción; no hace falta que también viaje en
   // los "Datos", donde solo confundiría (no es algo que haya que analizar).
@@ -329,7 +374,9 @@ Sobre los datos de tareas: "tareasAtrasadasDeDiasAnteriores" son de días ANTERI
 
 En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días a hoy: H = hecho, N = no hecho, . = sin responder, _ = el hábito todavía no existía ese día (se creó el "creadoEl"). Un día marcado "_" NO es un incumplimiento: no lo evalúes, no lo cuentes en contra del hábito, ignóralo como si no estuviera. Si "diasConHistorial" de un hábito es bajo (menos de 5 días, por ejemplo), dilo explícitamente ("llevas pocos días con este hábito, es pronto para ver un patrón") en vez de concluir que el hábito se sostiene o se cae.
 
-"comentarioDelDia" es lo que la persona escribió sobre cómo fue hoy (puede ser null si no escribió nada). Es contexto para leer junto a los hábitos y tareas, no el dato principal: úsalo para matizar o explicar lo que ya muestran las casillas, no lo repitas ni lo cites entero. Si es null, no lo menciones — no es un hueco que señalar.`
+"comentarioDelDia" es lo que la persona escribió sobre cómo fue hoy (puede ser null si no escribió nada). Es contexto para leer junto a los hábitos y tareas, no el dato principal: úsalo para matizar o explicar lo que ya muestran las casillas, no lo repitas ni lo cites entero. Si es null, no lo menciones — no es un hueco que señalar.
+
+${PROPOSITO_INSTRUCTIONS}`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }
@@ -348,7 +395,9 @@ Además de los hábitos hay metas de la semana, en "metas": cada una es "texto" 
 
 "comentariosDeLaSemana" trae, para los días de esta semana en que la persona escribió algo sobre cómo fue el día, "fecha" y "texto" (los días sin comentario simplemente no aparecen en la lista). Es contexto adicional, igual que en el análisis diario: úsalo para matizar lo que ya muestran los hábitos y las metas, no lo repitas ni lo cites entero, y si la lista viene vacía no lo menciones.
 
-"ideasCerradas" trae las ideas que se cerraron esta semana (pasaron a "hecha" o a "descartada"), cada una con su "texto" y su "estado" -- las que siguen abiertas (pendiente/en-marcha) no aparecen aquí. "hayIdeasCerradasSuficientes" no cuenta solo esta semana: dice si el TOTAL histórico de ideas cerradas, de cualquier semana, ya es suficiente para que un patrón signifique algo. Si es true, puedes comentar qué tipo de ideas se están ejecutando y cuáles se quedan sin avanzar, describiendo un patrón real a partir de los datos. Si es false, NO afirmes ningún patrón ni tendencia -- como mucho, menciona qué pasó esta semana en concreto con "ideasCerradas" (cuántas se cerraron y en qué quedaron), sin generalizar: dos o tres casos no son un patrón, ni siquiera si son los únicos que hay hasta ahora. Si "ideasCerradas" viene vacía o ausente, no hables de ideas: no es un hueco que señalar, simplemente no se cerró ninguna esta semana (aunque "hayIdeasCerradasSuficientes" sea true por cierres de semanas anteriores).`
+"ideasCerradas" trae las ideas que se cerraron esta semana (pasaron a "hecha" o a "descartada"), cada una con su "texto" y su "estado" -- las que siguen abiertas (pendiente/en-marcha) no aparecen aquí. "hayIdeasCerradasSuficientes" no cuenta solo esta semana: dice si el TOTAL histórico de ideas cerradas, de cualquier semana, ya es suficiente para que un patrón signifique algo. Si es true, puedes comentar qué tipo de ideas se están ejecutando y cuáles se quedan sin avanzar, describiendo un patrón real a partir de los datos. Si es false, NO afirmes ningún patrón ni tendencia -- como mucho, menciona qué pasó esta semana en concreto con "ideasCerradas" (cuántas se cerraron y en qué quedaron), sin generalizar: dos o tres casos no son un patrón, ni siquiera si son los únicos que hay hasta ahora. Si "ideasCerradas" viene vacía o ausente, no hables de ideas: no es un hueco que señalar, simplemente no se cerró ninguna esta semana (aunque "hayIdeasCerradasSuficientes" sea true por cierres de semanas anteriores).
+
+${PROPOSITO_INSTRUCTIONS}`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }

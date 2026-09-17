@@ -25,6 +25,7 @@ import type {
   JournalNote,
   MentorAnalysis,
   MentorAnalysisType,
+  MentorPurpose,
   MentorSummary,
   Payment,
   Quincena,
@@ -58,6 +59,7 @@ export const EXPENSE_COLS =
 export const MENTOR_ANALYSIS_COLS =
   'id,tipo,period_start,period_end,tono,incluyo_dinero,contenido,archived,created_at'
 export const MENTOR_SUMMARY_COLS = 'id,contenido,previous_contenido,created_at,updated_at'
+export const MENTOR_PURPOSE_COLS = 'id,objetivo,plazo,dificultad,reviewed_at,created_at,updated_at'
 export const JOURNAL_KEY_COLS =
   'id,wrapped_dek_password,salt_password,iv_password,wrapped_dek_recovery,salt_recovery,iv_recovery,created_at,updated_at'
 
@@ -636,3 +638,30 @@ export function rowToMentorSummary(r: MentorSummaryRow): MentorSummary {
 // valor de `previous_contenido` depende de leer la fila anterior primero
 // (ver `saveMentorSummary` en `./mentor`), así que esa lógica vive ahí, no
 // en un conversor genérico aquí.
+
+interface MentorPurposeRow {
+  id: string
+  objetivo: string | null
+  plazo: string | null
+  dificultad: string | null
+  reviewed_at: string
+  created_at: string
+  updated_at: string
+}
+
+export function rowToMentorPurpose(r: MentorPurposeRow): MentorPurpose {
+  return {
+    id: r.id,
+    objetivo: r.objetivo,
+    plazo: r.plazo,
+    dificultad: r.dificultad,
+    reviewedAt: r.reviewed_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+// Tampoco hay un "mentorPurposeToRow" simétrico, por la misma razón que
+// mentor_summary: guardar el propósito no es convertir un objeto ya armado
+// -- recorta, normaliza vacío a null y decide insertar/actualizar/borrar
+// (ver `saveMentorPurpose` en `./mentorPurpose`).
