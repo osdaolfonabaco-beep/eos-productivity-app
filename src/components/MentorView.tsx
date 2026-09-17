@@ -14,6 +14,7 @@ import {
   type WeekCompletion,
 } from '../data'
 import { useAsyncData } from '../useAsyncData'
+import MentorProposalSection from './MentorProposalSection'
 import MentorPurposeSection from './MentorPurposeSection'
 import MentorSummarySection from './MentorSummarySection'
 import SectionNav from './SectionNav'
@@ -324,11 +325,11 @@ export default function MentorView({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/*
-       * E) El resumen acumulado. El plan de mejora sigue sin construirse --
-       * a propósito no hay ningún elemento aquí todavía para eso.
-       */}
+      {/* E) El resumen acumulado. */}
       <MentorSummarySection />
+
+      {/* F) El plan de mejora: la propuesta del mentor, su seguimiento y su historial. */}
+      <MentorProposalSection />
 
       <SectionNav items={FILTER_ITEMS} active={filter} onChange={setFilter} />
 
