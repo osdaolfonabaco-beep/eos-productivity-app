@@ -286,7 +286,16 @@ export default function AnalysisSection({ onOpenMentor }: { onOpenMentor: () => 
 
   return (
     <section className="px-4 pt-6 text-texto">
-      <h2 className="mb-2 text-etiqueta uppercase etiqueta-calido">Mentor</h2>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-etiqueta uppercase etiqueta-calido">Mentor</h2>
+        <button
+          type="button"
+          onClick={onOpenMentor}
+          className="-mr-2 flex min-h-11 items-center px-2 text-meta font-medium text-[var(--color-acento-texto)] transition-transform duration-[var(--dur-toque)] ease-toque active:scale-[0.96]"
+        >
+          Panel del mentor
+        </button>
+      </div>
 
       {requestError && (
         <ActionError message={requestError} onDismiss={() => setRequestError(null)} />
@@ -327,14 +336,6 @@ export default function AnalysisSection({ onOpenMentor }: { onOpenMentor: () => 
           </div>
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={onOpenMentor}
-        className="mt-3 block w-full text-center text-xs font-medium text-texto-apagado underline"
-      >
-        Ver todo el historial
-      </button>
     </section>
   )
 }
