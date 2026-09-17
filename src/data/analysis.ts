@@ -22,6 +22,21 @@
  *   un análisis semanal y también a mano desde un botón (ver su propio
  *   comentario, más abajo).
  *
+ * Al final de un `requestWeeklyAnalysis`, SI no hay ya una propuesta activa
+ * (`./mentorProposals`), se lanza en paralelo una llamada aparte a la Edge
+ * Function con `tipo: 'propuesta'` -- no un JSON con dos campos ni una
+ * segunda vuelta secuencial: dos peticiones independientes que arrancan
+ * juntas, para no añadir espera a lo que la persona ya está esperando ver.
+ * Si Gemini responde el centinela `SIN_PROPUESTA` (`isNoProposalResponse`),
+ * esa semana no se guarda ninguna propuesta -- mejor sin propuesta que una
+ * de relleno. Ver el comentario de `requestWeeklyAnalysis`, más abajo.
+ *
+ * El diario y el semanal también llevan `propuestaActiva`
+ * (`buildPropuestaActivaPayload`) si hay una propuesta ACEPTADA en este
+ * momento: su texto y hace cuántos días se aceptó (precalculado, nunca
+ * aritmética de fechas para el modelo). Es solo seguimiento -- nunca pide
+ * una propuesta nueva, eso solo lo hace `tipo: 'propuesta'` arriba.
+ *
  * Los payloads usan campos explícitos y sin solapar — nunca inferir de un
  * booleano o de una clave repetida qué es cada cosa — y llevan el tono
  * elegido en Ajustes (`getTone`). El diario y el semanal también el
@@ -55,13 +70,18 @@ import { debtBalance, getPayments, listDebts } from './finance'
 import { listGoalUpdates, listWeeklyGoals } from './goals'
 import { listClosedIdeas } from './ideas'
 import { listMentorAnalyses, saveMentorAnalysis, saveMentorSummary, type MentorAnalysisInput } from './mentor'
+import {
+  createMentorProposal,
+  getActiveMentorProposal,
+  listRecentInactiveMentorProposals,
+} from './mentorProposals'
 import { getMentorPurpose, isMentorPurposeStale } from './mentorPurpose'
 import { getMentorSeesMoney, getTone, type Tone } from './preferences'
 import { getPeriodBreakdown } from './salaryPeriods'
 import { getEntriesInRange, listHabits } from './store'
 import { joinErrorDetail, readFunctionErrorBody, supabase } from './supabase'
 import { bucketTasks, listTasks } from './tasks'
-import type { Expense, GoalDirection, GoalResult, MentorAnalysis, MentorSummary } from './types'
+import type { Expense, GoalDirection, GoalResult, MentorAnalysis, MentorProposal, MentorSummary } from './types'
 import { getMentorCalculatedStats, getWeeklyHabitStats, type MentorCalculatedStats, type Tendencia } from './weeklyStats'
 
 const DAYS_BACK = 14
@@ -107,6 +127,28 @@ async function buildPropositoPayload(): Promise<PropositoPayload | undefined> {
     dificultad: purpose.dificultad,
     masDeUnMesSinRevisar: isMentorPurposeStale(purpose),
   }
+}
+
+/** El seguimiento de una propuesta de mejora, tal como viaja en el payload de diario/semanal. */
+interface PropuestaActivaPayload {
+  texto: string
+  diasActiva: number
+}
+
+/**
+ * `undefined` si no hay propuesta activa, o si la hay pero todavía está en
+ * `'propuesta'` (sin decidir): recién generada, sin `aceptadaEn`, todavía no
+ * hay nada que seguir. Solo una `'aceptada'` tiene sentido de comentar aquí.
+ * `diasActiva` se calcula sobre `aceptadaEn` (un `timestamptz`, no una
+ * fecha de calendario) igual que `isMentorPurposeStale` en `./mentorPurpose`
+ * -- resta directa de milisegundos, no `daysBetween` (que es para dos
+ * fechas `YYYY-MM-DD`).
+ */
+function buildPropuestaActivaPayload(active: MentorProposal | undefined): PropuestaActivaPayload | undefined {
+  if (!active || active.status !== 'aceptada' || !active.aceptadaEn) return undefined
+  const ms = Date.now() - new Date(active.aceptadaEn).getTime()
+  const diasActiva = Math.floor(ms / (24 * 60 * 60 * 1000))
+  return { texto: active.contenido, diasActiva }
 }
 
 const SIN_CATEGORIA_DINERO = 'Sin categoría'
@@ -225,6 +267,8 @@ interface DailyAnalysisPayload {
   proposito?: PropositoPayload
   /** Ausente si el interruptor de dinero está apagado -- ver el comentario de cabecera. */
   dinero?: DineroPayload
+  /** Ausente si no hay una propuesta de mejora aceptada en este momento -- ver el comentario de cabecera. */
+  propuestaActiva?: PropuestaActivaPayload
 }
 
 interface WeekRangePayload {
@@ -301,6 +345,8 @@ interface WeeklyAnalysisPayload {
   proposito?: PropositoPayload
   /** Ausente si el interruptor de dinero está apagado -- ver el comentario de cabecera. */
   dinero?: DineroPayload
+  /** Ausente si no hay una propuesta de mejora aceptada en este momento -- ver el comentario de cabecera. */
+  propuestaActiva?: PropuestaActivaPayload
 }
 
 /** Los dos estados desde los que se puede pedir análisis ("descartada" no ofrece el botón en la interfaz). */
@@ -358,6 +404,34 @@ interface ResumenAnalysisPayload {
   ultimosAnalisis: UltimoAnalisisPayload[]
   cifras: CifrasPayload
   tono: Tone
+}
+
+/** Una propuesta anterior que no cuajó, tal como viaja en "propuestasDescartadas" -- solo su texto, para no repetir la misma idea. */
+interface DiscardedProposalPayload {
+  contenido: string
+}
+
+/**
+ * El payload de "propuesta": los mismos hábitos/metas/comentarios que ve el
+ * análisis semanal, más las tareas atrasadas (que el semanal no lleva, pero
+ * el diario ya reúne -- `buildTasksSummary`/`OverdueTaskItem` se reutilizan
+ * tal cual) y las propuestas que ya se descartaron o se cerraron, para no
+ * repetir la misma idea. Deliberadamente SIN `dinero`: las propuestas nunca
+ * son financieras, así que no hace falta ni mandarlo -- ver el comentario
+ * de cabecera.
+ */
+interface ProposalPayload {
+  tipo: 'propuesta'
+  habitos: WeeklyHabitPayload[]
+  metas: GoalPayload[]
+  metasSemanaAnterior: PastGoalPayload[]
+  comentariosDeLaSemana: DayCommentPayload[]
+  tareasAtrasadasDeDiasAnteriores: OverdueTaskItem[]
+  totalTareasAtrasadas: number
+  propuestasDescartadas: DiscardedProposalPayload[]
+  tono: Tone
+  /** Ausente si el usuario no ha escrito un propósito. */
+  proposito?: PropositoPayload
 }
 
 /** Diferencia en días de calendario entre dos fechas `YYYY-MM-DD` (`to` - `from`). */
@@ -497,12 +571,18 @@ function messageFromBody(body: Record<string, unknown> | null | undefined): stri
 
 /**
  * Llama a la Edge Function `analyze` con un payload ya armado (diario,
- * semanal o idea — los tres comparten esta misma función y este mismo
- * manejo de errores). No guarda nada: el texto vive solo en el estado de
- * quien lo pidió.
+ * semanal, idea, resumen o propuesta — todos comparten esta misma función y
+ * este mismo manejo de errores). No guarda nada: el texto vive solo en el
+ * estado de quien lo pidió (o, para "propuesta", en la variable local de
+ * `requestWeeklyAnalysis` hasta que `saveWeeklyResultsQuietly` lo guarda).
  */
 async function invokeAnalyze(
-  payload: DailyAnalysisPayload | WeeklyAnalysisPayload | IdeaAnalysisPayload | ResumenAnalysisPayload,
+  payload:
+    | DailyAnalysisPayload
+    | WeeklyAnalysisPayload
+    | IdeaAnalysisPayload
+    | ResumenAnalysisPayload
+    | ProposalPayload,
 ): Promise<string> {
   const { data, error } = await supabase.functions.invoke<{
     analysis?: string
@@ -550,6 +630,57 @@ async function saveAnalysisQuietly(input: MentorAnalysisInput, onFailed?: () => 
 }
 
 /**
+ * El token EXACTO que devuelve Gemini cuando no hay nada concreto que
+ * proponer esta semana (ver `PROPOSAL_SCOPE_INSTRUCTIONS`, en
+ * `supabase/functions/analyze/index.ts`). Comparación normalizada
+ * (mayúsculas, sin espacios ni puntuación de cierre) en vez de una igualdad
+ * exacta de cadena: así no depende de que Gemini devuelva el token carácter
+ * por carácter, solo de que no haya dicho nada más.
+ */
+const NO_PROPOSAL_SENTINEL = 'SIN_PROPUESTA'
+
+function isNoProposalResponse(text: string): boolean {
+  const normalized = text.trim().toUpperCase().replace(/[.!¡¿?"'`]+$/, '')
+  return normalized === NO_PROPOSAL_SENTINEL
+}
+
+/**
+ * Guarda el análisis semanal y, si se pidió una propuesta nueva
+ * (`proposalPromise`), la propuesta -- todo en segundo plano, sin propagar
+ * ningún error (mismo criterio que `saveAnalysisQuietly`/
+ * `updateMentorSummaryQuietly`: la persona ya vio su análisis, un fallo al
+ * guardar algo de esto no puede quitárselo).
+ *
+ * `proposalPromise` ya está en marcha desde antes de llamar aquí (arrancada
+ * en paralelo con el análisis semanal mismo, en `requestWeeklyAnalysis`) --
+ * esta función solo espera su resultado y decide qué hacer con él: si es el
+ * centinela `SIN_PROPUESTA`, no se guarda nada (una semana sin propuesta es
+ * mejor que una de relleno); si es texto real, se crea la propuesta ligada
+ * al análisis que se acaba de guardar (`analisisId`).
+ */
+async function saveWeeklyResultsQuietly(
+  input: MentorAnalysisInput,
+  proposalPromise: Promise<string> | undefined,
+): Promise<void> {
+  let savedId: string | undefined
+  try {
+    savedId = (await saveMentorAnalysis(input)).id
+  } catch (err) {
+    console.error('No se pudo guardar el análisis del mentor:', err)
+  }
+
+  if (!proposalPromise) return
+  try {
+    const propuesta = await proposalPromise
+    if (!isNoProposalResponse(propuesta)) {
+      await createMentorProposal({ contenido: propuesta, analisisId: savedId })
+    }
+  } catch (err) {
+    console.error('No se pudo generar o guardar la propuesta del mentor:', err)
+  }
+}
+
+/**
  * El análisis diario: hábitos de los últimos 14 días + tareas de hoy y
  * atrasadas. `onSaveFailed`, opcional, avisa si el guardado en segundo plano
  * falló del todo (ver `saveAnalysisQuietly`) — nada más lo necesita hoy
@@ -557,15 +688,17 @@ async function saveAnalysisQuietly(input: MentorAnalysisInput, onFailed?: () => 
  */
 export async function requestAnalysis(onSaveFailed?: () => void): Promise<string> {
   const today = todayISO()
-  const [habitos, tareas, comentario, tono, proposito, veDinero] = await Promise.all([
+  const [habitos, tareas, comentario, tono, proposito, veDinero, activeProposal] = await Promise.all([
     buildHabitsSummary(today),
     buildTasksSummary(today),
     getDayComment(today),
     getTone(),
     buildPropositoPayload(),
     getMentorSeesMoney(),
+    getActiveMentorProposal(),
   ])
   const dinero = veDinero ? await buildDineroPayload(today) : undefined
+  const propuestaActiva = buildPropuestaActivaPayload(activeProposal)
 
   const payload: DailyAnalysisPayload = {
     tipo: 'diario',
@@ -576,6 +709,7 @@ export async function requestAnalysis(onSaveFailed?: () => void): Promise<string
     tono,
     ...(proposito ? { proposito } : {}),
     ...(dinero ? { dinero } : {}),
+    ...(propuestaActiva ? { propuestaActiva } : {}),
   }
   const contenido = await invokeAnalyze(payload)
   // Sin `await` a propósito: guardar en segundo plano para no retrasar un
@@ -606,48 +740,87 @@ export async function requestWeeklyAnalysis(): Promise<string> {
   const today = todayISO()
   const thisMonday = startOfWeekISO(today)
 
-  const [stats, goals, comentarios, ideasCerradasInfo, tono, proposito, veDinero] = await Promise.all([
-    getWeeklyHabitStats(today),
-    buildGoalsSummary(today),
-    getDayCommentsInRange(thisMonday, today),
-    buildClosedIdeasSummary(thisMonday, today),
-    getTone(),
-    buildPropositoPayload(),
-    getMentorSeesMoney(),
-  ])
+  const [stats, goals, comentarios, tareas, ideasCerradasInfo, tono, proposito, veDinero, activeProposal] =
+    await Promise.all([
+      getWeeklyHabitStats(today),
+      buildGoalsSummary(today),
+      getDayCommentsInRange(thisMonday, today),
+      buildTasksSummary(today),
+      buildClosedIdeasSummary(thisMonday, today),
+      getTone(),
+      buildPropositoPayload(),
+      getMentorSeesMoney(),
+      getActiveMentorProposal(),
+    ])
   const dinero = veDinero ? await buildDineroPayload(today) : undefined
+  const propuestaActiva = buildPropuestaActivaPayload(activeProposal)
+  // Solo hace falta si de verdad se va a pedir una propuesta nueva (ver
+  // `proposalPromise`, más abajo) -- si ya hay una activa, esta consulta no
+  // sirve de nada.
+  const propuestasDescartadas = activeProposal
+    ? []
+    : (await listRecentInactiveMentorProposals()).map((p) => ({ contenido: p.contenido }))
+  const habitos = stats.habitos.map((h) => ({
+    nombre: h.habit.name,
+    creadoEl: toISODate(new Date(h.habit.createdAt)),
+    estaSemana: h.estaSemana,
+    semanaAnterior: h.semanaAnterior,
+  }))
+  const comentariosDeLaSemana = comentarios.map((c) => ({ fecha: c.date, texto: c.text }))
 
   const payload: WeeklyAnalysisPayload = {
     tipo: 'semanal',
     semanaActual: stats.semanaActual,
     semanaAnterior: stats.semanaAnterior,
     hayHistoriaSuficiente: stats.hayHistoriaSuficiente,
-    habitos: stats.habitos.map((h) => ({
-      nombre: h.habit.name,
-      creadoEl: toISODate(new Date(h.habit.createdAt)),
-      estaSemana: h.estaSemana,
-      semanaAnterior: h.semanaAnterior,
-    })),
+    habitos,
     metas: goals.metas,
     metasSemanaAnterior: goals.metasSemanaAnterior,
-    comentariosDeLaSemana: comentarios.map((c) => ({ fecha: c.date, texto: c.text })),
+    comentariosDeLaSemana,
     ideasCerradas: ideasCerradasInfo.ideasCerradas,
     hayIdeasCerradasSuficientes: ideasCerradasInfo.totalIdeasCerradas >= MIN_IDEAS_CERRADAS_PARA_PATRON,
     tono,
     ...(proposito ? { proposito } : {}),
     ...(dinero ? { dinero } : {}),
+    ...(propuestaActiva ? { propuestaActiva } : {}),
   }
+
+  // Si NO hay ya una propuesta activa, se arranca AQUÍ (antes de `await
+  // invokeAnalyze(payload)`, no después) una segunda llamada independiente
+  // a Gemini pidiendo una propuesta nueva -- las dos corren en paralelo, así
+  // que no se le añade espera a la persona por pedir esto de más. Si ya hay
+  // una activa, `propuestaActiva` (arriba) ya se encarga de que el análisis
+  // comente cómo va, y aquí no se pide ninguna nueva.
+  const proposalPromise = activeProposal
+    ? undefined
+    : invokeAnalyze({
+        tipo: 'propuesta',
+        habitos,
+        metas: goals.metas,
+        metasSemanaAnterior: goals.metasSemanaAnterior,
+        comentariosDeLaSemana,
+        tareasAtrasadasDeDiasAnteriores: tareas.tareasAtrasadasDeDiasAnteriores,
+        totalTareasAtrasadas: tareas.totalTareasAtrasadas,
+        propuestasDescartadas,
+        tono,
+        ...(proposito ? { proposito } : {}),
+      })
+
   const contenido = await invokeAnalyze(payload)
   // Sin `await`, mismo criterio que en requestAnalysis: no retrasar lo que
-  // ya se puede leer.
-  void saveAnalysisQuietly({
-    tipo: 'semanal',
-    periodStart: stats.semanaActual.inicio,
-    periodEnd: stats.semanaActual.fin,
-    tono,
-    contenido,
-    incluyoDinero: dinero !== undefined,
-  })
+  // ya se puede leer. Guarda el análisis y, si `proposalPromise` existe, la
+  // propuesta que resulte -- ver el comentario de `saveWeeklyResultsQuietly`.
+  void saveWeeklyResultsQuietly(
+    {
+      tipo: 'semanal',
+      periodStart: stats.semanaActual.inicio,
+      periodEnd: stats.semanaActual.fin,
+      tono,
+      contenido,
+      incluyoDinero: dinero !== undefined,
+    },
+    proposalPromise,
+  )
   // También en segundo plano y también sin propagar el error: el resumen
   // acumulado se actualiza SOLO con el análisis semanal (nunca con el
   // diario, que duplicaría esta llamada extra a la IA en cada análisis del

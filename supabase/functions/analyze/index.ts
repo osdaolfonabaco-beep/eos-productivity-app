@@ -1,16 +1,19 @@
 // Edge Function "analyze": manda un resumen de hábitos y tareas a Gemini y
 // devuelve un análisis breve en español.
 //
-// Sirve CUATRO tipos de análisis, discriminados por "tipo" en el payload:
+// Sirve CINCO tipos de análisis, discriminados por "tipo" en el payload:
 // "diario" (hábitos de los últimos 14 días + tareas de hoy/atrasadas + el
 // comentario del día, el original), "semanal" (el dashboard de Vida ->
 // Semana: cumplimiento de esta semana por hábito y comparación con la
 // anterior, las metas de la semana y sus avances, los comentarios del día
 // de esta semana, y las ideas que se cerraron esta semana), "idea" (una
 // sola idea de la pestaña Ideas, con su texto y su estado -- ver
-// buildIdeaPrompt), y "resumen" (reescribe mentor_summary, la nota de
+// buildIdeaPrompt), "resumen" (reescribe mentor_summary, la nota de
 // memoria larga del mentor, a partir de los últimos análisis y de cuatro
-// cifras ya calculadas del lado del cliente -- ver buildResumenPrompt). Se
+// cifras ya calculadas del lado del cliente -- ver buildResumenPrompt), y
+// "propuesta" (UNA propuesta de mejora de hábitos/tareas/rutinas al final
+// del análisis semanal, o el centinela SIN_PROPUESTA si no hay nada
+// concreto que proponer esa semana -- ver buildProposalPrompt). Se
 // reutiliza la misma función -- y el mismo mecanismo de tono (toneOf/
 // getTone) -- en vez de crear una nueva; solo cambia qué prompt se
 // construye antes de llamar a Gemini. Los prompts existentes
@@ -18,17 +21,26 @@
 // no se tocan para añadir uno nuevo.
 //
 // No toca la base de datos: el cliente (src/data/analysis.ts) arma el JSON
-// y se lo manda ya listo -- incluido "resumen", que solo devuelve el texto;
-// quien lo guarda en mentor_summary es el cliente. El journal nunca pasa
-// por aquí, en ninguno de los cuatro tipos; el modo "idea" además no
-// recibe la lista de ideas, hábitos, tareas ni comentarios -- solo el
-// texto y el estado de la idea que se pidió.
+// y se lo manda ya listo -- incluido "resumen" y "propuesta", que solo
+// devuelven texto; quien lo guarda (en mentor_summary o en
+// mentor_proposals) es el cliente. El journal nunca pasa por aquí, en
+// ninguno de los cinco tipos; el modo "idea" además no recibe la lista de
+// ideas, hábitos, tareas ni comentarios -- solo el texto y el estado de la
+// idea que se pidió.
 //
 // "diario" y "semanal" también pueden traer "proposito" -- qué está
 // intentando lograr el usuario, en qué plazo y qué le está costando (lo
 // escribe el usuario, no forma parte de los datos de hábitos/tareas) -- si
 // no ha escrito ninguno, la clave viene ausente. "idea" nunca lo lleva, a
 // propósito: ver el comentario de cabecera de src/data/analysis.ts.
+// "propuesta" sí lo lleva (puede afinar sobre qué proponer), igual de
+// opcional.
+//
+// "diario" y "semanal" también pueden traer "propuestaActiva" -- el
+// seguimiento de una propuesta de mejora ya aceptada (su texto y hace
+// cuántos días se aceptó), para que el mentor compruebe una vez si se está
+// cumpliendo -- ver PROPUESTA_ACTIVA_INSTRUCTIONS. Nunca es el lugar donde
+// se pide una propuesta nueva; eso solo lo hace "propuesta".
 //
 // "diario" y "semanal" también pueden traer "dinero" -- sueldo/ingresos/
 // gastos/disponible de la quincena actual, gastos AGREGADOS por categoría
@@ -36,10 +48,12 @@
 // interruptor correspondiente en Ajustes, la clave viene ausente y el
 // prompt instruye no mencionar el dinero en absoluto (NO_DINERO_INSTRUCTIONS).
 // Cuando sí viaja, y también en "resumen" (que nunca recibe esta clave pero
-// puede leer dinero en análisis anteriores), rige el candado financiero
-// incondicional -- ver FINANCIAL_LOCK_INSTRUCTIONS, la parte más importante
-// de este archivo: con cifras reales delante, la tentación del modelo de
-// opinar o de hacer cálculos financieros es mucho mayor que antes.
+// puede leer dinero en análisis anteriores) y en "propuesta" (que tampoco
+// la recibe nunca -- las propuestas no son financieras), rige el candado
+// financiero incondicional -- ver FINANCIAL_LOCK_INSTRUCTIONS, la parte más
+// importante de este archivo: con cifras reales delante, la tentación del
+// modelo de opinar o de hacer cálculos financieros es mucho mayor que
+// antes.
 //
 // Requiere el secreto GEMINI_API_KEY:
 //   supabase secrets set GEMINI_API_KEY=tu-clave
@@ -116,6 +130,23 @@ function isPropositoPayload(v: unknown): v is PropositoPayload {
     textField(p.dificultad) &&
     typeof p.masDeUnMesSinRevisar === 'boolean'
   )
+}
+
+/**
+ * La propuesta de mejora ACEPTADA en curso (si hay una), tal como llega en
+ * "diario" y "semanal" -- ver PROPUESTA_ACTIVA_INSTRUCTIONS más abajo.
+ * "diasActiva" llega ya calculado del cliente (mismo criterio que
+ * "masDeUnMesSinRevisar" de arriba): el modelo no hace aritmética de fechas.
+ */
+interface PropuestaActivaPayload {
+  texto: string
+  diasActiva: number
+}
+
+function isPropuestaActivaPayload(v: unknown): v is PropuestaActivaPayload {
+  if (typeof v !== 'object' || v === null) return false
+  const p = v as Record<string, unknown>
+  return typeof p.texto === 'string' && typeof p.diasActiva === 'number'
 }
 
 /**
@@ -215,6 +246,8 @@ interface DailyPayload {
   proposito?: PropositoPayload
   /** Ausente si el interruptor de dinero está apagado. */
   dinero?: DineroPayload
+  /** Ausente si no hay una propuesta del mentor aceptada en este momento. */
+  propuestaActiva?: PropuestaActivaPayload
 }
 
 function isDailyPayload(v: Record<string, unknown>): v is DailyPayload {
@@ -223,6 +256,7 @@ function isDailyPayload(v: Record<string, unknown>): v is DailyPayload {
   }
   if (v.proposito !== undefined && !isPropositoPayload(v.proposito)) return false
   if (v.dinero !== undefined && !isDineroPayload(v.dinero)) return false
+  if (v.propuestaActiva !== undefined && !isPropuestaActivaPayload(v.propuestaActiva)) return false
   return (
     typeof v.fechaDeHoy === 'string' &&
     Array.isArray(v.habitos) &&
@@ -307,6 +341,8 @@ interface WeeklyPayload {
   proposito?: PropositoPayload
   /** Ausente si el interruptor de dinero está apagado. */
   dinero?: DineroPayload
+  /** Ausente si no hay una propuesta del mentor aceptada en este momento. */
+  propuestaActiva?: PropuestaActivaPayload
 }
 
 function isWeeklyHabitStats(v: unknown): v is WeeklyHabitStats {
@@ -359,6 +395,18 @@ function isClosedIdeaSummary(v: unknown): v is ClosedIdeaSummary {
   return typeof c.texto === 'string' && (c.estado === 'hecha' || c.estado === 'descartada')
 }
 
+/** Compartido entre "semanal" y "propuesta" -- ambos reciben el mismo desglose de hábitos por semana. */
+function isWeeklyHabitSummary(h: unknown): h is WeeklyHabitSummary {
+  if (typeof h !== 'object' || h === null) return false
+  const hh = h as Record<string, unknown>
+  return (
+    typeof hh.nombre === 'string' &&
+    typeof hh.creadoEl === 'string' &&
+    isWeeklyHabitStats(hh.estaSemana) &&
+    (hh.semanaAnterior === null || isWeeklyHabitStats(hh.semanaAnterior))
+  )
+}
+
 function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
   if (v.tipo !== 'semanal') return false
   const semanaActual = v.semanaActual as Record<string, unknown> | undefined
@@ -386,16 +434,8 @@ function isWeeklyPayload(v: Record<string, unknown>): v is WeeklyPayload {
   }
   if (v.proposito !== undefined && !isPropositoPayload(v.proposito)) return false
   if (v.dinero !== undefined && !isDineroPayload(v.dinero)) return false
-  return (v.habitos as unknown[]).every((h) => {
-    if (typeof h !== 'object' || h === null) return false
-    const hh = h as Record<string, unknown>
-    return (
-      typeof hh.nombre === 'string' &&
-      typeof hh.creadoEl === 'string' &&
-      isWeeklyHabitStats(hh.estaSemana) &&
-      (hh.semanaAnterior === null || isWeeklyHabitStats(hh.semanaAnterior))
-    )
-  })
+  if (v.propuestaActiva !== undefined && !isPropuestaActivaPayload(v.propuestaActiva)) return false
+  return (v.habitos as unknown[]).every(isWeeklyHabitSummary)
 }
 
 /** Los dos estados desde los que se puede pedir análisis ("descartada" no ofrece el botón en la interfaz). */
@@ -457,6 +497,14 @@ No inventes datos que no estén aquí. No repitas los datos tal cual ni cites lo
 const PROPOSITO_INSTRUCTIONS = `"proposito" (puede faltar, si la persona no ha escrito ninguno) es lo que dijo que está intentando lograr en general -- no algo de hoy ni de esta semana en particular. Trae "objetivo", "plazo" y "dificultad", cada uno null si no se escribió. Relaciona lo que observas en los datos con este propósito cuando de verdad tenga sentido (por ejemplo, si el objetivo habla de ahorrar y hay un patrón de tareas de dinero atrasadas, coméntalo en relación a eso); no lo repitas ni lo cites tal cual de vuelta, y no fuerces la conexión si no hay ninguna real que señalar. Si "masDeUnMesSinRevisar" es true, puedes mencionar una sola vez, de forma breve y sin insistir, que hace tiempo que no se revisa este propósito -- por ejemplo, invitar a confirmar si sigue vigente -- sin convertirlo en el tema central del análisis.`
 
 /**
+ * Cómo leer "propuestaActiva", compartido entre diario y semanal -- el
+ * seguimiento de una propuesta de mejora ya aceptada. Nunca se pide una
+ * propuesta NUEVA aquí (eso lo hace "propuesta", un tipo aparte); esto es
+ * solo comentar cómo va la que ya está en curso.
+ */
+const PROPUESTA_ACTIVA_INSTRUCTIONS = `"propuestaActiva" (puede faltar, si no hay ninguna propuesta de mejora aceptada en este momento) es un plan de mejora que esta persona aceptó hace "diasActiva" días: "texto" es lo que se propuso. Compruébalo contra lo que ves en los datos y, si tiene sentido, menciona en una sola frase si parece que se está cumpliendo o no -- una vez, sin insistir ni repetirlo si ya lo dijiste en un análisis anterior. Si "propuestaActiva" no viene, no menciones nada sobre propuestas de mejora: no es un hueco que señalar.`
+
+/**
  * El candado financiero. Antes era preventivo (el mentor no veía cifras);
  * con saldos, tasas y deudas en mora delante, la tentación de recomendar
  * qué pagar primero es mucho mayor, así que esto tiene que quedar sin
@@ -507,6 +555,8 @@ En "ultimos14dias" de cada hábito, cada carácter es un día, de hace 13 días 
 
 ${PROPOSITO_INSTRUCTIONS}
 
+${PROPUESTA_ACTIVA_INSTRUCTIONS}
+
 ${dineroBlockFor(payload)}`
 
   return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
@@ -529,6 +579,8 @@ Además de los hábitos hay metas de la semana, en "metas": cada una es "texto" 
 "ideasCerradas" trae las ideas que se cerraron esta semana (pasaron a "hecha" o a "descartada"), cada una con su "texto" y su "estado" -- las que siguen abiertas (pendiente/en-marcha) no aparecen aquí. "hayIdeasCerradasSuficientes" no cuenta solo esta semana: dice si el TOTAL histórico de ideas cerradas, de cualquier semana, ya es suficiente para que un patrón signifique algo. Si es true, puedes comentar qué tipo de ideas se están ejecutando y cuáles se quedan sin avanzar, describiendo un patrón real a partir de los datos. Si es false, NO afirmes ningún patrón ni tendencia -- como mucho, menciona qué pasó esta semana en concreto con "ideasCerradas" (cuántas se cerraron y en qué quedaron), sin generalizar: dos o tres casos no son un patrón, ni siquiera si son los únicos que hay hasta ahora. Si "ideasCerradas" viene vacía o ausente, no hables de ideas: no es un hueco que señalar, simplemente no se cerró ninguna esta semana (aunque "hayIdeasCerradasSuficientes" sea true por cierres de semanas anteriores).
 
 ${PROPOSITO_INSTRUCTIONS}
+
+${PROPUESTA_ACTIVA_INSTRUCTIONS}
 
 ${dineroBlockFor(payload)}`
 
@@ -574,6 +626,121 @@ ${COMMON_CLOSING}
 Escribe en segunda persona (tú). Sin markdown pesado: nada de negritas, asteriscos, numeración ni viñetas -- los dos títulos de sección van tal cual, en texto plano, seguidos de su párrafo.`
 
   return `${instrucciones}\n\nIdea (estado: ${estado}):\n${texto}`
+}
+
+// --- "propuesta": UNA propuesta de mejora al final del análisis semanal --
+
+/** Una propuesta anterior que no cuajó, tal como llega en "propuestasDescartadas" -- solo su texto, para no repetir la misma idea. */
+interface DiscardedProposalSummary {
+  contenido: string
+}
+
+function isDiscardedProposalSummary(v: unknown): v is DiscardedProposalSummary {
+  if (typeof v !== 'object' || v === null) return false
+  return typeof (v as Record<string, unknown>).contenido === 'string'
+}
+
+/**
+ * Payload de "propuesta": los mismos hábitos/metas/comentarios que ve el
+ * análisis semanal, más las tareas atrasadas (que el semanal no lleva, pero
+ * el diario ya reúne -- `buildTasksSummary`/`OverdueTaskItem` en
+ * src/data/analysis.ts se reutilizan tal cual) y las propuestas que ya se
+ * descartaron o se cerraron, para no repetir la misma idea. Nunca lleva
+ * "dinero": las propuestas no son financieras, así que no hace falta ni
+ * mandarlo.
+ */
+interface ProposalPayload {
+  tipo: 'propuesta'
+  habitos: WeeklyHabitSummary[]
+  metas: GoalSummary[]
+  metasSemanaAnterior: PastGoalSummary[]
+  comentariosDeLaSemana: DayCommentSummary[]
+  tareasAtrasadasDeDiasAnteriores: OverdueTaskItem[]
+  totalTareasAtrasadas: number
+  propuestasDescartadas: DiscardedProposalSummary[]
+  tono: Tone
+  /** Ausente si el usuario no ha escrito un propósito. */
+  proposito?: PropositoPayload
+}
+
+function isOverdueTaskItem(v: unknown): v is OverdueTaskItem {
+  if (typeof v !== 'object' || v === null) return false
+  const t = v as Record<string, unknown>
+  return typeof t.texto === 'string' && typeof t.diasDeAtraso === 'number'
+}
+
+function isProposalPayload(v: Record<string, unknown>): v is ProposalPayload {
+  if (v.tipo !== 'propuesta') return false
+  if (!Array.isArray(v.habitos) || !v.habitos.every(isWeeklyHabitSummary)) return false
+  if (!Array.isArray(v.metas) || !v.metas.every(isGoalSummary)) return false
+  if (!Array.isArray(v.metasSemanaAnterior) || !v.metasSemanaAnterior.every(isPastGoalSummary)) return false
+  if (!Array.isArray(v.comentariosDeLaSemana) || !v.comentariosDeLaSemana.every(isDayCommentSummary)) {
+    return false
+  }
+  if (
+    !Array.isArray(v.tareasAtrasadasDeDiasAnteriores) ||
+    !v.tareasAtrasadasDeDiasAnteriores.every(isOverdueTaskItem)
+  ) {
+    return false
+  }
+  if (typeof v.totalTareasAtrasadas !== 'number') return false
+  if (!Array.isArray(v.propuestasDescartadas) || !v.propuestasDescartadas.every(isDiscardedProposalSummary)) {
+    return false
+  }
+  if (v.proposito !== undefined && !isPropositoPayload(v.proposito)) return false
+  return true
+}
+
+/** El token EXACTO que debe devolver Gemini cuando no hay nada concreto que proponer -- ver PROPOSAL_SCOPE_INSTRUCTIONS. */
+const NO_PROPOSAL_SENTINEL = 'SIN_PROPUESTA'
+
+/**
+ * La parte más delicada de este prompt: exige que la propuesta se apoye en
+ * un dato concreto (nada de consejos de manual de productividad), que sea
+ * pequeña y comprobable en dos semanas, y que si no hay nada así, el modelo
+ * lo diga con el centinela en vez de inventar relleno -- una propuesta de
+ * relleno cada semana es peor que ninguna, porque en un mes deja de leerse.
+ * El candado financiero se aplica también aquí (FINANCIAL_LOCK_INSTRUCTIONS,
+ * al final de `buildProposalPrompt`) aunque este payload nunca lleve
+ * "dinero": defensa en profundidad, no solo prevención.
+ */
+const PROPOSAL_SCOPE_INSTRUCTIONS = `Tu propuesta es SIEMPRE sobre hábitos, tareas o rutinas de esta persona -- cómo organizar el día, qué empezar, qué simplificar, qué probar durante las próximas dos semanas.
+
+Tiene que apoyarse en algo CONCRETO de estos datos, y decir qué es: un hábito que se cae, una tarea que lleva días atrasada, una meta que no avanza, un comentario que escribió. Nunca un consejo genérico de productividad que serviría para cualquiera (nada de "prueba la técnica pomodoro", "usa un planificador", "sé más constante") si no está anclado en un dato concreto de ESTA persona.
+
+Tiene que ser pequeña y comprobable: algo que dentro de dos semanas se pueda mirar y responder sí o no, sin ambigüedad. Nunca una intención vaga ("mejora tu constancia", "organízate mejor").
+
+Si no hay nada así que proponer esta semana, no inventes nada de relleno: responde ÚNICAMENTE con esta palabra, exacta, sin nada más antes ni después, sin punto final ni comillas:
+${NO_PROPOSAL_SENTINEL}
+
+Si sí hay algo que proponer, responde con SOLO el texto de la propuesta (1 a 3 frases, en segunda persona), sin encabezados ni explicación antes o después.
+
+NUNCA propongas nada sobre dinero: ni ahorrar, ni pagar deudas, ni gastar menos, ni ninguna acción financiera, aunque en otros análisis hayas visto cifras de esta persona. Este payload de todas formas no trae ningún dato de dinero.
+
+"propuestasDescartadas" trae propuestas anteriores que no cuajaron (se descartaron sin aceptarse, o se aceptaron y se abandonaron). No propongas la misma idea ni una demasiado parecida.`
+
+/** Modula solo la fórmula de las frases, nunca la estructura (que ya fija PROPOSAL_SCOPE_INSTRUCTIONS) -- mismo criterio que IDEA_TONE_HINTS/RESUMEN_TONE_HINTS. */
+const PROPOSAL_TONE_HINTS: Record<Tone, string> = {
+  directo: 'Sé directo: nombra el problema concreto sin suavizarlo.',
+  equilibrado: 'Sé honesto y concreto, sin ser duro ni tampoco condescendiente.',
+  breve: 'Sé lo más breve posible: una sola frase si alcanza.',
+}
+
+function buildProposalPrompt(payload: ProposalPayload): string {
+  const { tono, tipo: _tipo, ...data } = payload
+  const instrucciones = `Eres el mentor de esta persona, revisando su semana para proponerle UNA sola mejora concreta que probar. ${PROPOSAL_TONE_HINTS[tono]}
+
+${PROPOSAL_SCOPE_INSTRUCTIONS}
+
+Sobre los datos: "habitos" trae el cumplimiento de esta semana y, si existe, el de la semana anterior -- igual que en el análisis semanal. "metas" y "metasSemanaAnterior" son las metas de la semana con sus avances. "comentariosDeLaSemana" son los comentarios del día que escribió esta semana. "tareasAtrasadasDeDiasAnteriores" son tareas de días anteriores que siguen sin hacerse (el número real es "totalTareasAtrasadas"); si la lista está vacía, no hay ninguna atrasada.
+
+${PROPOSITO_INSTRUCTIONS}
+
+Todo el texto EN ESPAÑOL, sin mezclar palabras ni frases en inglés -- salvo el propio centinela "${NO_PROPOSAL_SENTINEL}", que es literal y va tal cual si aplica. No inventes datos que no estén aquí.
+
+${FINANCIAL_LOCK_INSTRUCTIONS}`
+
+  return `${instrucciones}\n\nDatos:\n${JSON.stringify(data)}`
 }
 
 // --- "resumen": reescribe la nota de memoria larga del mentor -----------
@@ -818,6 +985,11 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Faltan datos del resumen.' }, 400)
     }
     prompt = buildResumenPrompt({ ...v, tono })
+  } else if (v.tipo === 'propuesta') {
+    if (!isProposalPayload(v)) {
+      return json({ error: 'Faltan datos para la propuesta.' }, 400)
+    }
+    prompt = buildProposalPrompt({ ...v, tono })
   } else {
     if (!isDailyPayload(v)) {
       return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)
