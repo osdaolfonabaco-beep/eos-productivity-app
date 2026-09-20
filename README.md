@@ -1,3 +1,5 @@
+<img width="289" height="932" alt="Captura de pantalla 2026-09-19 a la(s) 11 56 01 p m" src="https://github.com/user-attachments/assets/77c38675-eacb-4452-968d-95cbc71443a6" />
+<img width="290" height="1066" alt="Captura de pantalla 2026-09-19 a la(s) 11 55 04 p m" src="https://github.com/user-attachments/assets/ef0af0c2-b85d-416e-864d-ab71717a3716" />
 # Eos · Personalized Tracker
 
 A single-user personal tracker for habits, daily tasks, weekly goals, personal
