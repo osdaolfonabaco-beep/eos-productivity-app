@@ -1,5 +1,3 @@
-<img width="289" height="932" alt="Captura de pantalla 2026-09-19 a la(s) 11 56 01 p m" src="https://github.com/user-attachments/assets/77c38675-eacb-4452-968d-95cbc71443a6" />
-<img width="290" height="1066" alt="Captura de pantalla 2026-09-19 a la(s) 11 55 04 p m" src="https://github.com/user-attachments/assets/ef0af0c2-b85d-416e-864d-ab71717a3716" />
 # Eos · Personalized Tracker
 
 A single-user personal tracker for habits, daily tasks, weekly goals, personal
@@ -111,4 +109,6 @@ the reminder log.
 <img width="284" height="931" alt="Captura de pantalla 2026-09-19 a la(s) 11 51 44 p m" src="https://github.com/user-attachments/assets/8b481396-53d6-460e-a2db-278fbcdb88a3" />
 <img width="289" height="929" alt="Captura de pantalla 2026-09-19 a la(s) 11 51 28 p m" src="https://github.com/user-attachments/assets/505f00e9-11f1-4550-afa0-6964e36c98a5" />
 <img width="289" height="930" alt="Captura de pantalla 2026-09-19 a la(s) 11 51 02 p m" src="https://github.com/user-attachments/assets/236f1228-63ba-4233-b74c-ef23f30486f6" />
+<img width="289" height="932" alt="Captura de pantalla 2026-09-19 a la(s) 11 56 01 p m" src="https://github.com/user-attachments/assets/77c38675-eacb-4452-968d-95cbc71443a6" />
+<img width="290" height="1066" alt="Captura de pantalla 2026-09-19 a la(s) 11 55 04 p m" src="https://github.com/user-attachments/assets/ef0af0c2-b85d-416e-864d-ab71717a3716" />
 
