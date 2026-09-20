@@ -105,9 +105,8 @@ the reminder log.
 
 ## Screenshots
 
-<!-- TODO: add screenshots here -->
+<img width="292" height="931" alt="Captura de pantalla 2026-09-19 a la(s) 11 52 42 p m" src="https://github.com/user-attachments/assets/7ca79ccd-dd54-40f2-b4d9-f6492cd73cb7" />
+<img width="284" height="931" alt="Captura de pantalla 2026-09-19 a la(s) 11 51 44 p m" src="https://github.com/user-attachments/assets/8b481396-53d6-460e-a2db-278fbcdb88a3" />
+<img width="289" height="929" alt="Captura de pantalla 2026-09-19 a la(s) 11 51 28 p m" src="https://github.com/user-attachments/assets/505f00e9-11f1-4550-afa0-6964e36c98a5" />
+<img width="289" height="930" alt="Captura de pantalla 2026-09-19 a la(s) 11 51 02 p m" src="https://github.com/user-attachments/assets/236f1228-63ba-4233-b74c-ef23f30486f6" />
 
-| | |
-|---|---|
-| _Today_ | _Week_ |
-| _Money_ | _Mentor_ |
