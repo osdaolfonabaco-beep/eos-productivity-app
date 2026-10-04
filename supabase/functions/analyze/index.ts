@@ -66,6 +66,8 @@
 // en vez del error técnico. Para cualquier otro tipo de error, el detalle
 // completo de Gemini sigue mostrándose, como antes.
 
+import { sendTrace, type TraceInput } from '../_shared/trace.ts'
+
 // Google retira modelos con el tiempo; si este vuelve a dar 404, el error de
 // Gemini (que la app ya muestra completo) suele decir el nombre nuevo.
 const GEMINI_MODEL = 'gemini-3.6-flash'
@@ -75,6 +77,11 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 // uno. MAX_RETRIES = 2 -> hasta 3 intentos en total.
 const MAX_RETRIES = 2
 const RETRY_BASE_DELAY_MS = 500
+
+// Parámetros de generación. Están aquí, fuera de `callGemini`, porque la traza
+// a Langfuse también los reporta: un solo sitio con la verdad, para que al
+// cambiar uno la traza no empiece a mentir.
+const GENERATION_CONFIG = { temperature: 0.4, maxOutputTokens: 8192 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -905,8 +912,17 @@ function json(body: unknown, status: number): Response {
  * (500ms, 1000ms...) hasta MAX_RETRIES veces más. Cualquier otro estado, o el
  * último 503 si se agotan los reintentos, se devuelve tal cual para que el
  * llamador decida.
+ *
+ * `stats.intentos` se va actualizando en cada vuelta. Es un objeto mutable (y
+ * no un valor de retorno) a propósito: si un `fetch` lanza, la excepción sale
+ * de aquí sin devolver nada, y la traza todavía necesita saber en qué intento
+ * se estaba.
  */
-async function callGemini(prompt: string, apiKey: string): Promise<Response> {
+async function callGemini(
+  prompt: string,
+  apiKey: string,
+  stats: { intentos: number },
+): Promise<Response> {
   // Paso 1 de la corrección: sin thinkingConfig todavía (el 400 "invalid
   // argument" venía de ahí; hay que confirmar primero la forma correcta en
   // la documentación, no por memoria). Solo se sube maxOutputTokens, como
@@ -914,12 +930,13 @@ async function callGemini(prompt: string, apiKey: string): Promise<Response> {
   // antes de que quede espacio para la respuesta.
   const requestBody = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.4, maxOutputTokens: 8192 },
+    generationConfig: GENERATION_CONFIG,
   }
   console.log('analyze: petición a Gemini', { model: GEMINI_MODEL, body: requestBody })
 
   let last: Response | undefined
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    stats.intentos = attempt + 1
     const res = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -970,43 +987,92 @@ Deno.serve(async (req: Request) => {
   const tono = toneOf(v)
 
   let prompt: string
+  // `tipo` se fija en cada rama, no se copia de `v.tipo`: así la traza nombra
+  // el prompt que de verdad se construyó (un tipo desconocido cae en la rama
+  // diaria, y la traza debe decir "diario", no el valor que llegó).
+  let tipo: string
   if (v.tipo === 'semanal') {
     if (!isWeeklyPayload(v)) {
       return json({ error: 'Faltan datos del dashboard semanal.' }, 400)
     }
+    tipo = 'semanal'
     prompt = buildWeeklyPrompt({ ...v, tono })
   } else if (v.tipo === 'idea') {
     if (!isIdeaPayload(v)) {
       return json({ error: 'Faltan datos de la idea.' }, 400)
     }
+    tipo = 'idea'
     prompt = buildIdeaPrompt({ ...v, tono })
   } else if (v.tipo === 'resumen') {
     if (!isResumenPayload(v)) {
       return json({ error: 'Faltan datos del resumen.' }, 400)
     }
+    tipo = 'resumen'
     prompt = buildResumenPrompt({ ...v, tono })
   } else if (v.tipo === 'propuesta') {
     if (!isProposalPayload(v)) {
       return json({ error: 'Faltan datos para la propuesta.' }, 400)
     }
+    tipo = 'propuesta'
     prompt = buildProposalPrompt({ ...v, tono })
   } else {
     if (!isDailyPayload(v)) {
       return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)
     }
+    tipo = 'diario'
     prompt = buildDailyPrompt({ ...v, tono })
+  }
+
+  // Desde aquí ya hay prompt, así que TODA salida emite una traza a Langfuse.
+  // Las salidas anteriores (método, falta de GEMINI_API_KEY, JSON inválido,
+  // payload incompleto) no la emiten: no hubo llamada a Gemini que trazar.
+  //
+  // `stats` lo rellena `callGemini` vuelta a vuelta; se lee aquí incluso si
+  // lanzó. `endMs` se toma al emitir, que está a menos de un milisegundo del
+  // final real de la llamada en todos los caminos.
+  const stats = { intentos: 0 }
+  const startMs = Date.now()
+
+  const emitirTraza = (
+    extra: Pick<TraceInput, 'output'> &
+      Partial<Pick<TraceInput, 'httpStatus' | 'finishReason' | 'usage' | 'error'>>,
+  ) => {
+    const input: TraceInput = {
+      tipo,
+      tono,
+      model: GEMINI_MODEL,
+      modelParameters: GENERATION_CONFIG,
+      prompt,
+      startMs,
+      endMs: Date.now(),
+      intentos: stats.intentos,
+      ...extra,
+    }
+    // waitUntil le dice al runtime de Supabase "no mates el isolate todavía,
+    // esta promesa sigue viva": la respuesta sale a la app de inmediato y el
+    // POST a Langfuse termina después. En local EdgeRuntime no existe, así
+    // que se dispara sin await -- `sendTrace` nunca lanza, de modo que la
+    // promesa huérfana no puede provocar un unhandled rejection.
+    const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } })
+      .EdgeRuntime
+    if (runtime?.waitUntil) runtime.waitUntil(sendTrace(input))
+    else void sendTrace(input)
   }
 
   // La URL no lleva la clave (va en la cabecera x-goog-api-key), así que es
   // segura de mostrar en los logs y de devolver a la app.
   let geminiRes: Response
   try {
-    geminiRes = await callGemini(prompt, apiKey)
+    geminiRes = await callGemini(prompt, apiKey, stats)
   } catch (err) {
     console.error('analyze: fallo de red al llamar a Gemini', {
       model: GEMINI_MODEL,
       url: GEMINI_URL,
       error: String(err),
+    })
+    emitirTraza({
+      output: String(err),
+      error: `Fallo de red al llamar a Gemini: ${String(err)}`,
     })
     return json(
       { error: 'No se pudo contactar a Gemini.', detail: String(err), model: GEMINI_MODEL, url: GEMINI_URL },
@@ -1021,6 +1087,13 @@ Deno.serve(async (req: Request) => {
       url: GEMINI_URL,
       status: geminiRes.status,
       body: detail,
+    })
+    // Una sola traza para los dos caminos de abajo (503 saturado y cualquier
+    // otro estado): la llamada a Gemini fue una, el span es uno.
+    emitirTraza({
+      output: detail,
+      httpStatus: geminiRes.status,
+      error: `Gemini respondió con error (${geminiRes.status}).`,
     })
 
     // 503 tras agotar los reintentos: es saturación de Gemini, no un fallo
@@ -1067,6 +1140,14 @@ Deno.serve(async (req: Request) => {
       model: GEMINI_MODEL,
       body: data,
     })
+    const motivo = 'La respuesta se cortó por falta de espacio de salida (MAX_TOKENS).'
+    emitirTraza({
+      output: motivo,
+      httpStatus: geminiRes.status,
+      finishReason,
+      usage: data?.usageMetadata,
+      error: motivo,
+    })
     return json(
       {
         error: 'La respuesta de Gemini se cortó por falta de espacio de salida (MAX_TOKENS).',
@@ -1093,11 +1174,26 @@ Deno.serve(async (req: Request) => {
       finishReason,
       body: data,
     })
+    const motivo = 'Gemini no devolvió texto usable.'
+    emitirTraza({
+      output: motivo,
+      httpStatus: geminiRes.status,
+      finishReason,
+      usage: data?.usageMetadata,
+      error: motivo,
+    })
     return json(
       { error: 'Gemini no devolvió texto.', detail: JSON.stringify(data), model: GEMINI_MODEL },
       502,
     )
   }
+
+  emitirTraza({
+    output: text,
+    httpStatus: geminiRes.status,
+    finishReason,
+    usage: data?.usageMetadata,
+  })
 
   return json({ analysis: text }, 200)
 })
