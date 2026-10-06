@@ -44,6 +44,8 @@ export interface TraceInput {
   httpStatus?: number
   finishReason?: string
   usage?: GeminiUsage
+  /** Segundos que Gemini pidió esperar en un 429 (RetryInfo.retryDelay). */
+  retryAfterS?: number
   /** Si está presente, el span se marca como ERROR con este motivo. */
   error?: string
 }
@@ -125,6 +127,9 @@ export async function sendTrace(t: TraceInput): Promise<void> {
     }
     if (t.httpStatus !== undefined) {
       attributes.push(attr('langfuse.observation.metadata.http_status', String(t.httpStatus)))
+    }
+    if (t.retryAfterS !== undefined) {
+      attributes.push(attr('langfuse.observation.metadata.retry_after_s', String(t.retryAfterS)))
     }
     if (t.finishReason) {
       attributes.push(attr('langfuse.observation.metadata.finish_reason', t.finishReason))

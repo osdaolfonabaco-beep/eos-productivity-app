@@ -23,10 +23,11 @@
  *   comentario, más abajo).
  *
  * Al final de un `requestWeeklyAnalysis`, SI no hay ya una propuesta activa
- * (`./mentorProposals`), se lanza en paralelo una llamada aparte a la Edge
- * Function con `tipo: 'propuesta'` -- no un JSON con dos campos ni una
- * segunda vuelta secuencial: dos peticiones independientes que arrancan
- * juntas, para no añadir espera a lo que la persona ya está esperando ver.
+ * (`./mentorProposals`), se hace una llamada aparte a la Edge Function con
+ * `tipo: 'propuesta'` -- no un JSON con dos campos. Arranca en segundo plano
+ * DESPUÉS de que el análisis semanal responde, nunca a la vez: el plan
+ * gratuito de Gemini limita las peticiones por minuto, y dos simultáneas
+ * provocaban 429. La persona no espera más por eso: ya tiene su análisis.
  * Si Gemini responde el centinela `SIN_PROPUESTA` (`isNoProposalResponse`),
  * esa semana no se guarda ninguna propuesta -- mejor sin propuesta que una
  * de relleno. Ver el comentario de `requestWeeklyAnalysis`, más abajo.
@@ -557,13 +558,15 @@ async function buildClosedIdeasSummary(
 
 /**
  * Mensaje a partir del cuerpo de error de la función. Si es saturación de
- * Gemini (`code: 'overloaded'`), un mensaje entendible y nada más — el
- * detalle técnico no ayuda ahí y solo confunde. Para cualquier otro error,
+ * Gemini (`code: 'overloaded'`) o el límite de peticiones del plan
+ * (`code: 'rate_limited'`), un mensaje entendible y nada más — el detalle
+ * técnico no ayuda ahí y solo confunde. Para cualquier otro error,
  * "error" + "detail" completos (compartido con otras funciones vía
  * `joinErrorDetail`, en `./supabase`).
  */
 function messageFromBody(body: Record<string, unknown> | null | undefined): string | undefined {
-  if (body?.code === 'overloaded' && typeof body.error === 'string') {
+  const friendly = body?.code === 'overloaded' || body?.code === 'rate_limited'
+  if (friendly && typeof body?.error === 'string') {
     return body.error
   }
   return joinErrorDetail(body)
@@ -574,7 +577,7 @@ function messageFromBody(body: Record<string, unknown> | null | undefined): stri
  * semanal, idea, resumen o propuesta — todos comparten esta misma función y
  * este mismo manejo de errores). No guarda nada: el texto vive solo en el
  * estado de quien lo pidió (o, para "propuesta", en la variable local de
- * `requestWeeklyAnalysis` hasta que `saveWeeklyResultsQuietly` lo guarda).
+ * `requestWeeklyAnalysis` hasta que `finishWeeklyAnalysisQuietly` lo guarda).
  */
 async function invokeAnalyze(
   payload:
@@ -670,22 +673,28 @@ function isNoProposalResponse(text: string): boolean {
 }
 
 /**
- * Guarda el análisis semanal y, si se pidió una propuesta nueva
- * (`proposalPromise`), la propuesta -- todo en segundo plano, sin propagar
- * ningún error (mismo criterio que `saveAnalysisQuietly`/
- * `updateMentorSummaryQuietly`: la persona ya vio su análisis, un fallo al
- * guardar algo de esto no puede quitárselo).
+ * Lo que sigue a un análisis semanal, todo en segundo plano y en serie --
+ * nunca dos peticiones a Gemini a la vez (el plan gratuito limita las
+ * peticiones por minuto y las simultáneas provocaban 429):
  *
- * `proposalPromise` ya está en marcha desde antes de llamar aquí (arrancada
- * en paralelo con el análisis semanal mismo, en `requestWeeklyAnalysis`) --
- * esta función solo espera su resultado y decide qué hacer con él: si es el
- * centinela `SIN_PROPUESTA`, no se guarda nada (una semana sin propuesta es
- * mejor que una de relleno); si es texto real, se crea la propuesta ligada
- * al análisis que se acaba de guardar (`analisisId`).
+ * 1. Guarda el análisis semanal.
+ * 2. Si se pidió una propuesta nueva (`requestProposal`), la pide AHORA --
+ *    no antes: es una función sin ejecutar, no una promesa ya en marcha. Si
+ *    es el centinela `SIN_PROPUESTA`, no se guarda nada (una semana sin
+ *    propuesta es mejor que una de relleno); si es texto real, se crea la
+ *    propuesta ligada al análisis que se acaba de guardar (`analisisId`).
+ * 3. Reescribe el resumen acumulado (`updateMentorSummaryQuietly`). Va al
+ *    final también porque lee los últimos análisis de la base de datos: así
+ *    ya incluye el que se guardó en el paso 1.
+ *
+ * Cada paso tiene su propio try/catch y ninguno propaga el error (mismo
+ * criterio que `saveAnalysisQuietly`: la persona ya vio su análisis, un
+ * fallo aquí no puede quitárselo). Si un paso falla -- por ejemplo la
+ * propuesta por un 429 --, los siguientes se ejecutan igual.
  */
-async function saveWeeklyResultsQuietly(
+async function finishWeeklyAnalysisQuietly(
   input: MentorAnalysisInput,
-  proposalPromise: Promise<string> | undefined,
+  requestProposal: (() => Promise<string>) | undefined,
 ): Promise<void> {
   let savedId: string | undefined
   try {
@@ -694,15 +703,19 @@ async function saveWeeklyResultsQuietly(
     console.error('No se pudo guardar el análisis del mentor:', err)
   }
 
-  if (!proposalPromise) return
-  try {
-    const propuesta = await proposalPromise
-    if (!isNoProposalResponse(propuesta)) {
-      await createMentorProposal({ contenido: propuesta, analisisId: savedId })
+  if (requestProposal) {
+    try {
+      const propuesta = await requestProposal()
+      if (!isNoProposalResponse(propuesta)) {
+        await createMentorProposal({ contenido: propuesta, analisisId: savedId })
+      }
+    } catch (err) {
+      console.error('No se pudo generar o guardar la propuesta del mentor:', err)
     }
-  } catch (err) {
-    console.error('No se pudo generar o guardar la propuesta del mentor:', err)
   }
+
+  // Ya atrapa y registra su propio error.
+  await updateMentorSummaryQuietly()
 }
 
 /**
@@ -780,7 +793,7 @@ export async function requestWeeklyAnalysis(): Promise<string> {
   const dinero = veDinero ? await buildDineroPayload(today) : undefined
   const propuestaActiva = buildPropuestaActivaPayload(activeProposal)
   // Solo hace falta si de verdad se va a pedir una propuesta nueva (ver
-  // `proposalPromise`, más abajo) -- si ya hay una activa, esta consulta no
+  // `requestProposal`, más abajo) -- si ya hay una activa, esta consulta no
   // sirve de nada.
   const propuestasDescartadas = activeProposal
     ? []
@@ -810,15 +823,15 @@ export async function requestWeeklyAnalysis(): Promise<string> {
     ...(propuestaActiva ? { propuestaActiva } : {}),
   }
 
-  // Si NO hay ya una propuesta activa, se arranca AQUÍ (antes de `await
-  // invokeAnalyze(payload)`, no después) una segunda llamada independiente
-  // a Gemini pidiendo una propuesta nueva -- las dos corren en paralelo, así
-  // que no se le añade espera a la persona por pedir esto de más. Si ya hay
-  // una activa, `propuestaActiva` (arriba) ya se encarga de que el análisis
-  // comente cómo va, y aquí no se pide ninguna nueva.
-  const proposalPromise = activeProposal
+  // Si NO hay ya una propuesta activa, se prepara AQUÍ la llamada que pide
+  // una nueva -- pero sin ejecutarla: es una función, y la ejecuta
+  // `finishWeeklyAnalysisQuietly` en segundo plano cuando el análisis ya
+  // respondió, para no tener nunca dos peticiones a Gemini a la vez. Si ya
+  // hay una activa, `propuestaActiva` (arriba) ya se encarga de que el
+  // análisis comente cómo va, y aquí no se pide ninguna nueva.
+  const requestProposal = activeProposal
     ? undefined
-    : invokeAnalyze({
+    : () => invokeAnalyze({
         tipo: 'propuesta',
         habitos,
         metas: goals.metas,
@@ -833,9 +846,12 @@ export async function requestWeeklyAnalysis(): Promise<string> {
 
   const contenido = await invokeAnalyze(payload)
   // Sin `await`, mismo criterio que en requestAnalysis: no retrasar lo que
-  // ya se puede leer. Guarda el análisis y, si `proposalPromise` existe, la
-  // propuesta que resulte -- ver el comentario de `saveWeeklyResultsQuietly`.
-  void saveWeeklyResultsQuietly(
+  // ya se puede leer. Guarda el análisis, pide la propuesta (si
+  // `requestProposal` existe) y reescribe el resumen acumulado, en ese orden
+  // -- ver el comentario de `finishWeeklyAnalysisQuietly`. El resumen se
+  // actualiza SOLO con el análisis semanal (nunca con el diario, que
+  // duplicaría esta llamada extra a la IA en cada análisis del día).
+  void finishWeeklyAnalysisQuietly(
     {
       tipo: 'semanal',
       periodStart: stats.semanaActual.inicio,
@@ -844,13 +860,8 @@ export async function requestWeeklyAnalysis(): Promise<string> {
       contenido,
       incluyoDinero: dinero !== undefined,
     },
-    proposalPromise,
+    requestProposal,
   )
-  // También en segundo plano y también sin propagar el error: el resumen
-  // acumulado se actualiza SOLO con el análisis semanal (nunca con el
-  // diario, que duplicaría esta llamada extra a la IA en cada análisis del
-  // día) y su fallo no puede quitarle a la persona el análisis que ya pidió.
-  void updateMentorSummaryQuietly()
   return contenido
 }
 
@@ -961,7 +972,7 @@ function truncateAtSentenceEnd(text: string, maxChars: number): string {
  * son siempre los análisis y las cifras, nunca la nota de sí misma.
  *
  * Se llama de dos formas: automáticamente y en silencio después de un
- * análisis semanal (`updateMentorSummaryQuietly`, en `requestWeeklyAnalysis`
+ * análisis semanal (`updateMentorSummaryQuietly`, desde `finishWeeklyAnalysisQuietly`
  * arriba), y a mano desde un botón en el panel del Mentor -- ahí sí debe
  * poder mostrar un error si falla, por eso esta función en sí no atrapa
  * nada y deja que quien la llama decida.

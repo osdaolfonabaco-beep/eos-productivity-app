@@ -63,7 +63,9 @@
 //
 // Si Gemini está saturado (503), reintenta unas veces con espera creciente
 // antes de rendirse; si aun así falla, la app muestra un mensaje entendible
-// en vez del error técnico. Para cualquier otro tipo de error, el detalle
+// en vez del error técnico. Lo mismo con el 429 (límite de peticiones): un
+// reintento si la espera pedida es corta, y si no, un mensaje que dice cuánto
+// esperar. Para cualquier otro tipo de error, el detalle
 // completo de Gemini sigue mostrándose, como antes.
 
 import { sendTrace, type TraceInput } from '../_shared/trace.ts'
@@ -77,6 +79,13 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 // uno. MAX_RETRIES = 2 -> hasta 3 intentos en total.
 const MAX_RETRIES = 2
 const RETRY_BASE_DELAY_MS = 500
+
+// Ante 429 (límite de peticiones del plan), solo se reintenta UNA vez y solo
+// si Gemini pide esperar poco: esperar 30 s dentro de la función dejaría a la
+// persona mirando un spinner. Si pide más, se le dice cuánto esperar.
+const MAX_RATE_LIMIT_WAIT_S = 5
+// Lo que se le dice a la app si Gemini no trae un tiempo de espera usable.
+const DEFAULT_RETRY_AFTER_S = 60
 
 // Parámetros de generación. Están aquí, fuera de `callGemini`, porque la traza
 // a Langfuse también los reporta: un solo sitio con la verdad, para que al
@@ -908,10 +917,32 @@ function json(body: unknown, status: number): Response {
 }
 
 /**
+ * Segundos de espera que trae el cuerpo de un 429 de Gemini: el elemento de
+ * `error.details[]` cuyo "@type" termina en "RetryInfo", campo `retryDelay`
+ * ("30s", "2.5s"...). Se redondea hacia arriba para no decirle a nadie que
+ * espere menos de lo necesario. `undefined` si el cuerpo no es JSON o no trae
+ * ese dato con ese formato -- nunca lanza.
+ */
+function retryAfterSecondsFrom(bodyText: string): number | undefined {
+  try {
+    const details: unknown = JSON.parse(bodyText)?.error?.details
+    if (!Array.isArray(details)) return undefined
+    const info = details.find(
+      (d) => typeof d?.['@type'] === 'string' && d['@type'].endsWith('RetryInfo'),
+    )
+    const match = typeof info?.retryDelay === 'string' ? /^(\d+(?:\.\d+)?)s$/.exec(info.retryDelay) : null
+    return match ? Math.ceil(Number(match[1])) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Llama a Gemini. Si responde 503 (saturado), reintenta con espera creciente
- * (500ms, 1000ms...) hasta MAX_RETRIES veces más. Cualquier otro estado, o el
- * último 503 si se agotan los reintentos, se devuelve tal cual para que el
- * llamador decida.
+ * (500ms, 1000ms...) hasta MAX_RETRIES veces más. Si responde 429 (límite de
+ * peticiones) y pide esperar MAX_RATE_LIMIT_WAIT_S segundos o menos, espera
+ * eso y reintenta UNA sola vez. Cualquier otro estado, o el último 503/429 si
+ * no hay más reintentos, se devuelve tal cual para que el llamador decida.
  *
  * `stats.intentos` se va actualizando en cada vuelta. Es un objeto mutable (y
  * no un valor de retorno) a propósito: si un `fetch` lanza, la excepción sale
@@ -935,13 +966,28 @@ async function callGemini(
   console.log('analyze: petición a Gemini', { model: GEMINI_MODEL, body: requestBody })
 
   let last: Response | undefined
+  let rateLimitRetried = false
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    stats.intentos = attempt + 1
+    stats.intentos++
     const res = await fetch(GEMINI_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify(requestBody),
     })
+    if (res.status === 429 && !rateLimitRetried) {
+      // Se lee de una copia: el original sigue intacto por si se devuelve,
+      // y el llamador todavía tiene que leer su cuerpo.
+      const waitS = retryAfterSecondsFrom(await res.clone().text().catch(() => ''))
+      if (waitS === undefined || waitS > MAX_RATE_LIMIT_WAIT_S) return res
+      rateLimitRetried = true
+      console.error('analyze: límite de peticiones de Gemini (429), reintentando una vez', {
+        esperaS: waitS,
+      })
+      await sleep(waitS * 1000)
+      // El reintento por 429 no gasta uno de los reintentos por 503.
+      attempt--
+      continue
+    }
     if (res.status !== 503) return res
 
     last = res
@@ -1035,7 +1081,7 @@ Deno.serve(async (req: Request) => {
 
   const emitirTraza = (
     extra: Pick<TraceInput, 'output'> &
-      Partial<Pick<TraceInput, 'httpStatus' | 'finishReason' | 'usage' | 'error'>>,
+      Partial<Pick<TraceInput, 'httpStatus' | 'finishReason' | 'usage' | 'retryAfterS' | 'error'>>,
   ) => {
     const input: TraceInput = {
       tipo,
@@ -1088,13 +1134,35 @@ Deno.serve(async (req: Request) => {
       status: geminiRes.status,
       body: detail,
     })
-    // Una sola traza para los dos caminos de abajo (503 saturado y cualquier
-    // otro estado): la llamada a Gemini fue una, el span es uno.
+    // Solo tiene sentido en un 429; en cualquier otro estado queda undefined
+    // y la traza no lleva retry_after_s.
+    const retryAfterS = geminiRes.status === 429 ? retryAfterSecondsFrom(detail) : undefined
+
+    // Una sola traza para los caminos de abajo (503 saturado, 429 límite de
+    // peticiones y cualquier otro estado): la llamada a Gemini fue una, el
+    // span es uno.
     emitirTraza({
       output: detail,
       httpStatus: geminiRes.status,
+      retryAfterS,
       error: `Gemini respondió con error (${geminiRes.status}).`,
     })
+
+    // 429 sin reintento posible (o tras el único reintento): es el límite del
+    // plan de Gemini, no un fallo nuestro. Igual que el 503, la app muestra
+    // solo un mensaje entendible -- con cuánto esperar.
+    if (geminiRes.status === 429) {
+      const n = retryAfterS ?? DEFAULT_RETRY_AFTER_S
+      return json(
+        {
+          error: `Se alcanzó el límite de peticiones. Inténtalo en ${n} segundos.`,
+          code: 'rate_limited',
+          retryAfterSeconds: n,
+          model: GEMINI_MODEL,
+        },
+        429,
+      )
+    }
 
     // 503 tras agotar los reintentos: es saturación de Gemini, no un fallo
     // nuestro. La app muestra un mensaje entendible en vez del detalle
