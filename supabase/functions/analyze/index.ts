@@ -58,6 +58,12 @@
 // Requiere el secreto GEMINI_API_KEY:
 //   supabase secrets set GEMINI_API_KEY=tu-clave
 //
+// Qué contenido llevan las trazas de Langfuse lo decide el secreto opcional
+// TRACE_CONTENT: "redacted" (por defecto, si falta), "full" u "off" -- ver
+// docs/privacidad-trazas.md. A Gemini siempre se le manda el prompt real.
+// Los logs de Supabase nunca llevan contenido (ni petición, ni respuesta, ni
+// prompt): solo metadatos.
+//
 // Supabase exige un JWT válido antes de ejecutar esto (verify_jwt por
 // defecto): una petición sin sesión nunca llega a este código.
 //
@@ -68,7 +74,8 @@
 // esperar. Para cualquier otro tipo de error, el detalle
 // completo de Gemini sigue mostrándose, como antes.
 
-import { sendTrace, type TraceInput } from '../_shared/trace.ts'
+import { redactPayload, redactText, type DebtPseudonyms } from '../_shared/redact.ts'
+import { sendTrace, type GeminiUsage, type TraceInput } from '../_shared/trace.ts'
 
 // Google retira modelos con el tiempo; si este vuelve a dar 404, el error de
 // Gemini (que la app ya muestra completo) suele decir el nombre nuevo.
@@ -909,6 +916,49 @@ ${FINANCIAL_LOCK_INSTRUCTIONS}`
   return `${instrucciones}\n\nDatos:\n${JSON.stringify({ ultimosAnalisis, cifras })}`
 }
 
+type TraceContent = 'redacted' | 'full' | 'off'
+
+/** Lee TRACE_CONTENT. Si falta o trae algo desconocido, "redacted": el modo seguro es el de por defecto. */
+function traceContentMode(): TraceContent {
+  const raw = Deno.env.get('TRACE_CONTENT')?.trim().toLowerCase()
+  if (!raw) return 'redacted'
+  if (raw === 'redacted' || raw === 'full' || raw === 'off') return raw
+  console.warn('analyze: TRACE_CONTENT no reconocido, se usa "redacted"', { valor: raw })
+  return 'redacted'
+}
+
+interface BuiltPrompts {
+  /** El prompt real, el que va a Gemini. Nunca redactado. */
+  prompt: string
+  /** El que va a la traza: redactado, igual al real, o ausente en "off". */
+  tracePrompt?: string
+  /** Para redactar la respuesta del modelo con los mismos seudónimos. */
+  seudonimos: DebtPseudonyms
+}
+
+/**
+ * Construye el prompt real y, según el modo, el de la traza -- pasando el
+ * payload redactado por el MISMO build*Prompt, para que la traza muestre la
+ * forma exacta del prompt sin los datos personales.
+ */
+function buildPrompts<P>(build: (p: P) => string, payload: P, mode: TraceContent): BuiltPrompts {
+  const prompt = build(payload)
+  if (mode === 'full') return { prompt, tracePrompt: prompt, seudonimos: new Map() }
+  if (mode === 'off') return { prompt, seudonimos: new Map() }
+  const redacted = redactPayload(payload)
+  return { prompt, tracePrompt: build(redacted.payload), seudonimos: redacted.seudonimos }
+}
+
+/** Los cuatro conteos de `usageMetadata`, sin nada más -- para los logs. */
+function tokensOf(usage: GeminiUsage | undefined) {
+  return {
+    entrada: usage?.promptTokenCount,
+    salida: usage?.candidatesTokenCount,
+    razonamiento: usage?.thoughtsTokenCount,
+    total: usage?.totalTokenCount,
+  }
+}
+
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -963,7 +1013,6 @@ async function callGemini(
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: GENERATION_CONFIG,
   }
-  console.log('analyze: petición a Gemini', { model: GEMINI_MODEL, body: requestBody })
 
   let last: Response | undefined
   let rateLimitRetried = false
@@ -1031,8 +1080,9 @@ Deno.serve(async (req: Request) => {
   }
   const v = rawPayload as Record<string, unknown>
   const tono = toneOf(v)
+  const contenido = traceContentMode()
 
-  let prompt: string
+  let built: BuiltPrompts
   // `tipo` se fija en cada rama, no se copia de `v.tipo`: así la traza nombra
   // el prompt que de verdad se construyó (un tipo desconocido cae en la rama
   // diaria, y la traza debe decir "diario", no el valor que llegó).
@@ -1042,31 +1092,31 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Faltan datos del dashboard semanal.' }, 400)
     }
     tipo = 'semanal'
-    prompt = buildWeeklyPrompt({ ...v, tono })
+    built = buildPrompts(buildWeeklyPrompt, { ...v, tono }, contenido)
   } else if (v.tipo === 'idea') {
     if (!isIdeaPayload(v)) {
       return json({ error: 'Faltan datos de la idea.' }, 400)
     }
     tipo = 'idea'
-    prompt = buildIdeaPrompt({ ...v, tono })
+    built = buildPrompts(buildIdeaPrompt, { ...v, tono }, contenido)
   } else if (v.tipo === 'resumen') {
     if (!isResumenPayload(v)) {
       return json({ error: 'Faltan datos del resumen.' }, 400)
     }
     tipo = 'resumen'
-    prompt = buildResumenPrompt({ ...v, tono })
+    built = buildPrompts(buildResumenPrompt, { ...v, tono }, contenido)
   } else if (v.tipo === 'propuesta') {
     if (!isProposalPayload(v)) {
       return json({ error: 'Faltan datos para la propuesta.' }, 400)
     }
     tipo = 'propuesta'
-    prompt = buildProposalPrompt({ ...v, tono })
+    built = buildPrompts(buildProposalPrompt, { ...v, tono }, contenido)
   } else {
     if (!isDailyPayload(v)) {
       return json({ error: 'Faltan datos de hábitos o tareas.' }, 400)
     }
     tipo = 'diario'
-    prompt = buildDailyPrompt({ ...v, tono })
+    built = buildPrompts(buildDailyPrompt, { ...v, tono }, contenido)
   }
 
   // Desde aquí ya hay prompt, así que TODA salida emite una traza a Langfuse.
@@ -1076,23 +1126,40 @@ Deno.serve(async (req: Request) => {
   // `stats` lo rellena `callGemini` vuelta a vuelta; se lee aquí incluso si
   // lanzó. `endMs` se toma al emitir, que está a menos de un milisegundo del
   // final real de la llamada en todos los caminos.
+  const { prompt, tracePrompt, seudonimos } = built
   const stats = { intentos: 0 }
   const startMs = Date.now()
 
+  // Lo único que se escribe en los logs de Supabase: metadatos, nunca
+  // contenido. `extra` solo debe llevar status, finishReason o tokens.
+  const meta = (extra: Record<string, unknown> = {}) => ({
+    tipo,
+    model: GEMINI_MODEL,
+    intentos: stats.intentos,
+    ms: Date.now() - startMs,
+    ...extra,
+  })
+
   const emitirTraza = (
-    extra: Pick<TraceInput, 'output'> &
+    extra: { output: string } &
       Partial<Pick<TraceInput, 'httpStatus' | 'finishReason' | 'usage' | 'retryAfterS' | 'error'>>,
   ) => {
+    // La salida se redacta con los mismos seudónimos que la entrada. En
+    // "off" no viaja ni una ni otra: la traza queda solo con metadatos.
+    const output =
+      contenido === 'off' ? undefined : contenido === 'redacted' ? redactText(extra.output, seudonimos) : extra.output
     const input: TraceInput = {
       tipo,
       tono,
       model: GEMINI_MODEL,
       modelParameters: GENERATION_CONFIG,
-      prompt,
       startMs,
       endMs: Date.now(),
       intentos: stats.intentos,
       ...extra,
+      contenido,
+      prompt: tracePrompt,
+      output,
     }
     // waitUntil le dice al runtime de Supabase "no mates el isolate todavía,
     // esta promesa sigue viva": la respuesta sale a la app de inmediato y el
@@ -1105,17 +1172,16 @@ Deno.serve(async (req: Request) => {
     else void sendTrace(input)
   }
 
+  console.log('analyze: petición a Gemini', { tipo, model: GEMINI_MODEL, contenido })
+
   // La URL no lleva la clave (va en la cabecera x-goog-api-key), así que es
-  // segura de mostrar en los logs y de devolver a la app.
+  // segura de devolver a la app.
   let geminiRes: Response
   try {
     geminiRes = await callGemini(prompt, apiKey, stats)
   } catch (err) {
-    console.error('analyze: fallo de red al llamar a Gemini', {
-      model: GEMINI_MODEL,
-      url: GEMINI_URL,
-      error: String(err),
-    })
+    // Solo el nombre del error ("TypeError"...), no su mensaje.
+    console.error('analyze: fallo de red al llamar a Gemini', meta({ error: (err as Error)?.name ?? 'Error' }))
     emitirTraza({
       output: String(err),
       error: `Fallo de red al llamar a Gemini: ${String(err)}`,
@@ -1128,12 +1194,7 @@ Deno.serve(async (req: Request) => {
 
   if (!geminiRes.ok) {
     const detail = await geminiRes.text().catch(() => '(sin cuerpo)')
-    console.error('analyze: Gemini respondió con error', {
-      model: GEMINI_MODEL,
-      url: GEMINI_URL,
-      status: geminiRes.status,
-      body: detail,
-    })
+    console.error('analyze: Gemini respondió con error', meta({ status: geminiRes.status }))
     // Solo tiene sentido en un 429; en cualquier otro estado queda undefined
     // y la traza no lleva retry_after_s.
     const retryAfterS = geminiRes.status === 429 ? retryAfterSecondsFrom(detail) : undefined
@@ -1192,22 +1253,24 @@ Deno.serve(async (req: Request) => {
   }
 
   const data = await geminiRes.json()
-  // Se registra siempre, incluso si sale bien: es la única forma de ver por
-  // qué un texto "funciona" pero sale raro (partes de razonamiento coladas,
-  // cortado a mitad, etc.) sin tener que reproducir el problema a ciegas.
-  console.log('analyze: respuesta cruda de Gemini', JSON.stringify(data))
-
   const candidate = data?.candidates?.[0]
   const finishReason: string | undefined = candidate?.finishReason
+
+  // Se registra siempre, incluso si sale bien, pero solo metadatos: la
+  // respuesta cruda ya no va a los logs. Para ver el texto, la traza de
+  // Langfuse (según TRACE_CONTENT).
+  const respuestaMeta = meta({
+    status: geminiRes.status,
+    finishReason,
+    tokens: tokensOf(data?.usageMetadata),
+  })
+  console.log('analyze: respuesta de Gemini', respuestaMeta)
 
   // Si Gemini se quedó sin presupuesto de salida, lo que haya en `parts` es
   // una respuesta a medias (a veces mezclada con razonamiento en inglés).
   // Mejor avisar que devolver texto cortado.
   if (finishReason === 'MAX_TOKENS') {
-    console.error('analyze: Gemini se quedó sin tokens de salida (MAX_TOKENS)', {
-      model: GEMINI_MODEL,
-      body: data,
-    })
+    console.error('analyze: Gemini se quedó sin tokens de salida (MAX_TOKENS)', respuestaMeta)
     const motivo = 'La respuesta se cortó por falta de espacio de salida (MAX_TOKENS).'
     emitirTraza({
       output: motivo,
@@ -1237,11 +1300,7 @@ Deno.serve(async (req: Request) => {
     .trim()
 
   if (!text) {
-    console.error('analyze: Gemini no devolvió texto usable', {
-      model: GEMINI_MODEL,
-      finishReason,
-      body: data,
-    })
+    console.error('analyze: Gemini no devolvió texto usable', respuestaMeta)
     const motivo = 'Gemini no devolvió texto usable.'
     emitirTraza({
       output: motivo,

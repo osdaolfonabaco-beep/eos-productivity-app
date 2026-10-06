@@ -1,6 +1,8 @@
 // Traza cada llamada a Gemini en Langfuse, para poder ver después qué prompt
 // se mandó, qué contestó el modelo, cuánto tardó y cuántos tokens costó --
-// sin tener que reproducir nada a ciegas desde los logs.
+// sin tener que reproducir nada a ciegas desde los logs. El prompt y la
+// respuesta llegan aquí ya redactados (o ausentes) según TRACE_CONTENT -- ver
+// docs/privacidad-trazas.md.
 //
 // Sin SDK y sin dependencias: un POST directo al endpoint OTLP de Langfuse
 // (OpenTelemetry sobre JSON). Langfuse acepta OTLP nativo, así que no hace
@@ -34,9 +36,16 @@ export interface TraceInput {
   tono: string
   model: string
   modelParameters: Record<string, unknown>
-  prompt: string
-  /** El texto final si salió bien; el motivo del fallo si no. */
-  output: string
+  /**
+   * Qué contenido lleva la traza: "redacted", "full" u "off" (ver
+   * TRACE_CONTENT en analyze/index.ts). Quien llama ya redactó `prompt` y
+   * `output`; aquí solo se reporta el modo como metadata.
+   */
+  contenido: string
+  /** Ausente en modo "off": la traza sale sin entrada. */
+  prompt?: string
+  /** El texto final si salió bien; el motivo del fallo si no. Ausente en modo "off". */
+  output?: string
   startMs: number
   endMs: number
   /** Intentos que hizo callGemini, contando el primero. */
@@ -110,15 +119,21 @@ export async function sendTrace(t: TraceInput): Promise<void> {
     const attributes = [
       attr('langfuse.observation.type', 'generation'),
       attr('langfuse.trace.name', `analyze:${t.tipo}`),
-      attr('langfuse.observation.input', JSON.stringify(t.prompt)),
-      attr('langfuse.observation.output', JSON.stringify(t.output)),
       attr('langfuse.observation.model.name', t.model),
       attr('langfuse.observation.model.parameters', JSON.stringify(t.modelParameters)),
       attr('langfuse.observation.metadata.tipo', t.tipo),
       attr('langfuse.observation.metadata.tono', t.tono),
       attr('langfuse.observation.metadata.intentos', String(t.intentos)),
+      attr('langfuse.observation.metadata.contenido', t.contenido),
       attr('langfuse.environment', 'production'),
     ]
+
+    if (t.prompt !== undefined) {
+      attributes.push(attr('langfuse.observation.input', JSON.stringify(t.prompt)))
+    }
+    if (t.output !== undefined) {
+      attributes.push(attr('langfuse.observation.output', JSON.stringify(t.output)))
+    }
 
     // Los opcionales se omiten en vez de mandarse vacíos: un
     // finish_reason: "" ensuciaría los filtros del panel de Langfuse.
@@ -178,8 +193,9 @@ export async function sendTrace(t: TraceInput): Promise<void> {
     if (!res.ok) {
       // Un 401 o un 422 de OTLP es silencioso de otro modo: sin esto, las
       // trazas simplemente no aparecerían en el panel y no se sabría por qué.
-      const detail = await res.text().catch(() => '(sin cuerpo)')
-      console.error('trace: Langfuse rechazó la traza', { status: res.status, body: detail })
+      // Solo el status: el cuerpo del rechazo podría repetir parte de la
+      // traza, y el contenido nunca se escribe en los logs.
+      console.error('trace: Langfuse rechazó la traza', { status: res.status })
     }
   } catch (err) {
     // Incluye el timeout de AbortSignal. Observar no puede romper lo observado.
